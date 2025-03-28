@@ -35,16 +35,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Cargar sesión y configurar listener de autenticación
   useEffect(() => {
-    // Establecer listener para cambios de autenticación
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
         console.log("Auth state changed:", event);
         setSession(newSession);
         
         if (newSession?.user) {
-          // Obtener datos del perfil
           setTimeout(async () => {
             try {
               const { data: profileData } = await supabase
@@ -53,7 +50,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 .eq('id', newSession.user.id)
                 .single();
               
-              // Combinar datos de usuario y perfil
               setUser({
                 ...newSession.user,
                 name: profileData?.full_name || newSession.user.email?.split('@')[0] || '',
@@ -71,21 +67,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     );
 
-    // Verificar sesión existente
     const checkSession = async () => {
       try {
         const { data: { session: currentSession } } = await supabase.auth.getSession();
         setSession(currentSession);
         
         if (currentSession?.user) {
-          // Obtener datos del perfil
           const { data: profileData } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', currentSession.user.id)
             .single();
           
-          // Combinar datos de usuario y perfil
           setUser({
             ...currentSession.user,
             name: profileData?.full_name || currentSession.user.email?.split('@')[0] || '',
@@ -108,7 +101,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
   }, []);
 
-  // Función para iniciar sesión con Google
   const loginWithGoogle = async () => {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
@@ -130,7 +122,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  // Función de login
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
@@ -158,7 +149,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  // Función de registro - modificada para mantener la sesión
   const register = async (name: string, email: string, password: string) => {
     setIsLoading(true);
     try {
@@ -169,7 +159,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           data: {
             full_name: name,
           },
-          // No require email confirmation
           emailRedirectTo: `${window.location.origin}/onboarding`
         }
       });
@@ -195,7 +184,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  // Función de logout
   const logout = async () => {
     try {
       const { error } = await supabase.auth.signOut();
@@ -218,7 +206,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  // Actualizar datos del usuario
   const updateUser = (data: Partial<UserWithMeta>) => {
     if (user) {
       const updatedUser = { ...user, ...data };
@@ -226,7 +213,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  // Función para crear empresa
   const createCompany = async (companyData: any) => {
     if (!session?.user) throw new Error("Usuario no autenticado");
     
@@ -250,7 +236,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         
       if (error) throw error;
       
-      // Actualizamos el usuario con el ID de la empresa
       if (data.id) {
         updateUser({ companyId: data.id });
       }
@@ -272,12 +257,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
   
-  // Función para guardar servicios
   const saveServices = async (servicesData: any[]) => {
     if (!user?.companyId) throw new Error("No hay empresa asociada al usuario");
     
     try {
-      // Convertir servicios al formato correcto para empresa_productos
       const formattedServices = servicesData.map(service => ({
         empresa_id: user.companyId,
         nombre: service.name,
@@ -306,51 +289,76 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
   
-  // Función para crear chatbot y contextos
   const createChatbot = async (chatbotData: any) => {
     if (!user?.companyId) throw new Error("No hay empresa asociada al usuario");
     
     try {
-      // Verificar existencia del bucket de avatars antes de intentar subir
       let uploadedAvatarUrl = null;
-      if (chatbotData.avatarUrl) {
-        // Si ya tenemos una URL, usarla directamente
-        uploadedAvatarUrl = chatbotData.avatarUrl;
-      } else if (chatbotData.avatarFile) {
+      
+      if (chatbotData.avatarFile) {
         try {
-          // Verificar que el bucket exista antes de intentar subir
+          console.log("Preparing to upload avatar file to storage");
+          
           const { data: bucketData, error: bucketError } = await supabase.storage
             .getBucket('avatars');
             
-          if (!bucketError) {
-            // Solo intentar subir si el bucket existe
+          if (bucketError) {
+            console.error("Error checking avatars bucket:", bucketError.message);
+            console.log("Will continue without avatar upload");
+          } else {
+            console.log("Avatars bucket exists, proceeding with file upload");
+            
             const fileExt = chatbotData.avatarFile.name.split('.').pop();
-            const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
-            const filePath = `chatbot-avatars/${fileName}`;
+            const fileName = `chatbot-${Date.now()}.${fileExt}`;
+            const filePath = `${fileName}`;
             
             const { error: uploadError, data } = await supabase.storage
               .from('avatars')
               .upload(filePath, chatbotData.avatarFile);
               
-            if (!uploadError) {
+            if (uploadError) {
+              console.error("Error uploading avatar:", uploadError);
+            } else {
+              console.log("Avatar uploaded successfully");
+              
               const { data: { publicUrl } } = supabase.storage
                 .from('avatars')
                 .getPublicUrl(filePath);
                 
               uploadedAvatarUrl = publicUrl;
-            } else {
-              console.error("Error uploading avatar:", uploadError);
+              console.log("Public URL for avatar:", uploadedAvatarUrl);
             }
-          } else {
-            console.warn("Avatars bucket not available, skipping avatar upload");
           }
         } catch (uploadError) {
           console.error("Error during avatar upload process:", uploadError);
-          // Continuar con la creación del chatbot incluso si falla la subida del avatar
+          // Continue with chatbot creation even if avatar upload fails
         }
       }
       
-      // 1. Crear el chatbot
+      let websiteChannelId = null;
+      const { data: channelData, error: channelError } = await supabase
+        .from('canales')
+        .select('id')
+        .eq('tipo', 'website')
+        .maybeSingle();
+        
+      if (channelError) {
+        console.error("Error fetching website channel:", channelError);
+      } else if (channelData) {
+        websiteChannelId = channelData.id;
+        console.log("Found website channel with ID:", websiteChannelId);
+      } else {
+        console.log("No website channel found in database");
+      }
+      
+      console.log("Creating chatbot with data:", {
+        empresa_id: user.companyId,
+        nombre: chatbotData.name,
+        personalidad: chatbotData.persona,
+        instrucciones: chatbotData.customInstructions,
+        avatar_url: uploadedAvatarUrl
+      });
+      
       const { data: chatbotResult, error: chatbotError } = await supabase
         .from('chatbots')
         .insert([{
@@ -363,93 +371,75 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .select('id')
         .single();
         
-      if (chatbotError) throw chatbotError;
-      
-      const chatbotId = chatbotResult.id;
-      
-      // 2. Verificar si la tabla canales existe y tiene el registro para website
-      const { data: canalData, error: canalQueryError } = await supabase
-        .from('canales')
-        .select('id')
-        .eq('tipo', 'website')
-        .single();
-        
-      if (canalQueryError) {
-        console.error("Error fetching website channel:", canalQueryError);
-        // Crear un registro para website en la tabla canales si no existe
-        const { data: newCanalData, error: newCanalError } = await supabase
-          .from('canales')
-          .insert([{
-            tipo: 'website',
-            nombre: 'Sitio Web',
-            descripcion: 'Canal para chatbot en sitio web'
-          }])
-          .select('id')
-          .single();
-          
-        if (newCanalError) {
-          console.error("Error creating website channel:", newCanalError);
-          throw new Error("No se pudo configurar el canal para el chatbot");
-        }
-        
-        // Usar el nuevo canal creado
-        const { error: canalError } = await supabase
-          .from('chatbot_canales')
-          .insert([{
-            chatbot_id: chatbotId,
-            canal_id: newCanalData.id,
-            configuracion: {
-              mensaje_bienvenida: chatbotData.welcomeMessage
-            },
-            is_active: true
-          }]);
-            
-        if (canalError) throw canalError;
-      } else {
-        // Usar el canal existente
-        const { error: canalError } = await supabase
-          .from('chatbot_canales')
-          .insert([{
-            chatbot_id: chatbotId,
-            canal_id: canalData.id,
-            configuracion: {
-              mensaje_bienvenida: chatbotData.welcomeMessage
-            },
-            is_active: true
-          }]);
-            
-        if (canalError) throw canalError;
+      if (chatbotError) {
+        console.error("Error creating chatbot:", chatbotError);
+        throw chatbotError;
       }
       
-      // 3. Crear contextos del chatbot si hay FAQs
-      if (chatbotData.faqs && chatbotData.faqs.length > 0) {
-        // Crear FAQs de empresa
+      console.log("Chatbot created with ID:", chatbotResult.id);
+      const chatbotId = chatbotResult.id;
+      
+      if (websiteChannelId) {
+        console.log("Setting up chatbot channel integration with channel ID:", websiteChannelId);
+        
+        const { error: canalError } = await supabase
+          .from('chatbot_canales')
+          .insert([{
+            chatbot_id: chatbotId,
+            canal_id: websiteChannelId,
+            configuracion: {
+              mensaje_bienvenida: chatbotData.welcomeMessage
+            },
+            is_active: true
+          }]);
+            
+        if (canalError) {
+          console.error("Error creating chatbot channel integration:", canalError);
+        } else {
+          console.log("Chatbot channel integration created successfully");
+        }
+      }
+      
+      const validFaqs = chatbotData.faqs.filter((faq: any) => 
+        faq.question.trim() && faq.answer.trim()
+      );
+      
+      if (validFaqs.length > 0) {
+        console.log("Creating FAQs for the company");
+        
         const { error: faqError } = await supabase
           .from('empresa_faqs')
-          .insert(chatbotData.faqs.map((faq: any, index: number) => ({
+          .insert(validFaqs.map((faq: any, index: number) => ({
             empresa_id: user.companyId,
             pregunta: faq.question,
             respuesta: faq.answer,
             orden: index
           })));
+            
+        if (faqError) {
+          console.error("Error creating FAQs:", faqError);
+        } else {
+          console.log("FAQs created successfully");
           
-        if (faqError) throw faqError;
-        
-        // Añadir contexto de preguntas frecuentes
-        const faqsText = chatbotData.faqs.map((faq: any) => 
-          `Pregunta: ${faq.question}\nRespuesta: ${faq.answer}`
-        ).join('\n\n');
-        
-        const { error: contextoError } = await supabase
-          .from('chatbot_contextos')
-          .insert([{
-            chatbot_id: chatbotId,
-            tipo: 'faqs',
-            contenido: faqsText,
-            orden: 1
-          }]);
+          const faqsText = validFaqs.map((faq: any) => 
+            `Pregunta: ${faq.question}\nRespuesta: ${faq.answer}`
+          ).join('\n\n');
           
-        if (contextoError) throw contextoError;
+          const { error: contextoError } = await supabase
+            .from('chatbot_contextos')
+            .insert([{
+              chatbot_id: chatbotId,
+              tipo: 'faqs',
+              contenido: faqsText,
+              orden: 1
+            }]);
+              
+          if (contextoError) {
+            console.error("Error creating chatbot context:", contextoError);
+          } else {
+            console.log("Chatbot context created successfully");
+          }
+        }
       }
       
       toast({
@@ -462,17 +452,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.error("Error creating chatbot:", error);
       toast({
         title: "Error",
-        description: "No se pudo configurar el chatbot",
+        description: "No se pudo configurar el chatbot: " + (error.message || "Error desconocido"),
         variant: "destructive"
       });
       throw error;
     }
   };
 
-  // Marcar onboarding como completado
   const setOnboardingCompleted = () => {
     if (user) {
-      // Actualizar perfil en Supabase
       supabase
         .from('profiles')
         .update({
@@ -486,7 +474,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             return;
           }
           
-          // Actualizar estado local
           const updatedUser = { ...user, onboardingCompleted: true };
           setUser(updatedUser);
           
@@ -516,7 +503,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-// Hook para usar el contexto de autenticación
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {

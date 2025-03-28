@@ -121,39 +121,6 @@ const OnboardingChatbot = () => {
     if (avatarUrl) URL.revokeObjectURL(avatarUrl);
     setAvatarUrl(null);
   };
-  
-  const uploadAvatar = async (): Promise<string | null> => {
-    if (!avatarFile) return null;
-    
-    setAvatarUploading(true);
-    try {
-      const fileExt = avatarFile.name.split('.').pop();
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
-      const filePath = `chatbot-avatars/${fileName}`;
-      
-      const { error: uploadError, data } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, avatarFile);
-        
-      if (uploadError) throw uploadError;
-      
-      const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(filePath);
-        
-      return publicUrl;
-    } catch (error) {
-      console.error("Error uploading avatar:", error);
-      toast({
-        title: "Error",
-        description: "No se pudo cargar el avatar",
-        variant: "destructive",
-      });
-      return null;
-    } finally {
-      setAvatarUploading(false);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
