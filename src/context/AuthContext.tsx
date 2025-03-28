@@ -442,6 +442,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
       }
       
+      await setOnboardingCompleted();
+      
       toast({
         title: "Chatbot creado",
         description: "El chatbot ha sido configurado correctamente"
@@ -459,29 +461,43 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const setOnboardingCompleted = () => {
-    if (user) {
-      supabase
+  const setOnboardingCompleted = async () => {
+    if (!user) {
+      console.error("No user found when trying to complete onboarding");
+      return Promise.reject("No user found");
+    }
+    
+    try {
+      console.log(`Marking onboarding as completed for user ${user.id}`);
+      
+      const { error } = await supabase
         .from('profiles')
         .update({
           onboarding_completed: true,
           onboarding_step: 'completed'
         })
-        .eq('id', user.id)
-        .then(({ error }) => {
-          if (error) {
-            console.error("Error updating profile:", error);
-            return;
-          }
-          
-          const updatedUser = { ...user, onboardingCompleted: true };
-          setUser(updatedUser);
-          
-          toast({
-            title: "Configuración completada",
-            description: "¡Ahora puedes comenzar a utilizar todas las funciones!"
-          });
-        });
+        .eq('id', user.id);
+        
+      if (error) {
+        console.error("Error updating profile:", error);
+        return Promise.reject(error);
+      }
+      
+      // Update local user state
+      const updatedUser = { ...user, onboardingCompleted: true };
+      setUser(updatedUser);
+      
+      console.log("Onboarding completed successfully");
+      
+      toast({
+        title: "Configuración completada",
+        description: "¡Ahora puedes comenzar a utilizar todas las funciones!"
+      });
+      
+      return Promise.resolve();
+    } catch (error) {
+      console.error("Error in setOnboardingCompleted:", error);
+      return Promise.reject(error);
     }
   };
 

@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -38,7 +39,7 @@ interface FAQ {
 
 const OnboardingChatbot = () => {
   const navigate = useNavigate();
-  const { createChatbot } = useAuth();
+  const { createChatbot, setOnboardingCompleted } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -149,18 +150,31 @@ const OnboardingChatbot = () => {
     try {
       const validFaqs = faqs.filter(faq => faq.question.trim() && faq.answer.trim());
       
+      // Create the chatbot
       await createChatbot({
         ...chatbot,
         avatarFile: avatarFile,
         faqs: validFaqs
       });
       
-      navigate("/dashboard");
+      // Mark onboarding as completed
+      await setOnboardingCompleted();
+      
+      // Short delay to ensure database updates are processed
+      setTimeout(() => {
+        toast({
+          title: "¡Configuración completada!",
+          description: "Su chatbot ha sido configurado con éxito. Redirigiendo al dashboard...",
+        });
+        
+        // Explicitly redirect to dashboard
+        navigate("/dashboard", { replace: true });
+      }, 1000);
     } catch (error) {
-      console.error(error);
+      console.error("Error al configurar el chatbot:", error);
       toast({
         title: "Error",
-        description: "No se pudo configurar el chatbot",
+        description: "No se pudo configurar el chatbot. Por favor, intente nuevamente.",
         variant: "destructive",
       });
     } finally {

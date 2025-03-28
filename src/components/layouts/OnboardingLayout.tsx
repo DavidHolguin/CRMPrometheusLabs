@@ -18,12 +18,12 @@ const OnboardingLayout = () => {
     return 0;
   };
 
-  // Redirect logic
+  // Logging for debugging
   useEffect(() => {
-    // Este efecto es para manejar redirecciones basadas en el estado del onboarding
     if (user && !isLoading) {
       console.log("OnboardingLayout - User:", user);
       console.log("OnboardingLayout - Current step:", getCurrentStep());
+      console.log("OnboardingLayout - Onboarding completed:", user.onboardingCompleted);
     }
   }, [user, isLoading, location]);
 
