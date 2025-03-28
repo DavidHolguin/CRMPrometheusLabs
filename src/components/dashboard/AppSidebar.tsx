@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { 
   BarChart2,
@@ -11,7 +11,8 @@ import {
   User, 
   Users,
   Mail,
-  LogOut
+  LogOut,
+  Building
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { 
@@ -26,10 +27,18 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { supabase } from "@/integrations/supabase/client";
 
 interface AppSidebarProps {
   isMobileOpen: boolean;
   setIsMobileOpen: (open: boolean) => void;
+}
+
+interface CompanyInfo {
+  id: string;
+  nombre: string;
+  logo_url?: string | null;
+  plan?: string;
 }
 
 export function AppSidebar({ isMobileOpen, setIsMobileOpen }: AppSidebarProps) {
@@ -37,6 +46,40 @@ export function AppSidebar({ isMobileOpen, setIsMobileOpen }: AppSidebarProps) {
   const location = useLocation();
   const isMobile = useIsMobile();
   const { isCollapsed, setCollapsed } = useSidebar();
+  const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
+
+  // Fetch company information
+  useEffect(() => {
+    const fetchCompanyInfo = async () => {
+      if (user?.companyId) {
+        try {
+          const { data, error } = await supabase
+            .from('empresas')
+            .select('id, nombre, logo_url')
+            .eq('id', user.companyId)
+            .single();
+          
+          if (error) {
+            console.error("Error fetching company:", error);
+            return;
+          }
+          
+          if (data) {
+            setCompanyInfo({
+              id: data.id,
+              nombre: data.nombre,
+              logo_url: data.logo_url,
+              plan: "Plan Básico" // This could be fetched from a subscription table in the future
+            });
+          }
+        } catch (error) {
+          console.error("Error in company fetch:", error);
+        }
+      }
+    };
+
+    fetchCompanyInfo();
+  }, [user?.companyId]);
 
   // Cambiar ancho del sidebar
   const toggleCollapse = () => {
@@ -179,13 +222,24 @@ export function AppSidebar({ isMobileOpen, setIsMobileOpen }: AppSidebarProps) {
           {/* Información de la empresa */}
           <div className="mb-3 flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary/10 text-primary">
-              {user?.companyId ? "B" : "E"}
+              {companyInfo?.logo_url ? (
+                <Avatar className="h-9 w-9">
+                  <AvatarImage src={companyInfo.logo_url} alt={companyInfo.nombre} />
+                  <AvatarFallback>
+                    <Building size={16} />
+                  </AvatarFallback>
+                </Avatar>
+              ) : (
+                <Building size={16} />
+              )}
             </div>
             {!isCollapsed && (
               <div className="flex flex-col overflow-hidden">
-                <span className="truncate text-sm font-medium">Mi Empresa</span>
+                <span className="truncate text-sm font-medium">
+                  {companyInfo?.nombre || "Mi Empresa"}
+                </span>
                 <span className="truncate text-xs text-muted-foreground">
-                  Plan Básico
+                  {companyInfo?.plan || "Plan Básico"}
                 </span>
               </div>
             )}
