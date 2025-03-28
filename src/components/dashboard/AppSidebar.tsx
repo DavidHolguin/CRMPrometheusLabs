@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
-import { useMediaQuery } from "@/hooks/use-mobile";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface AppSidebarProps {
   isMobileOpen: boolean;
@@ -34,7 +34,7 @@ interface AppSidebarProps {
 export function AppSidebar({ isMobileOpen, setIsMobileOpen }: AppSidebarProps) {
   const { user, logout } = useAuth();
   const location = useLocation();
-  const isMobile = useMediaQuery("(max-width: 768px)");
+  const isMobile = useIsMobile();
   const { isCollapsed, setCollapsed } = useSidebar();
 
   // Cambiar ancho del sidebar
