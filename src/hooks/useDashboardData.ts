@@ -49,31 +49,38 @@ export const useDashboardStats = () => {
         console.error("Error obteniendo leads:", leadsError);
       }
       
-      // Obtener el total de conversaciones
+      // Obtener los IDs de leads de la empresa
+      const { data: leadsIds } = await supabase
+        .from("leads")
+        .select("id")
+        .eq("empresa_id", user.companyId);
+      
+      const leadIdArray = leadsIds ? leadsIds.map(lead => lead.id) : [];
+      
+      // Obtener el total de conversaciones para estos leads
       const { count: conversaciones, error: convsError } = await supabase
         .from("conversaciones")
         .select("id", { count: "exact", head: true })
         .eq("chatbot_id", "chatbot_id") // Aquí se necesitaría una relación entre chatbots y empresa_id
-        .in("lead_id", supabase
-          .from("leads")
-          .select("id")
-          .eq("empresa_id", user.companyId));
+        .in("lead_id", leadIdArray.length > 0 ? leadIdArray : ['no-leads']);
           
       if (convsError) {
         console.error("Error obteniendo conversaciones:", convsError);
       }
       
+      // Obtener IDs de conversaciones
+      const { data: conversacionesIds } = await supabase
+        .from("conversaciones")
+        .select("id")
+        .in("lead_id", leadIdArray.length > 0 ? leadIdArray : ['no-leads']);
+      
+      const conversacionIdArray = conversacionesIds ? conversacionesIds.map(conv => conv.id) : [];
+      
       // Obtener el total de mensajes (para interacciones de chatbot)
       const { count: mensajes, error: msgsError } = await supabase
         .from("mensajes")
         .select("id", { count: "exact", head: true })
-        .in("conversacion_id", supabase
-          .from("conversaciones")
-          .select("id")
-          .in("lead_id", supabase
-            .from("leads")
-            .select("id")
-            .eq("empresa_id", user.companyId)));
+        .in("conversacion_id", conversacionIdArray.length > 0 ? conversacionIdArray : ['no-conversations']);
             
       if (msgsError) {
         console.error("Error obteniendo mensajes:", msgsError);
@@ -136,14 +143,21 @@ export const useLeadsActivityData = () => {
           console.error("Error obteniendo leads por día:", leadsError);
         }
         
+        // Obtener los IDs de leads de la empresa para este día
+        const { data: dayLeadsIds } = await supabase
+          .from("leads")
+          .select("id")
+          .eq("empresa_id", user.companyId)
+          .gte("created_at", startOfDay.toISOString())
+          .lte("created_at", endOfDay.toISOString());
+        
+        const dayLeadIdArray = dayLeadsIds ? dayLeadsIds.map(lead => lead.id) : [];
+        
         // Contar conversaciones creadas en este día
         const { count: convsCount, error: convsError } = await supabase
           .from("conversaciones")
           .select("id", { count: "exact", head: true })
-          .in("lead_id", supabase
-            .from("leads")
-            .select("id")
-            .eq("empresa_id", user.companyId))
+          .in("lead_id", dayLeadIdArray.length > 0 ? dayLeadIdArray : ['no-leads'])
           .gte("created_at", startOfDay.toISOString())
           .lte("created_at", endOfDay.toISOString());
           
@@ -176,13 +190,12 @@ export const useLeadsByChannelData = () => {
         throw new Error("No hay ID de empresa");
       }
       
-      // Obtener leads agrupados por canal
+      // Obtener datos agrupados por canal_origen manualmente
       const { data, error } = await supabase
         .from("leads")
-        .select("canal_origen, count")
+        .select("canal_origen")
         .eq("empresa_id", user.companyId)
-        .not("canal_origen", "is", null)
-        .group("canal_origen");
+        .not("canal_origen", "is", null);
         
       if (error) {
         console.error("Error obteniendo leads por canal:", error);
@@ -194,13 +207,21 @@ export const useLeadsByChannelData = () => {
         return [];
       }
       
+      // Agrupar datos manualmente
+      const channelCounts: Record<string, number> = {};
+      
+      data.forEach(item => {
+        const channel = item.canal_origen || "Desconocido";
+        channelCounts[channel] = (channelCounts[channel] || 0) + 1;
+      });
+      
       // Calcular el total de leads
-      const total = data.reduce((acc, curr) => acc + (curr.count || 0), 0);
+      const total = Object.values(channelCounts).reduce((acc, curr) => acc + curr, 0);
       
       // Transformar los datos para el gráfico de barras
-      return data.map(item => ({
-        name: item.canal_origen || "Desconocido",
-        value: Math.round(((item.count || 0) / total) * 100)
+      return Object.entries(channelCounts).map(([channel, count]) => ({
+        name: channel,
+        value: Math.round((count / total) * 100)
       }));
     },
     enabled: !!user?.companyId,
