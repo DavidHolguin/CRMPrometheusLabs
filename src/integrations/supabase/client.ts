@@ -14,5 +14,46 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
+  },
+  realtime: {
+    params: {
+      eventsPerSecond: 10
+    }
   }
 });
+
+// Crear buckets de storage si no existen
+const createStorageBuckets = async () => {
+  try {
+    // Bucket para logos de empresas
+    const { data: logosData, error: logosError } = await supabase
+      .storage
+      .getBucket('logos');
+      
+    if (logosError && logosError.message.includes('The resource was not found')) {
+      await supabase.storage.createBucket('logos', {
+        public: true,
+        fileSizeLimit: 5 * 1024 * 1024, // 5MB
+        allowedMimeTypes: ['image/png', 'image/jpeg', 'image/gif', 'image/svg+xml']
+      });
+    }
+    
+    // Bucket para avatares de chatbots
+    const { data: avatarsData, error: avatarsError } = await supabase
+      .storage
+      .getBucket('avatars');
+      
+    if (avatarsError && avatarsError.message.includes('The resource was not found')) {
+      await supabase.storage.createBucket('avatars', {
+        public: true,
+        fileSizeLimit: 2 * 1024 * 1024, // 2MB
+        allowedMimeTypes: ['image/png', 'image/jpeg', 'image/gif']
+      });
+    }
+  } catch (error) {
+    console.error('Error creating storage buckets:', error);
+  }
+};
+
+// Intentar crear buckets cuando se inicializa el cliente
+createStorageBuckets();

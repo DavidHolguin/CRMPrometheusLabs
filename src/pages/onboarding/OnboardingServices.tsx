@@ -7,6 +7,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
+import { 
+  Card, 
+  CardContent, 
+  CardDescription, 
+  CardHeader, 
+  CardTitle 
+} from "@/components/ui/card";
 
 interface Service {
   id: string;
@@ -17,6 +25,7 @@ interface Service {
 
 const OnboardingServices = () => {
   const navigate = useNavigate();
+  const { saveServices } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [services, setServices] = useState<Service[]>([
     {
@@ -120,8 +129,8 @@ const OnboardingServices = () => {
     setIsLoading(true);
     
     try {
-      // Simulamos guardado
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Guardar servicios/productos en Supabase
+      await saveServices(services);
       
       // Navegamos al siguiente paso
       navigate("/onboarding/chatbot");
@@ -145,6 +154,30 @@ const OnboardingServices = () => {
           Ingrese los productos y servicios que ofrece su empresa
         </p>
       </div>
+      
+      <Card className="mb-6">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-lg">Ejemplos de servicios</CardTitle>
+          <CardDescription>
+            Estos son ejemplos de cómo puede organizar sus servicios:
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4 text-sm">
+            <div>
+              <p><strong>Nombre:</strong> Consultoría Marketing Digital</p>
+              <p><strong>Descripción:</strong> Estrategias personalizadas para mejorar su presencia online.</p>
+              <p><strong>Características:</strong></p>
+              <ul className="list-disc list-inside ml-2 text-muted-foreground">
+                <li>Análisis de competencia</li>
+                <li>Estrategia de contenidos</li>
+                <li>Optimización SEO</li>
+                <li>Análisis de métricas</li>
+              </ul>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {services.map((service, serviceIndex) => (

@@ -2,9 +2,10 @@
 import { Outlet, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { StepIndicator } from "../onboarding/StepIndicator";
+import { useEffect } from "react";
 
 const OnboardingLayout = () => {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, session } = useAuth();
   const location = useLocation();
   
   // Determine current step based on URL path
@@ -17,6 +18,15 @@ const OnboardingLayout = () => {
     return 0;
   };
 
+  // Redirect logic
+  useEffect(() => {
+    // Este efecto es para manejar redirecciones basadas en el estado del onboarding
+    if (user && !isLoading) {
+      console.log("OnboardingLayout - User:", user);
+      console.log("OnboardingLayout - Current step:", getCurrentStep());
+    }
+  }, [user, isLoading, location]);
+
   // Show loading state while checking authentication
   if (isLoading) {
     return (
@@ -27,12 +37,14 @@ const OnboardingLayout = () => {
   }
 
   // Redirect if not authenticated
-  if (!user) {
+  if (!session) {
+    console.log("OnboardingLayout - No session, redirecting to login");
     return <Navigate to="/login" replace />;
   }
 
   // Redirect if onboarding already completed
-  if (user.onboardingCompleted) {
+  if (user?.onboardingCompleted) {
+    console.log("OnboardingLayout - Onboarding completed, redirecting to dashboard");
     return <Navigate to="/dashboard" replace />;
   }
 

@@ -21,6 +21,9 @@ type AuthContextType = {
   logout: () => Promise<void>;
   updateUser: (data: Partial<UserWithMeta>) => void;
   setOnboardingCompleted: () => void;
+  createCompany: (companyData: any) => Promise<string>;
+  createChatbot: (chatbotData: any) => Promise<string>;
+  saveServices: (servicesData: any[]) => Promise<void>;
 };
 
 // Creamos el contexto
@@ -133,7 +136,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  // Función de registro
+  // Función de registro - modificada para mantener la sesión
   const register = async (name: string, email: string, password: string) => {
     setIsLoading(true);
     try {
@@ -153,6 +156,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         title: "Registro exitoso",
         description: "Bienvenido a Prometheus CRM Nexus"
       });
+      
+      // No hace falta iniciar sesión porque signUp ya establece la sesión
     } catch (error: any) {
       console.error(error);
       toast({
@@ -197,6 +202,172 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  // Función para crear empresa
+  const createCompany = async (companyData: any) => {
+    if (!session?.user) throw new Error("Usuario no autenticado");
+    
+    try {
+      const { data, error } = await supabase
+        .from('empresas')
+        .insert([{
+          nombre: companyData.name,
+          descripcion: companyData.description,
+          email: companyData.email,
+          telefono: companyData.phone,
+          sitio_web: companyData.website,
+          direccion: companyData.address,
+          logo_url: companyData.logoUrl,
+          ciudad: companyData.city,
+          pais: companyData.country,
+          codigo_postal: companyData.postalCode
+        }])
+        .select('id')
+        .single();
+        
+      if (error) throw error;
+      
+      // Actualizamos el usuario con el ID de la empresa
+      if (data.id) {
+        updateUser({ companyId: data.id });
+      }
+      
+      toast({
+        title: "Empresa creada",
+        description: "Información de empresa guardada correctamente"
+      });
+      
+      return data.id;
+    } catch (error: any) {
+      console.error("Error creating company:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo guardar la información de la empresa",
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
+  
+  // Función para guardar servicios
+  const saveServices = async (servicesData: any[]) => {
+    if (!user?.companyId) throw new Error("No hay empresa asociada al usuario");
+    
+    try {
+      // Convertir servicios al formato correcto para empresa_productos
+      const formattedServices = servicesData.map(service => ({
+        empresa_id: user.companyId,
+        nombre: service.name,
+        descripcion: service.description,
+        caracteristicas: service.features
+      }));
+      
+      const { error } = await supabase
+        .from('empresa_productos')
+        .insert(formattedServices);
+        
+      if (error) throw error;
+      
+      toast({
+        title: "Servicios guardados",
+        description: "Los servicios se han guardado correctamente"
+      });
+    } catch (error: any) {
+      console.error("Error saving services:", error);
+      toast({
+        title: "Error",
+        description: "No se pudieron guardar los servicios",
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
+  
+  // Función para crear chatbot y contextos
+  const createChatbot = async (chatbotData: any) => {
+    if (!user?.companyId) throw new Error("No hay empresa asociada al usuario");
+    
+    try {
+      // 1. Crear el chatbot
+      const { data: chatbotResult, error: chatbotError } = await supabase
+        .from('chatbots')
+        .insert([{
+          empresa_id: user.companyId,
+          nombre: chatbotData.name,
+          personalidad: chatbotData.persona,
+          instrucciones: chatbotData.customInstructions,
+          avatar_url: chatbotData.avatarUrl
+        }])
+        .select('id')
+        .single();
+        
+      if (chatbotError) throw chatbotError;
+      
+      const chatbotId = chatbotResult.id;
+      
+      // 2. Crear canal del chatbot (siempre website por defecto)
+      const { error: canalError } = await supabase
+        .from('chatbot_canales')
+        .insert([{
+          chatbot_id: chatbotId,
+          canal_id: '00000000-0000-0000-0000-000000000000', // ID temporal del canal website
+          configuracion: {
+            mensaje_bienvenida: chatbotData.welcomeMessage
+          },
+          is_active: true
+        }]);
+        
+      if (canalError) throw canalError;
+      
+      // 3. Crear contextos del chatbot si hay FAQs
+      if (chatbotData.faqs && chatbotData.faqs.length > 0) {
+        // Crear FAQs de empresa
+        const { error: faqError } = await supabase
+          .from('empresa_faqs')
+          .insert(chatbotData.faqs.map((faq: any, index: number) => ({
+            empresa_id: user.companyId,
+            pregunta: faq.question,
+            respuesta: faq.answer,
+            orden: index
+          })));
+          
+        if (faqError) throw faqError;
+        
+        // Añadir contexto de preguntas frecuentes
+        const faqsText = chatbotData.faqs.map((faq: any) => 
+          `Pregunta: ${faq.question}\nRespuesta: ${faq.answer}`
+        ).join('\n\n');
+        
+        const { error: contextoError } = await supabase
+          .from('chatbot_contextos')
+          .insert([{
+            chatbot_id: chatbotId,
+            tipo: 'faqs',
+            contenido: faqsText,
+            orden: 1
+          }]);
+          
+        if (contextoError) throw contextoError;
+      }
+      
+      // Marcar onboarding completado se hace automáticamente por el trigger
+      
+      toast({
+        title: "Chatbot creado",
+        description: "El chatbot ha sido configurado correctamente"
+      });
+      
+      return chatbotId;
+    } catch (error: any) {
+      console.error("Error creating chatbot:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo configurar el chatbot",
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
+
   // Marcar onboarding como completado
   const setOnboardingCompleted = () => {
     if (user) {
@@ -234,7 +405,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     register,
     logout,
     updateUser,
-    setOnboardingCompleted
+    setOnboardingCompleted,
+    createCompany,
+    saveServices,
+    createChatbot
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
