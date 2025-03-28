@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -66,7 +65,6 @@ const OnboardingChatbot = () => {
     setChatbot(prev => ({ ...prev, [field]: value }));
   };
   
-  // Manejo de FAQs
   const addFaq = () => {
     setFaqs([...faqs, { id: crypto.randomUUID(), question: "", answer: "" }]);
   };
@@ -88,14 +86,12 @@ const OnboardingChatbot = () => {
     ));
   };
   
-  // Manejo de avatar
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     
     const file = files[0];
     
-    // Validar tamaño (máx 2MB)
     if (file.size > 2 * 1024 * 1024) {
       toast({
         title: "Error",
@@ -105,7 +101,6 @@ const OnboardingChatbot = () => {
       return;
     }
     
-    // Validar tipo
     if (!file.type.startsWith('image/')) {
       toast({
         title: "Error",
@@ -117,7 +112,6 @@ const OnboardingChatbot = () => {
     
     setAvatarFile(file);
     
-    // Mostrar vista previa
     const objectUrl = URL.createObjectURL(file);
     setAvatarUrl(objectUrl);
   };
@@ -133,19 +127,16 @@ const OnboardingChatbot = () => {
     
     setAvatarUploading(true);
     try {
-      // Crear un nombre único para el archivo
       const fileExt = avatarFile.name.split('.').pop();
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
       const filePath = `chatbot-avatars/${fileName}`;
       
-      // Subir a Supabase Storage
       const { error: uploadError, data } = await supabase.storage
         .from('avatars')
         .upload(filePath, avatarFile);
         
       if (uploadError) throw uploadError;
       
-      // Obtener URL pública
       const { data: { publicUrl } } = supabase.storage
         .from('avatars')
         .getPublicUrl(filePath);
@@ -176,7 +167,6 @@ const OnboardingChatbot = () => {
       return;
     }
     
-    // Validar preguntas frecuentes
     const invalidFaqs = faqs.filter(faq => !faq.question.trim() || !faq.answer.trim());
     if (faqs.some(faq => faq.question.trim() || faq.answer.trim()) && invalidFaqs.length > 0) {
       toast({
@@ -190,23 +180,14 @@ const OnboardingChatbot = () => {
     setIsLoading(true);
     
     try {
-      // Subir avatar si existe
-      let uploadedAvatarUrl = null;
-      if (avatarFile) {
-        uploadedAvatarUrl = await uploadAvatar();
-      }
-      
-      // Filtrar FAQs vacías
       const validFaqs = faqs.filter(faq => faq.question.trim() && faq.answer.trim());
       
-      // Guardar chatbot en Supabase
       await createChatbot({
         ...chatbot,
-        avatarUrl: uploadedAvatarUrl,
+        avatarFile: avatarFile,
         faqs: validFaqs
       });
       
-      // Navegamos al dashboard
       navigate("/dashboard");
     } catch (error) {
       console.error(error);
@@ -467,7 +448,7 @@ const OnboardingChatbot = () => {
             type="submit" 
             disabled={isLoading || avatarUploading}
           >
-            {isLoading || avatarUploading ? "Finalizando..." : "Finalizar configuración"}
+            {isLoading ? "Finalizando..." : "Finalizar configuración"}
           </Button>
         </div>
       </form>

@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -312,6 +311,45 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (!user?.companyId) throw new Error("No hay empresa asociada al usuario");
     
     try {
+      // Verificar existencia del bucket de avatars antes de intentar subir
+      let uploadedAvatarUrl = null;
+      if (chatbotData.avatarUrl) {
+        // Si ya tenemos una URL, usarla directamente
+        uploadedAvatarUrl = chatbotData.avatarUrl;
+      } else if (chatbotData.avatarFile) {
+        try {
+          // Verificar que el bucket exista antes de intentar subir
+          const { data: bucketData, error: bucketError } = await supabase.storage
+            .getBucket('avatars');
+            
+          if (!bucketError) {
+            // Solo intentar subir si el bucket existe
+            const fileExt = chatbotData.avatarFile.name.split('.').pop();
+            const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+            const filePath = `chatbot-avatars/${fileName}`;
+            
+            const { error: uploadError, data } = await supabase.storage
+              .from('avatars')
+              .upload(filePath, chatbotData.avatarFile);
+              
+            if (!uploadError) {
+              const { data: { publicUrl } } = supabase.storage
+                .from('avatars')
+                .getPublicUrl(filePath);
+                
+              uploadedAvatarUrl = publicUrl;
+            } else {
+              console.error("Error uploading avatar:", uploadError);
+            }
+          } else {
+            console.warn("Avatars bucket not available, skipping avatar upload");
+          }
+        } catch (uploadError) {
+          console.error("Error during avatar upload process:", uploadError);
+          // Continuar con la creación del chatbot incluso si falla la subida del avatar
+        }
+      }
+      
       // 1. Crear el chatbot
       const { data: chatbotResult, error: chatbotError } = await supabase
         .from('chatbots')
@@ -320,7 +358,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           nombre: chatbotData.name,
           personalidad: chatbotData.persona,
           instrucciones: chatbotData.customInstructions,
-          avatar_url: chatbotData.avatarUrl
+          avatar_url: uploadedAvatarUrl
         }])
         .select('id')
         .single();
@@ -329,19 +367,59 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       const chatbotId = chatbotResult.id;
       
-      // 2. Crear canal del chatbot (siempre website por defecto)
-      const { error: canalError } = await supabase
-        .from('chatbot_canales')
-        .insert([{
-          chatbot_id: chatbotId,
-          canal_id: '00000000-0000-0000-0000-000000000000', // ID temporal del canal website
-          configuracion: {
-            mensaje_bienvenida: chatbotData.welcomeMessage
-          },
-          is_active: true
-        }]);
+      // 2. Verificar si la tabla canales existe y tiene el registro para website
+      const { data: canalData, error: canalQueryError } = await supabase
+        .from('canales')
+        .select('id')
+        .eq('tipo', 'website')
+        .single();
         
-      if (canalError) throw canalError;
+      if (canalQueryError) {
+        console.error("Error fetching website channel:", canalQueryError);
+        // Crear un registro para website en la tabla canales si no existe
+        const { data: newCanalData, error: newCanalError } = await supabase
+          .from('canales')
+          .insert([{
+            tipo: 'website',
+            nombre: 'Sitio Web',
+            descripcion: 'Canal para chatbot en sitio web'
+          }])
+          .select('id')
+          .single();
+          
+        if (newCanalError) {
+          console.error("Error creating website channel:", newCanalError);
+          throw new Error("No se pudo configurar el canal para el chatbot");
+        }
+        
+        // Usar el nuevo canal creado
+        const { error: canalError } = await supabase
+          .from('chatbot_canales')
+          .insert([{
+            chatbot_id: chatbotId,
+            canal_id: newCanalData.id,
+            configuracion: {
+              mensaje_bienvenida: chatbotData.welcomeMessage
+            },
+            is_active: true
+          }]);
+            
+        if (canalError) throw canalError;
+      } else {
+        // Usar el canal existente
+        const { error: canalError } = await supabase
+          .from('chatbot_canales')
+          .insert([{
+            chatbot_id: chatbotId,
+            canal_id: canalData.id,
+            configuracion: {
+              mensaje_bienvenida: chatbotData.welcomeMessage
+            },
+            is_active: true
+          }]);
+            
+        if (canalError) throw canalError;
+      }
       
       // 3. Crear contextos del chatbot si hay FAQs
       if (chatbotData.faqs && chatbotData.faqs.length > 0) {
@@ -373,8 +451,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           
         if (contextoError) throw contextoError;
       }
-      
-      // Marcar onboarding completado se hace automáticamente por el trigger
       
       toast({
         title: "Chatbot creado",

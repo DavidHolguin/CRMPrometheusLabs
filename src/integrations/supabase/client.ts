@@ -53,3 +53,4 @@ const verifyStorageBuckets = async () => {
 
 // Verify buckets when the client is initialized
 verifyStorageBuckets();
+
