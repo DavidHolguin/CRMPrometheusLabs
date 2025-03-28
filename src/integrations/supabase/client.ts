@@ -22,38 +22,34 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   }
 });
 
-// Crear buckets de storage si no existen
-const createStorageBuckets = async () => {
+// Verify storage buckets exist rather than trying to create them automatically
+const verifyStorageBuckets = async () => {
   try {
-    // Bucket para logos de empresas
+    // Check logos bucket
     const { data: logosData, error: logosError } = await supabase
       .storage
       .getBucket('logos');
       
-    if (logosError && logosError.message.includes('The resource was not found')) {
-      await supabase.storage.createBucket('logos', {
-        public: true,
-        fileSizeLimit: 5 * 1024 * 1024, // 5MB
-        allowedMimeTypes: ['image/png', 'image/jpeg', 'image/gif', 'image/svg+xml']
-      });
+    if (logosError) {
+      console.error('Error verifying logos bucket:', logosError.message);
+    } else {
+      console.log('Logos bucket verified');
     }
     
-    // Bucket para avatares de chatbots
+    // Check avatars bucket
     const { data: avatarsData, error: avatarsError } = await supabase
       .storage
       .getBucket('avatars');
       
-    if (avatarsError && avatarsError.message.includes('The resource was not found')) {
-      await supabase.storage.createBucket('avatars', {
-        public: true,
-        fileSizeLimit: 2 * 1024 * 1024, // 2MB
-        allowedMimeTypes: ['image/png', 'image/jpeg', 'image/gif']
-      });
+    if (avatarsError) {
+      console.error('Error verifying avatars bucket:', avatarsError.message);
+    } else {
+      console.log('Avatars bucket verified');
     }
   } catch (error) {
-    console.error('Error creating storage buckets:', error);
+    console.error('Error checking storage buckets:', error);
   }
 };
 
-// Intentar crear buckets cuando se inicializa el cliente
-createStorageBuckets();
+// Verify buckets when the client is initialized
+verifyStorageBuckets();
