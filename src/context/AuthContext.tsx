@@ -17,6 +17,7 @@ type AuthContextType = {
   session: Session | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (data: Partial<UserWithMeta>) => void;
@@ -39,7 +40,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     // Establecer listener para cambios de autenticación
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, newSession) => {
+      async (event, newSession) => {
         console.log("Auth state changed:", event);
         setSession(newSession);
         
@@ -108,6 +109,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
   }, []);
 
+  // Función para iniciar sesión con Google
+  const loginWithGoogle = async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin
+        }
+      });
+      
+      if (error) throw error;
+    } catch (error: any) {
+      console.error("Error logging in with Google:", error);
+      toast({
+        title: "Error",
+        description: error.message || "No se pudo iniciar sesión con Google",
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
+
   // Función de login
   const login = async (email: string, password: string) => {
     setIsLoading(true);
@@ -146,7 +169,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         options: {
           data: {
             full_name: name,
-          }
+          },
+          // No require email confirmation
+          emailRedirectTo: `${window.location.origin}/onboarding`
         }
       });
 
@@ -402,6 +427,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     session,
     isLoading,
     login,
+    loginWithGoogle,
     register,
     logout,
     updateUser,

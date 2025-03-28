@@ -3,7 +3,7 @@ import { Outlet, Navigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 
 const AuthLayout = () => {
-  const { user, isLoading } = useAuth();
+  const { user, session, isLoading } = useAuth();
 
   // Show loading state while checking authentication
   if (isLoading) {
@@ -15,8 +15,8 @@ const AuthLayout = () => {
   }
 
   // Redirect if already authenticated
-  if (user) {
-    if (!user.onboardingCompleted) {
+  if (session) {
+    if (user && !user.onboardingCompleted) {
       return <Navigate to="/onboarding" replace />;
     } else {
       return <Navigate to="/dashboard" replace />;
