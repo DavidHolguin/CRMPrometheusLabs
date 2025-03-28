@@ -440,6 +440,7 @@ export type Database = {
           codigo_postal: string | null
           configuracion: Json | null
           created_at: string | null
+          created_by: string | null
           descripcion: string | null
           direccion: string | null
           email: string | null
@@ -458,6 +459,7 @@ export type Database = {
           codigo_postal?: string | null
           configuracion?: Json | null
           created_at?: string | null
+          created_by?: string | null
           descripcion?: string | null
           direccion?: string | null
           email?: string | null
@@ -476,6 +478,7 @@ export type Database = {
           codigo_postal?: string | null
           configuracion?: Json | null
           created_at?: string | null
+          created_by?: string | null
           descripcion?: string | null
           direccion?: string | null
           email?: string | null
@@ -489,7 +492,15 @@ export type Database = {
           telefono?: string | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "empresas_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       eventos: {
         Row: {

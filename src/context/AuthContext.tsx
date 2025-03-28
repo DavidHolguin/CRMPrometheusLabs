@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -229,7 +230,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           logo_url: companyData.logoUrl,
           ciudad: companyData.city,
           pais: companyData.country,
-          codigo_postal: companyData.postalCode
+          codigo_postal: companyData.postalCode,
+          created_by: session.user.id // Set the created_by field to the current user's ID
         }])
         .select('id')
         .single();
