@@ -1,30 +1,26 @@
 
-import { Outlet } from "react-router-dom";
-import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { Outlet, Navigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 
 const AuthLayout = () => {
-  const navigate = useNavigate();
   const { user, isLoading } = useAuth();
 
-  // Redireccionar si ya hay un usuario autenticado
-  useEffect(() => {
-    if (!isLoading && user) {
-      if (!user.onboardingCompleted) {
-        navigate("/onboarding");
-      } else {
-        navigate("/dashboard");
-      }
-    }
-  }, [user, isLoading, navigate]);
-
+  // Show loading state while checking authentication
   if (isLoading) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <div className="animate-pulse text-primary">Cargando...</div>
       </div>
     );
+  }
+
+  // Redirect if already authenticated
+  if (user) {
+    if (!user.onboardingCompleted) {
+      return <Navigate to="/onboarding" replace />;
+    } else {
+      return <Navigate to="/dashboard" replace />;
+    }
   }
 
   return (
