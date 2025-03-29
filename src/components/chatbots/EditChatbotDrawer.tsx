@@ -77,23 +77,26 @@ export function EditChatbotDrawer({ chatbot, open, onOpenChange, onSuccess }: Ed
 
   // Update form values when chatbot changes
   useEffect(() => {
-    form.reset({
-      nombre: chatbot.nombre,
-      descripcion: chatbot.descripcion || "",
-      is_active: chatbot.is_active,
-      personalidad: chatbot.personalidad || "",
-      tono: chatbot.tono || "",
-      instrucciones: chatbot.instrucciones || "",
-      avatar_url: chatbot.avatar_url || "",
-      general_context: chatbot.contexto?.generalContext || "",
-      welcome_message: chatbot.contexto?.welcomeMessage || "",
-      main_purpose: chatbot.contexto?.mainPurpose || "",
-      communication_tone: chatbot.contexto?.communicationTone || "",
-      key_points: chatbot.contexto?.keyPoints || [],
-      qa_examples: chatbot.contexto?.qaExamples || []
-    });
-    setPreviewAvatar(chatbot.avatar_url);
-  }, [chatbot, form]);
+    if (open) {
+      console.log("Resetting form with chatbot data:", chatbot);
+      form.reset({
+        nombre: chatbot.nombre,
+        descripcion: chatbot.descripcion || "",
+        is_active: chatbot.is_active,
+        personalidad: chatbot.personalidad || "",
+        tono: chatbot.tono || "",
+        instrucciones: chatbot.instrucciones || "",
+        avatar_url: chatbot.avatar_url || "",
+        general_context: chatbot.contexto?.generalContext || "",
+        welcome_message: chatbot.contexto?.welcomeMessage || "",
+        main_purpose: chatbot.contexto?.mainPurpose || "",
+        communication_tone: chatbot.contexto?.communicationTone || "",
+        key_points: chatbot.contexto?.keyPoints || [],
+        qa_examples: chatbot.contexto?.qaExamples || []
+      });
+      setPreviewAvatar(chatbot.avatar_url);
+    }
+  }, [chatbot, form, open]);
 
   const addKeyPoint = () => {
     if (newKeyPoint.trim()) {
@@ -288,19 +291,19 @@ export function EditChatbotDrawer({ chatbot, open, onOpenChange, onSuccess }: Ed
     ];
 
     return (
-      <div className="flex justify-center mb-6 overflow-x-auto">
-        <div className="inline-flex items-center flex-nowrap">
+      <div className="flex justify-center mb-6 overflow-x-auto py-2">
+        <div className="inline-flex items-center space-x-2 flex-nowrap">
           {steps.map((step, index) => (
             <div key={step.id} className="flex items-center">
               <div 
-                className={`flex items-center justify-center w-8 h-8 rounded-full border ${
+                className={`flex items-center justify-center w-10 h-10 rounded-full border ${
                   currentStep === step.id 
                     ? "bg-primary text-primary-foreground border-primary" 
                     : "bg-muted text-muted-foreground border-muted-foreground"
                 } cursor-pointer`}
                 onClick={() => setCurrentStep(step.id as Step)}
               >
-                {step.icon}
+                <span className="font-medium text-sm">{index + 1}</span>
               </div>
               <span className={`mx-1 text-xs ${currentStep === step.id ? "text-primary font-medium" : "text-muted-foreground"}`}>
                 {step.label}
@@ -691,7 +694,7 @@ export function EditChatbotDrawer({ chatbot, open, onOpenChange, onSuccess }: Ed
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="max-h-[90vh]">
+      <DrawerContent className="max-h-[90vh] h-[90vh]">
         <DrawerHeader>
           <DrawerTitle className="text-xl font-bold text-center">Editar Chatbot</DrawerTitle>
           <DrawerDescription className="text-center">
@@ -703,13 +706,13 @@ export function EditChatbotDrawer({ chatbot, open, onOpenChange, onSuccess }: Ed
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col h-full">
-            <ScrollArea className="px-6 flex-1" style={{ maxHeight: "calc(90vh - 200px)" }}>
+            <ScrollArea className="px-6 flex-1 overflow-y-auto" style={{ maxHeight: "calc(90vh - 220px)" }}>
               <div className="space-y-6 py-2 pr-4">
                 {renderStepContent()}
               </div>
             </ScrollArea>
 
-            <DrawerFooter className="border-t pt-4 mt-2">
+            <DrawerFooter className="border-t pt-4 mt-auto">
               <div className="flex justify-between w-full">
                 <Button 
                   type="button" 
