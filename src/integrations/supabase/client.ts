@@ -14,6 +14,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
+    detectSessionInUrl: true
   },
   realtime: {
     params: {
@@ -21,6 +22,3 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     }
   }
 });
-
-// Deshabilitado: verificación de buckets de almacenamiento para evitar errores
-// Estos se crearán cuando sea necesario en vez de verificarse al inicio

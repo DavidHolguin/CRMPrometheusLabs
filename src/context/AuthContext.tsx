@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -187,11 +186,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const logout = async () => {
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      
+      // First clear session state locally
       setUser(null);
       setSession(null);
+      
+      // Then try to sign out from Supabase
+      const { error } = await supabase.auth.signOut({
+        scope: 'local' // Use 'local' instead of 'global' to avoid requiring a valid session
+      });
+      
+      if (error) {
+        console.warn("Error from Supabase during logout:", error);
+        // Continue with client-side logout even if there's a server error
+      }
       
       toast({
         title: "Sesión cerrada",
@@ -199,10 +206,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
     } catch (error) {
       console.error("Error during logout:", error);
+      // Still consider the user logged out on the client side
       toast({
-        title: "Error",
-        description: "No se pudo cerrar la sesión",
-        variant: "destructive"
+        title: "Sesión cerrada",
+        description: "Has cerrado sesión localmente"
       });
     }
   };
