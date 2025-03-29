@@ -1,3 +1,4 @@
+
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -38,90 +39,67 @@ export const useDashboardStats = () => {
         throw new Error("No hay ID de empresa");
       }
       
-      try {
-        // Obtener el total de leads
-        const { count: totalLeads, error: leadsError } = await supabase
-          .from("leads")
-          .select("id", { count: "exact", head: true })
-          .eq("empresa_id", user.companyId);
-          
-        if (leadsError) {
-          console.error("Error obteniendo leads:", leadsError);
-        }
+      // Obtener el total de leads
+      const { count: totalLeads, error: leadsError } = await supabase
+        .from("leads")
+        .select("id", { count: "exact", head: true })
+        .eq("empresa_id", user.companyId);
         
-        // Obtener los IDs de leads de la empresa
-        const { data: leadsIds } = await supabase
-          .from("leads")
-          .select("id")
-          .eq("empresa_id", user.companyId);
-        
-        const leadIdArray = leadsIds ? leadsIds.map(lead => lead.id) : [];
-        
-        // Datos predeterminados si no se pueden obtener conversaciones
-        let conversaciones = 0;
-        let mensajes = 0;
-        
-        if (leadIdArray.length > 0) {
-          try {
-            // Intentar obtener conversaciones
-            const { count: convsCount, error: convsError } = await supabase
-              .from("conversaciones")
-              .select("id", { count: "exact", head: true })
-              .in("lead_id", leadIdArray);
-              
-            if (!convsError) {
-              conversaciones = convsCount || 0;
-            }
-            
-            // Obtener IDs de conversaciones
-            const { data: conversacionesIds } = await supabase
-              .from("conversaciones")
-              .select("id")
-              .in("lead_id", leadIdArray);
-            
-            const conversacionIdArray = conversacionesIds ? conversacionesIds.map(conv => conv.id) : [];
-            
-            if (conversacionIdArray.length > 0) {
-              // Obtener el total de mensajes
-              const { count: msgsCount, error: msgsError } = await supabase
-                .from("mensajes")
-                .select("id", { count: "exact", head: true })
-                .in("conversacion_id", conversacionIdArray);
-                
-              if (!msgsError) {
-                mensajes = msgsCount || 0;
-              }
-            }
-          } catch (error) {
-            console.error("Error obteniendo conversaciones:", error);
-          }
-        }
-        
-        // Calcular la tasa de conversión
-        const tasaConversion = totalLeads && totalLeads > 0 
-          ? Math.round((conversaciones || 0) / totalLeads * 100) 
-          : 0;
-        
-        return {
-          totalLeads: totalLeads || 0,
-          conversaciones: conversaciones,
-          tasaConversion,
-          interaccionesChatbot: mensajes
-        };
-      } catch (error) {
-        console.error("Error obteniendo estadísticas:", error);
-        // Devolver datos vacíos en caso de error
-        return {
-          totalLeads: 0,
-          conversaciones: 0,
-          tasaConversion: 0,
-          interaccionesChatbot: 0
-        };
+      if (leadsError) {
+        console.error("Error obteniendo leads:", leadsError);
       }
+      
+      // Obtener los IDs de leads de la empresa
+      const { data: leadsIds } = await supabase
+        .from("leads")
+        .select("id")
+        .eq("empresa_id", user.companyId);
+      
+      const leadIdArray = leadsIds ? leadsIds.map(lead => lead.id) : [];
+      
+      // Obtener el total de conversaciones para estos leads
+      const { count: conversaciones, error: convsError } = await supabase
+        .from("conversaciones")
+        .select("id", { count: "exact", head: true })
+        .eq("chatbot_id", "chatbot_id") // Aquí se necesitaría una relación entre chatbots y empresa_id
+        .in("lead_id", leadIdArray.length > 0 ? leadIdArray : ['no-leads']);
+          
+      if (convsError) {
+        console.error("Error obteniendo conversaciones:", convsError);
+      }
+      
+      // Obtener IDs de conversaciones
+      const { data: conversacionesIds } = await supabase
+        .from("conversaciones")
+        .select("id")
+        .in("lead_id", leadIdArray.length > 0 ? leadIdArray : ['no-leads']);
+      
+      const conversacionIdArray = conversacionesIds ? conversacionesIds.map(conv => conv.id) : [];
+      
+      // Obtener el total de mensajes (para interacciones de chatbot)
+      const { count: mensajes, error: msgsError } = await supabase
+        .from("mensajes")
+        .select("id", { count: "exact", head: true })
+        .in("conversacion_id", conversacionIdArray.length > 0 ? conversacionIdArray : ['no-conversations']);
+            
+      if (msgsError) {
+        console.error("Error obteniendo mensajes:", msgsError);
+      }
+      
+      // Calcular la tasa de conversión (asumiendo que es el % de leads que inician conversación)
+      const tasaConversion = totalLeads && totalLeads > 0 
+        ? Math.round((conversaciones || 0) / totalLeads * 100) 
+        : 0;
+      
+      return {
+        totalLeads: totalLeads || 0,
+        conversaciones: conversaciones || 0,
+        tasaConversion,
+        interaccionesChatbot: mensajes || 0
+      };
     },
     enabled: !!user?.companyId,
     staleTime: 5 * 60 * 1000, // 5 minutos
-    retry: 1, // Reducir intentos de retry para evitar muchas peticiones fallidas
   });
 };
 

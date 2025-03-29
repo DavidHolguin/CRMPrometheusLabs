@@ -13,19 +13,6 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 
 const formSchema = z.object({
   nombre: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
@@ -34,9 +21,6 @@ const formSchema = z.object({
   personalidad: z.string().optional(),
   tono: z.string().optional(),
   instrucciones: z.string().optional(),
-  welcome_message: z.string().optional(),
-  main_purpose: z.string().optional(),
-  general_context: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -60,18 +44,8 @@ export function CreateChatbotDialog({ open, onOpenChange, onSuccess }: CreateCha
       personalidad: "amigable y servicial",
       tono: "profesional",
       instrucciones: "",
-      welcome_message: "¡Hola! Soy el asistente virtual. ¿En qué puedo ayudarte hoy?",
-      main_purpose: "customer_support",
-      general_context: "",
     },
   });
-
-  const purposeOptions = [
-    { value: "customer_support", label: "Soporte al cliente" },
-    { value: "sales", label: "Ventas y conversión" },
-    { value: "lead_generation", label: "Generación de leads" },
-    { value: "information", label: "Información y FAQ" }
-  ];
 
   async function onSubmit(values: FormValues) {
     if (!user?.companyId) {
@@ -81,7 +55,6 @@ export function CreateChatbotDialog({ open, onOpenChange, onSuccess }: CreateCha
 
     setIsSubmitting(true);
     try {
-      // Create the chatbot
       const { data, error } = await supabase
         .from("chatbots")
         .insert({
@@ -97,29 +70,6 @@ export function CreateChatbotDialog({ open, onOpenChange, onSuccess }: CreateCha
         .single();
 
       if (error) throw error;
-      
-      // Create the chatbot context
-      const { error: contextError } = await supabase
-        .from("chatbot_contextos")
-        .insert({
-          chatbot_id: data.id,
-          tipo: "primary",
-          contenido: values.instrucciones || "",
-          welcome_message: values.welcome_message || "¡Hola! Soy el asistente virtual. ¿En qué puedo ayudarte hoy?",
-          personality: values.personalidad || "amigable y servicial",
-          communication_tone: values.tono || "profesional",
-          main_purpose: values.main_purpose || "customer_support",
-          general_context: values.general_context || "",
-          special_instructions: values.instrucciones || "",
-          key_points: [],
-          qa_examples: [],
-          orden: 0
-        });
-
-      if (contextError) {
-        console.error("Error al crear contexto del chatbot:", contextError);
-        // Continue even if context creation fails, we already have the chatbot
-      }
       
       form.reset();
       onOpenChange(false);
@@ -181,153 +131,67 @@ export function CreateChatbotDialog({ open, onOpenChange, onSuccess }: CreateCha
 
             <FormField
               control={form.control}
-              name="welcome_message"
+              name="personalidad"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Mensaje de bienvenida</FormLabel>
+                  <FormLabel>Personalidad</FormLabel>
                   <FormControl>
-                    <Textarea 
-                      placeholder="¡Hola! Soy el asistente virtual. ¿En qué puedo ayudarte hoy?" 
+                    <Input 
+                      placeholder="Ej: amigable y servicial" 
                       {...field} 
                       value={field.value || ""}
                     />
                   </FormControl>
                   <FormDescription>
-                    Este mensaje se mostrará cuando un usuario inicie una conversación
+                    Define la personalidad con la que responderá el chatbot
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="personalidad"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Personalidad</FormLabel>
-                    <FormControl>
-                      <Input 
-                        placeholder="Ej: amigable y servicial" 
-                        {...field} 
-                        value={field.value || ""}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      Define la personalidad del chatbot
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="tono"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Tono</FormLabel>
-                    <FormControl>
-                      <Input 
-                        placeholder="Ej: profesional" 
-                        {...field} 
-                        value={field.value || ""}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      Define el tono de comunicación
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
 
             <FormField
               control={form.control}
-              name="main_purpose"
+              name="tono"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Propósito principal</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                    value={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccione el propósito principal" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {purposeOptions.map(option => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <FormLabel>Tono</FormLabel>
+                  <FormControl>
+                    <Input 
+                      placeholder="Ej: profesional" 
+                      {...field} 
+                      value={field.value || ""}
+                    />
+                  </FormControl>
                   <FormDescription>
-                    Define el objetivo principal de este chatbot
+                    Define el tono de comunicación del chatbot
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            <Accordion type="single" collapsible className="w-full">
-              <AccordionItem value="advanced">
-                <AccordionTrigger>Configuración avanzada</AccordionTrigger>
-                <AccordionContent>
-                  <div className="space-y-4 pt-2">
-                    <FormField
-                      control={form.control}
-                      name="general_context"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Contexto general</FormLabel>
-                          <FormControl>
-                            <Textarea 
-                              placeholder="Información general sobre tu empresa, productos o servicios" 
-                              className="min-h-[100px]"
-                              {...field} 
-                              value={field.value || ""}
-                            />
-                          </FormControl>
-                          <FormDescription>
-                            Proporciona contexto que el chatbot debe conocer
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+            <FormField
+              control={form.control}
+              name="instrucciones"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Instrucciones</FormLabel>
+                  <FormControl>
+                    <Textarea 
+                      placeholder="Instrucciones adicionales para el comportamiento del chatbot" 
+                      className="min-h-[120px]"
+                      {...field} 
+                      value={field.value || ""}
                     />
-
-                    <FormField
-                      control={form.control}
-                      name="instrucciones"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Instrucciones especiales</FormLabel>
-                          <FormControl>
-                            <Textarea 
-                              placeholder="Instrucciones adicionales para el comportamiento del chatbot" 
-                              className="min-h-[120px]"
-                              {...field} 
-                              value={field.value || ""}
-                            />
-                          </FormControl>
-                          <FormDescription>
-                            Instrucciones específicas sobre cómo debe comportarse
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
+                  </FormControl>
+                  <FormDescription>
+                    Instrucciones específicas sobre cómo debe comportarse
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}
