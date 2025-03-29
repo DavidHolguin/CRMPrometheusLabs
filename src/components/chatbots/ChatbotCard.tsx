@@ -1,11 +1,10 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Chatbot } from "@/hooks/useChatbots";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { MoreHorizontal, Edit, Trash2, MessageSquare, Bot, Copy, Share2, Globe, Mail, Instagram, Facebook } from "lucide-react";
+import { MoreHorizontal, Edit, Trash2, MessageSquare, Bot, Copy, Share2, Globe, Mail, Instagram, Facebook, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -21,10 +20,96 @@ interface ChatbotCardProps {
   onLiveView: () => void;
 }
 
+interface ChatbotStats {
+  messages: number;
+  messagesYesterday: number;
+  messagesChange: number;
+  leads: number;
+  leadsYesterday: number;
+  leadsChange: number;
+}
+
 export function ChatbotCard({ chatbot, onDelete, onEdit, onLiveView }: ChatbotCardProps) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [stats, setStats] = useState<ChatbotStats | null>(null);
+  const [isLoadingStats, setIsLoadingStats] = useState(true);
+
+  useEffect(() => {
+    fetchChatbotStats();
+  }, [chatbot.id]);
+
+  const fetchChatbotStats = async () => {
+    setIsLoadingStats(true);
+    try {
+      // Get current date and yesterday
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      const todayStart = new Date(today.setHours(0, 0, 0, 0)).toISOString();
+      const todayEnd = new Date(today.setHours(23, 59, 59, 999)).toISOString();
+      const yesterdayStart = new Date(yesterday.setHours(0, 0, 0, 0)).toISOString();
+      const yesterdayEnd = new Date(yesterday.setHours(23, 59, 59, 999)).toISOString();
+      
+      // Get all conversations for this chatbot
+      const { data: conversations } = await supabase
+        .from("conversaciones")
+        .select("id, lead_id")
+        .eq("chatbot_id", chatbot.id);
+      
+      const conversationIds = conversations ? conversations.map(conv => conv.id) : [];
+      const leadIds = conversations ? conversations.map(conv => conv.lead_id).filter(Boolean) : [];
+      
+      // Count today's messages
+      const { count: messagesCount } = await supabase
+        .from("mensajes")
+        .select("id", { count: "exact", head: true })
+        .in("conversacion_id", conversationIds.length > 0 ? conversationIds : ['no-conversations']);
+      
+      // Count yesterday's messages
+      const { count: messagesYesterdayCount } = await supabase
+        .from("mensajes")
+        .select("id", { count: "exact", head: true })
+        .in("conversacion_id", conversationIds.length > 0 ? conversationIds : ['no-conversations'])
+        .gte("created_at", yesterdayStart)
+        .lte("created_at", yesterdayEnd);
+      
+      // Calculate leads
+      const leadsCount = leadIds.length;
+      
+      // Count leads created yesterday (approximate way since we can't directly query without the lead creation date)
+      const { count: leadsYesterdayCount } = await supabase
+        .from("conversaciones")
+        .select("lead_id", { count: "exact", head: true })
+        .eq("chatbot_id", chatbot.id)
+        .gte("created_at", yesterdayStart)
+        .lte("created_at", yesterdayEnd);
+      
+      // Calculate percentage change
+      const messagesChange = messagesYesterdayCount > 0 
+        ? Math.round((messagesCount - messagesYesterdayCount) / messagesYesterdayCount * 100) 
+        : 0;
+      
+      const leadsChange = leadsYesterdayCount > 0 
+        ? Math.round((leadsCount - leadsYesterdayCount) / leadsYesterdayCount * 100) 
+        : 0;
+      
+      setStats({
+        messages: messagesCount || 0,
+        messagesYesterday: messagesYesterdayCount || 0,
+        messagesChange,
+        leads: leadsCount,
+        leadsYesterday: leadsYesterdayCount || 0,
+        leadsChange
+      });
+    } catch (error) {
+      console.error("Error fetching chatbot stats:", error);
+    } finally {
+      setIsLoadingStats(false);
+    }
+  };
 
   const handleDelete = async () => {
     setIsDeleting(true);
@@ -70,12 +155,6 @@ export function ChatbotCard({ chatbot, onDelete, onEdit, onLiveView }: ChatbotCa
     const chatUrl = `${window.location.origin}/chat/${chatbot.id}`;
     navigator.clipboard.writeText(chatUrl);
     toast.success("Enlace copiado al portapapeles");
-  };
-
-  // Mock data - En una implementación real, esto vendría de la base de datos
-  const mockStats = {
-    messages: Math.floor(Math.random() * 500) + 10,
-    leads: Math.floor(Math.random() * 50) + 1,
   };
 
   // Mock canales conectados - En una implementación real, esto vendría de la base de datos
@@ -155,11 +234,47 @@ export function ChatbotCard({ chatbot, onDelete, onEdit, onLiveView }: ChatbotCa
           <div className="grid grid-cols-2 gap-2 mt-2 mb-3">
             <div className="bg-slate-50 dark:bg-slate-800 p-2 rounded-md">
               <div className="text-xs text-muted-foreground">Mensajes</div>
-              <div className="text-lg font-semibold">{mockStats.messages}</div>
+              <div className="flex justify-between items-center">
+                <div className="text-lg font-semibold">{isLoadingStats ? '...' : stats?.messages || 0}</div>
+                {!isLoadingStats && stats && (
+                  <div className="flex items-center text-xs">
+                    {stats.messagesChange > 0 ? (
+                      <ArrowUpRight className="h-3 w-3 text-green-500 mr-1" />
+                    ) : stats.messagesChange < 0 ? (
+                      <ArrowDownRight className="h-3 w-3 text-red-500 mr-1" />
+                    ) : null}
+                    <span className={
+                      stats.messagesChange > 0 ? "text-green-500" : 
+                      stats.messagesChange < 0 ? "text-red-500" : 
+                      "text-muted-foreground"
+                    }>
+                      {stats.messagesChange > 0 ? '+' : ''}{stats.messagesChange}%
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
             <div className="bg-slate-50 dark:bg-slate-800 p-2 rounded-md">
               <div className="text-xs text-muted-foreground">Leads</div>
-              <div className="text-lg font-semibold">{mockStats.leads}</div>
+              <div className="flex justify-between items-center">
+                <div className="text-lg font-semibold">{isLoadingStats ? '...' : stats?.leads || 0}</div>
+                {!isLoadingStats && stats && (
+                  <div className="flex items-center text-xs">
+                    {stats.leadsChange > 0 ? (
+                      <ArrowUpRight className="h-3 w-3 text-green-500 mr-1" />
+                    ) : stats.leadsChange < 0 ? (
+                      <ArrowDownRight className="h-3 w-3 text-red-500 mr-1" />
+                    ) : null}
+                    <span className={
+                      stats.leadsChange > 0 ? "text-green-500" : 
+                      stats.leadsChange < 0 ? "text-red-500" : 
+                      "text-muted-foreground"
+                    }>
+                      {stats.leadsChange > 0 ? '+' : ''}{stats.leadsChange}%
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           

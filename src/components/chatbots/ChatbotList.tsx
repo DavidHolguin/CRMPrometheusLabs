@@ -1,10 +1,9 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Chatbot } from "@/hooks/useChatbots";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { MoreHorizontal, Edit, Trash2, MessageSquare, Bot, Copy, Share2, Globe, Mail, Instagram, Facebook } from "lucide-react";
+import { MoreHorizontal, Edit, Trash2, MessageSquare, Bot, Copy, Share2, Globe, Mail, Instagram, Facebook, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from "date-fns";
@@ -21,10 +20,101 @@ interface ChatbotListProps {
   onLiveView: (id: string) => void;
 }
 
+interface ChatbotStats {
+  messages: number;
+  messagesChange: number;
+  leads: number;
+  leadsChange: number;
+}
+
 export function ChatbotList({ chatbots, onDelete, onEdit, onLiveView }: ChatbotListProps) {
   const [deletingChatbot, setDeletingChatbot] = useState<Chatbot | null>(null);
   const [editingChatbot, setEditingChatbot] = useState<Chatbot | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [chatbotStats, setChatbotStats] = useState<Record<string, ChatbotStats>>({});
+  const [isLoadingStats, setIsLoadingStats] = useState(true);
+
+  useEffect(() => {
+    if (chatbots.length > 0) {
+      fetchAllChatbotStats();
+    }
+  }, [chatbots]);
+
+  const fetchAllChatbotStats = async () => {
+    setIsLoadingStats(true);
+    
+    try {
+      const stats: Record<string, ChatbotStats> = {};
+      
+      // Get current date and yesterday
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      const todayStart = new Date(today.setHours(0, 0, 0, 0)).toISOString();
+      const todayEnd = new Date(today.setHours(23, 59, 59, 999)).toISOString();
+      const yesterdayStart = new Date(yesterday.setHours(0, 0, 0, 0)).toISOString();
+      const yesterdayEnd = new Date(yesterday.setHours(23, 59, 59, 999)).toISOString();
+      
+      for (const chatbot of chatbots) {
+        // Get all conversations for this chatbot
+        const { data: conversations } = await supabase
+          .from("conversaciones")
+          .select("id, lead_id")
+          .eq("chatbot_id", chatbot.id);
+        
+        const conversationIds = conversations ? conversations.map(conv => conv.id) : [];
+        const leadIds = conversations ? conversations.map(conv => conv.lead_id).filter(Boolean) : [];
+        
+        // Count total messages
+        const { count: messagesCount } = await supabase
+          .from("mensajes")
+          .select("id", { count: "exact", head: true })
+          .in("conversacion_id", conversationIds.length > 0 ? conversationIds : ['no-conversations']);
+        
+        // Count yesterday's messages
+        const { count: messagesYesterdayCount } = await supabase
+          .from("mensajes")
+          .select("id", { count: "exact", head: true })
+          .in("conversacion_id", conversationIds.length > 0 ? conversationIds : ['no-conversations'])
+          .gte("created_at", yesterdayStart)
+          .lte("created_at", yesterdayEnd);
+        
+        // Calculate leads
+        const leadsCount = leadIds.length;
+        
+        // Count leads created yesterday
+        const { count: leadsYesterdayCount } = await supabase
+          .from("conversaciones")
+          .select("lead_id", { count: "exact", head: true })
+          .eq("chatbot_id", chatbot.id)
+          .gte("created_at", yesterdayStart)
+          .lte("created_at", yesterdayEnd);
+        
+        // Calculate percentage change
+        const messagesChange = messagesYesterdayCount > 0 
+          ? Math.round((messagesCount - messagesYesterdayCount) / messagesYesterdayCount * 100) 
+          : 0;
+        
+        const leadsChange = leadsYesterdayCount > 0 
+          ? Math.round((leadsCount - leadsYesterdayCount) / leadsYesterdayCount * 100) 
+          : 0;
+        
+        stats[chatbot.id] = {
+          messages: messagesCount || 0,
+          messagesChange,
+          leads: leadsCount,
+          leadsChange
+        };
+      }
+      
+      setChatbotStats(stats);
+    } catch (error) {
+      console.error("Error fetching chatbot stats:", error);
+    } finally {
+      setIsLoadingStats(false);
+    }
+  };
 
   const handleDelete = async () => {
     if (!deletingChatbot) return;
@@ -71,12 +161,6 @@ export function ChatbotList({ chatbots, onDelete, onEdit, onLiveView }: ChatbotL
     toast.success("Enlace copiado al portapapeles");
   };
 
-  // Mock data para estadísticas
-  const getMockStats = (id: string) => ({
-    messages: Math.floor(Math.random() * 500) + 10,
-    leads: Math.floor(Math.random() * 50) + 1,
-  });
-
   // Mock canales conectados - En una implementación real, esto vendría de la base de datos
   const getChannels = (id: string) => [
     { type: "web", active: true },
@@ -103,8 +187,8 @@ export function ChatbotList({ chatbots, onDelete, onEdit, onLiveView }: ChatbotL
             <TableRow>
               <TableHead className="w-[250px]">Nombre</TableHead>
               <TableHead className="w-[150px]">Canales</TableHead>
-              <TableHead className="w-[100px]">Mensajes</TableHead>
-              <TableHead className="w-[100px]">Leads</TableHead>
+              <TableHead className="w-[120px]">Mensajes</TableHead>
+              <TableHead className="w-[120px]">Leads</TableHead>
               <TableHead className="w-[150px]">Creado</TableHead>
               <TableHead className="w-[180px] text-right">Acciones</TableHead>
             </TableRow>
@@ -113,7 +197,7 @@ export function ChatbotList({ chatbots, onDelete, onEdit, onLiveView }: ChatbotL
             {chatbots.map((chatbot) => {
               const creationDate = chatbot.created_at ? 
                 format(new Date(chatbot.created_at), "dd MMM yyyy", { locale: es }) : "Fecha desconocida";
-              const stats = getMockStats(chatbot.id);
+              const stats = chatbotStats[chatbot.id];
               const channels = getChannels(chatbot.id);
 
               return (
@@ -148,10 +232,50 @@ export function ChatbotList({ chatbots, onDelete, onEdit, onLiveView }: ChatbotL
                     </div>
                   </TableCell>
                   <TableCell>
-                    <span className="font-medium">{stats.messages}</span>
+                    {isLoadingStats ? (
+                      <span className="font-medium">...</span>
+                    ) : stats ? (
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{stats.messages}</span>
+                        {stats.messagesChange !== 0 && (
+                          <div className="flex items-center text-xs">
+                            {stats.messagesChange > 0 ? (
+                              <ArrowUpRight className="h-3 w-3 text-green-500 mr-0.5" />
+                            ) : (
+                              <ArrowDownRight className="h-3 w-3 text-red-500 mr-0.5" />
+                            )}
+                            <span className={stats.messagesChange > 0 ? "text-green-500" : "text-red-500"}>
+                              {stats.messagesChange > 0 ? '+' : ''}{stats.messagesChange}%
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="font-medium">0</span>
+                    )}
                   </TableCell>
                   <TableCell>
-                    <span className="font-medium">{stats.leads}</span>
+                    {isLoadingStats ? (
+                      <span className="font-medium">...</span>
+                    ) : stats ? (
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{stats.leads}</span>
+                        {stats.leadsChange !== 0 && (
+                          <div className="flex items-center text-xs">
+                            {stats.leadsChange > 0 ? (
+                              <ArrowUpRight className="h-3 w-3 text-green-500 mr-0.5" />
+                            ) : (
+                              <ArrowDownRight className="h-3 w-3 text-red-500 mr-0.5" />
+                            )}
+                            <span className={stats.leadsChange > 0 ? "text-green-500" : "text-red-500"}>
+                              {stats.leadsChange > 0 ? '+' : ''}{stats.leadsChange}%
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="font-medium">0</span>
+                    )}
                   </TableCell>
                   <TableCell>{creationDate}</TableCell>
                   <TableCell className="text-right">
