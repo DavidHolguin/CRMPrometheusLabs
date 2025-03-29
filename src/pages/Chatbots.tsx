@@ -15,15 +15,22 @@ import { CreateChatbotDialog } from "@/components/chatbots/CreateChatbotDialog";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
 
 const Chatbots = () => {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const { data: chatbots = [], isLoading, isError, refetch } = useChatbots();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   if (isError) {
     toast.error("Error al cargar los chatbots. Intente de nuevo.");
+  }
+
+  // Verificamos si hay un ID de empresa en el contexto del usuario
+  if (!user?.companyId && !isLoading) {
+    console.error("No hay ID de empresa asociada al usuario actual");
   }
 
   return (

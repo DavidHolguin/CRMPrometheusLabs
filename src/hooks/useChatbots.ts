@@ -24,8 +24,11 @@ export function useChatbots() {
     queryKey: ["chatbots", user?.companyId],
     queryFn: async (): Promise<Chatbot[]> => {
       if (!user?.companyId) {
-        throw new Error("No hay ID de empresa");
+        console.error("No hay ID de empresa en el contexto de autenticación");
+        return [];
       }
+      
+      console.log("Consultando chatbots para empresa:", user.companyId);
       
       const { data, error } = await supabase
         .from("chatbots")
@@ -38,6 +41,7 @@ export function useChatbots() {
         throw error;
       }
       
+      console.log("Chatbots obtenidos:", data?.length || 0);
       return data || [];
     },
     enabled: !!user?.companyId,
