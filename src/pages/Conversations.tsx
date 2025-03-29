@@ -83,7 +83,7 @@ const ConversationsPage = () => {
     if (conversationId) {
       markAsRead(conversationId);
     }
-  }, [conversationId]);
+  }, [conversationId, messages.length]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -136,6 +136,7 @@ const ConversationsPage = () => {
       .substring(0, 2);
   };
 
+  // Filter and sort conversations
   const filteredConversations = conversations.filter(conv => {
     const leadName = `${conv.lead?.nombre || ''} ${conv.lead?.apellido || ''}`.toLowerCase();
     const matchesSearch = searchTerm ? leadName.includes(searchTerm.toLowerCase()) : true;
@@ -227,7 +228,6 @@ const ConversationsPage = () => {
               {sortedConversations.map((conversation) => {
                 const leadName = `${conversation.lead?.nombre || ''} ${conversation.lead?.apellido || ''}`.trim();
                 const hasUnread = conversation.unread_count > 0;
-                const messageCount = messages.length;
                 const canalName = getChannelName(conversation.canal_id);
                 const canalType = getChannelType(conversation.canal_id);
                 
@@ -271,7 +271,7 @@ const ConversationsPage = () => {
                           
                           <div className="flex items-center text-xs text-muted-foreground">
                             <MessageSquare className="h-3 w-3 mr-1" />
-                            <span>{messages.length || 0}</span>
+                            <span>{conversation.message_count || 0}</span>
                           </div>
                           
                           {conversation.lead?.score !== undefined && (

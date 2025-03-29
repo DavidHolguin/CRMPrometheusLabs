@@ -90,12 +90,20 @@ export function useMessages(conversationId: string | undefined) {
       
       console.log("Enviando mensaje a la API:", payload);
       
+      // Get the auth token from Supabase
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      
+      if (!token) {
+        throw new Error("No hay sesión de autenticación");
+      }
+      
       // Make the API request
       const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabase.auth.getSession().then(res => res.data.session?.access_token)}`
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(payload)
       });

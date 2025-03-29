@@ -28,6 +28,7 @@ export interface Conversation {
   canal_id: string | null;
   canal_identificador: string | null;
   unread_count: number;
+  message_count: number; // Add a new property for total message count
   last_message: Message | null;
 }
 
@@ -91,15 +92,25 @@ export function useConversations() {
           }
           
           // Get unread count
-          const { count, error: countError } = await supabase
+          const { count: unreadCount, error: unreadCountError } = await supabase
             .from("mensajes")
             .select("id", { count: "exact" })
             .eq("conversacion_id", conv.id)
             .eq("origen", "lead")
             .is("leido", false);
           
-          if (countError) {
-            console.error("Error obteniendo conteo de no leídos:", countError);
+          if (unreadCountError) {
+            console.error("Error obteniendo conteo de no leídos:", unreadCountError);
+          }
+          
+          // Get total message count
+          const { count: totalCount, error: totalCountError } = await supabase
+            .from("mensajes")
+            .select("id", { count: "exact" })
+            .eq("conversacion_id", conv.id);
+            
+          if (totalCountError) {
+            console.error("Error obteniendo conteo total de mensajes:", totalCountError);
           }
           
           // Find the lead for this conversation
@@ -108,7 +119,8 @@ export function useConversations() {
           return {
             ...conv,
             lead,
-            unread_count: count || 0,
+            unread_count: unreadCount || 0,
+            message_count: totalCount || 0,
             last_message: lastMessage || null
           };
         })
