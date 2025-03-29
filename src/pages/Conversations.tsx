@@ -166,6 +166,22 @@ const ConversationsPage = () => {
     }
   };
 
+  const getSenderType = (origen: string, metadata: any): "user" | "bot" | "agent" => {
+    console.log(`Determining sender type for: ${origen}`, metadata);
+    
+    if (origen === 'usuario' || origen === 'lead') return "user";
+    if (origen === 'chatbot') return "bot";
+    if (origen === 'agente') return "agent";
+    
+    // Check for agent via metadata as a fallback
+    if (metadata && (metadata.agent_id || metadata.agent_name || metadata.origin === "agent")) {
+      return "agent";
+    }
+    
+    // Default to bot for any other case
+    return "bot";
+  };
+
   if (!user?.companyId) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -173,20 +189,6 @@ const ConversationsPage = () => {
       </div>
     );
   }
-
-  const getSenderType = (origen: string, metadata: any): "user" | "bot" | "agent" => {
-    if (origen === 'usuario' || origen === 'lead') return "user";
-    if (origen === 'agente') return "agent";
-    if (origen === 'chatbot') return "bot";
-    
-    // Check for agent via metadata as a fallback
-    if (metadata && (metadata.agent_id || metadata.agent_name || metadata.origin === "agent")) {
-      return "agent";
-    }
-    
-    // Default to bot
-    return "bot";
-  };
 
   return (
     <div className="flex h-[calc(100vh-4rem)] overflow-hidden bg-background">
@@ -368,10 +370,13 @@ const ConversationsPage = () => {
               ) : (
                 <div className="space-y-4">
                   {messages.map((msg) => {
-                    const isLead = msg.origen === 'lead';
-                    const isChatbot = msg.origen === 'chatbot';
-                    const isAgent = msg.origen === 'agente';
+                    const senderType = getSenderType(msg.origen, msg.metadata);
+                    const isLead = senderType === "user";
+                    const isChatbot = senderType === "bot";
+                    const isAgent = senderType === "agent";
                     const messageDate = new Date(msg.created_at);
+                    
+                    console.log(`Message from ${msg.origen}, identified as ${senderType}:`, msg.contenido);
                     
                     return (
                       <div 
@@ -403,7 +408,7 @@ const ConversationsPage = () => {
                             ) : (
                               <>
                                 <User className="h-3 w-3 mr-1" />
-                                <span>Tú</span>
+                                <span>{msg.metadata?.agent_name || 'Agente'}</span>
                               </>
                             )}
                           </div>

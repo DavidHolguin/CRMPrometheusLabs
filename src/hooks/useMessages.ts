@@ -49,28 +49,35 @@ export function useMessages(conversationId: string | undefined) {
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
           schema: 'public',
           table: 'mensajes',
           filter: `conversacion_id=eq.${conversationId}`
         },
         (payload) => {
           console.log("Real-time message received:", payload);
-          // Update the query cache with the new message
-          queryClient.setQueryData(["messages", conversationId], (oldData: Message[] = []) => {
-            // Check if the message already exists to avoid duplicates
-            const messageExists = oldData.some(msg => msg.id === payload.new.id);
-            if (messageExists) {
-              console.log("Message already exists in cache, skipping update");
-              return oldData;
-            }
-            
-            console.log("Adding new message to cache:", payload.new);
-            return [...oldData, payload.new as Message];
-          });
           
-          // Also invalidate conversations to refresh the list
-          queryClient.invalidateQueries({ queryKey: ["conversations"] });
+          // Only process INSERT events
+          if (payload.eventType === 'INSERT') {
+            // Update the query cache with the new message
+            queryClient.setQueryData(["messages", conversationId], (oldData: Message[] = []) => {
+              // Check if the message already exists to avoid duplicates
+              const messageExists = oldData.some(msg => msg.id === payload.new.id);
+              if (messageExists) {
+                console.log("Message already exists in cache, skipping update");
+                return oldData;
+              }
+              
+              console.log("Adding new message to cache:", payload.new);
+              console.log("Message origin:", payload.new.origen);
+              
+              // Add the message to the cache
+              return [...oldData, payload.new as Message];
+            });
+            
+            // Also invalidate conversations to refresh the list
+            queryClient.invalidateQueries({ queryKey: ["conversations"] });
+          }
         }
       )
       .subscribe((status) => {
@@ -106,7 +113,7 @@ export function useMessages(conversationId: string | undefined) {
       return data || [];
     },
     enabled: !!conversationId,
-    refetchInterval: 5000, // Refresh every 5 seconds
+    refetchInterval: 5000, // Still maintain a 5-second refresh as backup
   });
 
   // Mark messages as read
