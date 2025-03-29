@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -130,9 +131,10 @@ html, body, #root {
   background-color: #020817;
   background-image: url("https://static.whatsapp.net/rsrc.php/v4/yl/r/gi_DckOUM5a.png");
   background-attachment: fixed;
+  background-size: 60%; /* Reduced size of the pattern */
   position: relative;
-  background-blend-mode: normal;
-  background-color: rgba(2, 8, 23, 0.4);
+  background-blend-mode: overlay; /* Changed from normal to overlay for better blending */
+  background-color: rgba(2, 8, 23, 0.85); /* Increased opacity to make the pattern more subtle */
 }
 
 /* Conversation background - for agent conversations interface, solid dark color */
