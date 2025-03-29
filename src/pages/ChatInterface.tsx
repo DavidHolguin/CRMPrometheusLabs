@@ -14,6 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Drawer, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { EmojiPicker } from "@/components/conversations/EmojiPicker";
 import { useChatMessages, ChatMessage } from "@/hooks/useChatMessages";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const ChatInterface = () => {
   const { chatbotId } = useParams();
@@ -36,6 +37,7 @@ const ChatInterface = () => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   
   const { messages, addMessage } = useChatMessages(conversationId);
+  const isMobile = useIsMobile();
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -44,6 +46,7 @@ const ChatInterface = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const inputContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let storedSessionId = localStorage.getItem(`chatbot_session_${chatbotId}`);
@@ -396,8 +399,9 @@ const ChatInterface = () => {
       </div>;
   }
 
-  return <div className="flex flex-col h-screen bg-[#0e1621]" ref={containerRef}>
-      <header className="p-3 bg-[#020817] shadow-sm flex items-center justify-between sticky top-0 z-10 border-b border-[#3b82f6]">
+  return (
+    <div className="flex flex-col h-screen bg-[#0e1621] overflow-hidden" ref={containerRef}>
+      <header className="p-3 bg-[#020817] shadow-sm flex items-center justify-between fixed top-0 left-0 right-0 z-30 border-b border-[#3b82f6]">
         <div className="flex items-center gap-3">
           <div className="avatar-border">
             <Avatar className="h-10 w-10 border-2 border-transparent text-green-500">
@@ -447,7 +451,11 @@ const ChatInterface = () => {
         </Popover>
       </header>
 
-      <ScrollArea className="flex-1 chat-background">
+      <div 
+        className="flex-1 chat-background overflow-y-auto pt-16 pb-16" 
+        style={{ height: 'calc(100vh - 122px)' }}
+        ref={scrollAreaRef}
+      >
         <div className="space-y-2 max-w-3xl mx-auto pb-2 p-4 chat-message-container">
           {messages.length === 0 ? (
             <div className="text-center py-8">
@@ -483,9 +491,9 @@ const ChatInterface = () => {
           )}
           <div ref={messagesEndRef} />
         </div>
-      </ScrollArea>
+      </div>
 
-      <div className="p-2 bg-[#020817] border-t border-[#3b82f6]">
+      <div className="p-2 bg-[#020817] border-t border-[#3b82f6] fixed bottom-0 left-0 right-0 z-30">
         <div className="whatsapp-input-container" ref={inputContainerRef}>
           <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="whatsapp-button">
             <Smile className="h-6 w-6" />
@@ -513,7 +521,7 @@ const ChatInterface = () => {
       </div>
       
       {showEmojiPicker && (
-        <div className="absolute bottom-14 left-2 z-50">
+        <div className="absolute bottom-16 left-2 z-50">
           <EmojiPicker onEmojiSelect={handleEmojiSelect} />
         </div>
       )}
@@ -646,7 +654,8 @@ const ChatInterface = () => {
           </DrawerFooter>
         </DrawerContent>
       </Drawer>
-    </div>;
+    </div>
+  );
 };
 
 export default ChatInterface;
