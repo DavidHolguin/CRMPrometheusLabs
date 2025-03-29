@@ -40,12 +40,13 @@ export function useMessages(conversationId: string | undefined) {
     
     // Remove existing channel if there is one
     if (channelRef.current) {
+      console.log("Removing existing channel subscription");
       supabase.removeChannel(channelRef.current);
     }
     
-    // Create new channel
+    // Create new channel with improved configuration
     const channel = supabase
-      .channel(`messages-${conversationId}`)
+      .channel(`messages-${conversationId}-${Date.now()}`) // Add timestamp to make channel name unique
       .on(
         'postgres_changes',
         {
@@ -55,14 +56,17 @@ export function useMessages(conversationId: string | undefined) {
           filter: `conversacion_id=eq.${conversationId}`
         },
         (payload) => {
-          console.log("Real-time message received:", payload);
+          console.log("Real-time message event received:", payload);
           
-          // Only process INSERT events
+          // Handle INSERT events
           if (payload.eventType === 'INSERT') {
+            console.log("Processing INSERT event for message:", payload.new);
+            
             // Update the query cache with the new message
             queryClient.setQueryData(["messages", conversationId], (oldData: Message[] = []) => {
               // Check if the message already exists to avoid duplicates
               const messageExists = oldData.some(msg => msg.id === payload.new.id);
+              
               if (messageExists) {
                 console.log("Message already exists in cache, skipping update");
                 return oldData;
@@ -78,10 +82,26 @@ export function useMessages(conversationId: string | undefined) {
             // Also invalidate conversations to refresh the list
             queryClient.invalidateQueries({ queryKey: ["conversations"] });
           }
+          
+          // Handle UPDATE events
+          else if (payload.eventType === 'UPDATE') {
+            console.log("Processing UPDATE event for message:", payload.new);
+            
+            queryClient.setQueryData(["messages", conversationId], (oldData: Message[] = []) => {
+              return oldData.map(msg => 
+                msg.id === payload.new.id ? { ...msg, ...payload.new as Message } : msg
+              );
+            });
+          }
         }
       )
       .subscribe((status) => {
         console.log(`Enhanced realtime subscription status for conversation ${conversationId}:`, status);
+        
+        // Force refetch on successful subscription to ensure we have latest data
+        if (status === 'SUBSCRIBED') {
+          queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
+        }
       });
     
     // Save channel reference for cleanup
@@ -114,6 +134,7 @@ export function useMessages(conversationId: string | undefined) {
     },
     enabled: !!conversationId,
     refetchInterval: 5000, // Still maintain a 5-second refresh as backup
+    staleTime: 1000, // Mark data as stale quickly to encourage refetches
   });
 
   // Mark messages as read

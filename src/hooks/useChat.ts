@@ -1,13 +1,52 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 
 export function useChat(conversationId: string | undefined) {
   const { user } = useAuth();
   const [chatbotEnabled, setChatbotEnabled] = useState(true);
   const [isToggling, setIsToggling] = useState(false);
+  const queryClient = useQueryClient();
+
+  // Get current chatbot state on mount
+  useEffect(() => {
+    const checkChatbotState = async () => {
+      if (!conversationId) return;
+      
+      try {
+        // Check if there's a system message indicating chatbot was disabled
+        const { data, error } = await supabase
+          .from("mensajes")
+          .select("metadata")
+          .eq("conversacion_id", conversationId)
+          .eq("origen", "agente")
+          .is("metadata->is_system_message", true)
+          .order("created_at", { ascending: false })
+          .limit(1);
+        
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          // Find the latest system message about chatbot state
+          const latestMessage = data[0];
+          
+          // Check if the message contains info about chatbot being disabled
+          if (latestMessage.metadata && 
+              latestMessage.metadata.is_system_message && 
+              latestMessage.metadata.chatbot_state === false) {
+            setChatbotEnabled(false);
+          }
+        }
+      } catch (error) {
+        console.error("Error checking chatbot state:", error);
+      }
+    };
+    
+    checkChatbotState();
+  }, [conversationId]);
 
   const toggleChatbot = async () => {
     if (!conversationId || !user?.id) return;
@@ -36,7 +75,8 @@ export function useChat(conversationId: string | undefined) {
         metadata: {
           agent_name: user.name || "Agente",
           department: "Sistema",
-          is_system_message: true
+          is_system_message: true,
+          chatbot_state: !chatbotEnabled
         }
       };
       
@@ -53,7 +93,12 @@ export function useChat(conversationId: string | undefined) {
         throw new Error(`Error al ${chatbotEnabled ? 'desactivar' : 'activar'} el chatbot.`);
       }
       
+      // Update local state
       setChatbotEnabled(!chatbotEnabled);
+      
+      // Invalidate queries to refresh data
+      queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
+      
       toast.success(`Chatbot ${chatbotEnabled ? 'desactivado' : 'activado'} correctamente.`);
       
     } catch (error) {
