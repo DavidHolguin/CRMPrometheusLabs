@@ -174,6 +174,20 @@ const ConversationsPage = () => {
     );
   }
 
+  const getSenderType = (origen: string, metadata: any): "user" | "bot" | "agent" => {
+    if (origen === 'usuario' || origen === 'lead') return "user";
+    if (origen === 'agente') return "agent";
+    if (origen === 'chatbot') return "bot";
+    
+    // Check for agent via metadata as a fallback
+    if (metadata && (metadata.agent_id || metadata.agent_name || metadata.origin === "agent")) {
+      return "agent";
+    }
+    
+    // Default to bot
+    return "bot";
+  };
+
   return (
     <div className="flex h-[calc(100vh-4rem)] overflow-hidden bg-background">
       <div className="w-80 border-r flex flex-col">
@@ -347,7 +361,7 @@ const ConversationsPage = () => {
               ) : messages.length === 0 ? (
                 <div className="h-full flex items-center justify-center">
                   <div className="text-center">
-                    <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-20" />
+                    <MessageSquare className="h-16 w-16 text-muted-foreground mx-auto mb-6 opacity-20" />
                     <p className="text-muted-foreground">No hay mensajes en esta conversación.</p>
                   </div>
                 </div>

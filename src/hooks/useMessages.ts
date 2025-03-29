@@ -11,6 +11,8 @@ export interface Message {
   created_at: string;
   leido: boolean;
   remitente_id: string | null;
+  metadata?: any;
+  tipo_contenido?: string;
 }
 
 export function useMessages(conversationId: string | undefined) {
@@ -24,6 +26,8 @@ export function useMessages(conversationId: string | undefined) {
         return [];
       }
       
+      console.log(`Fetching messages for conversation: ${conversationId}`);
+      
       const { data, error } = await supabase
         .from("mensajes")
         .select("*")
@@ -35,11 +39,59 @@ export function useMessages(conversationId: string | undefined) {
         throw error;
       }
       
+      console.log(`Found ${data?.length || 0} messages for conversation ${conversationId}`);
       return data || [];
     },
     enabled: !!conversationId,
     refetchInterval: 5000, // Refresh every 5 seconds
+    onSuccess: (data) => {
+      // Set up real-time listener when the data is first loaded
+      if (conversationId && data) {
+        setupRealtimeListener(conversationId, queryClient);
+      }
+    }
   });
+
+  // Set up real-time listener for new messages
+  const setupRealtimeListener = (convId: string, queryClient: any) => {
+    console.log(`Setting up enhanced realtime subscription for conversation: ${convId}`);
+    
+    const channel = supabase
+      .channel(`messages-${convId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'mensajes',
+          filter: `conversacion_id=eq.${convId}`
+        },
+        (payload) => {
+          console.log("Real-time message received:", payload);
+          // Update the query cache with the new message
+          queryClient.setQueryData(["messages", convId], (oldData: Message[] = []) => {
+            // Check if the message already exists to avoid duplicates
+            const messageExists = oldData.some(msg => msg.id === payload.new.id);
+            if (messageExists) {
+              console.log("Message already exists in cache, skipping update");
+              return oldData;
+            }
+            
+            console.log("Adding new message to cache:", payload.new);
+            return [...oldData, payload.new as Message];
+          });
+          
+          // Also invalidate conversations to refresh the list
+          queryClient.invalidateQueries({ queryKey: ["conversations"] });
+        }
+      )
+      .subscribe((status) => {
+        console.log(`Enhanced realtime subscription status for conversation ${convId}:`, status);
+      });
+    
+    // Return channel for cleanup
+    return channel;
+  };
 
   // Mark messages as read
   const markAsReadMutation = useMutation({
