@@ -86,6 +86,28 @@ const ConversationsPage = () => {
     if (!message.trim() || !conversationId) return;
     
     try {
+      const nameMatch = message.match(/nombre:\s*([^,]+)/i);
+      const phoneMatch = message.match(/tel[eé]fono:\s*([^,]+)/i);
+      
+      if (nameMatch && phoneMatch && selectedConversation?.lead) {
+        const name = nameMatch[1].trim();
+        const phone = phoneMatch[1].trim();
+        
+        const { error: leadError } = await supabase
+          .from("leads")
+          .update({ 
+            nombre: name,
+            telefono: phone
+          })
+          .eq("id", selectedConversation.lead.id);
+          
+        if (leadError) {
+          console.error("Error updating lead info:", leadError);
+        } else {
+          console.log("Lead info updated successfully:", { name, phone });
+        }
+      }
+      
       await sendMessage(message);
       setMessage("");
       if (textareaRef.current) {
@@ -385,10 +407,7 @@ const ConversationsPage = () => {
                     const isAgent = senderType === "agent";
                     const messageDate = new Date(msg.created_at);
                     
-                    console.log(`Message from ${msg.origen}, identified as ${senderType}:`, msg.contenido);
-                    
                     if (msg.metadata && msg.metadata.is_system_message === true) {
-                      console.log("Skipping system message:", msg);
                       return null;
                     }
                     
@@ -399,13 +418,14 @@ const ConversationsPage = () => {
                       >
                         <div 
                           className={`
-                            max-w-[80%] px-4 py-3 rounded-lg
+                            px-4 py-3 rounded-lg
                             ${isLead 
                               ? 'bg-muted text-foreground' 
                               : isChatbot 
                                 ? 'bg-primary/10 text-foreground' 
                                 : 'bg-primary text-primary-foreground'
                             }
+                            ${isLead ? 'bot-bubble' : (isChatbot ? 'bot-bubble' : 'user-bubble')}
                           `}
                         >
                           <div className="text-xs mb-1 font-medium flex items-center">
@@ -426,10 +446,15 @@ const ConversationsPage = () => {
                               </>
                             )}
                           </div>
-                          <p className="whitespace-pre-wrap break-words">{msg.contenido}</p>
-                          <div className="text-xs mt-1 opacity-70 flex justify-end items-center gap-1">
-                            {messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            {!isLead && <CheckCheck className="h-3 w-3" />}
+                          
+                          <div className="flex flex-wrap items-end">
+                            <div className="message-content whitespace-pre-wrap break-words">
+                              {msg.contenido}
+                            </div>
+                            <div className="chat-timestamp flex items-center gap-1">
+                              {messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              {!isLead && <CheckCheck className="h-3 w-3" />}
+                            </div>
                           </div>
                         </div>
                       </div>

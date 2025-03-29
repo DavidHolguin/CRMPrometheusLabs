@@ -151,7 +151,7 @@ html, body, #root {
   z-index: 1;
 }
 
-/* WhatsApp style user message bubble (right side) - Updated to use theme blue color and smoother corners */
+/* WhatsApp style user message bubble (right side) */
 .user-bubble {
   background-color: hsl(var(--user-bubble));
   color: white;
@@ -159,12 +159,11 @@ html, body, #root {
   border-top-right-radius: 0;
   box-shadow: 0 1px 0.5px rgba(0,0,0,0.13);
   position: relative;
-  padding-right: 4.5rem; /* Extra space for timestamp */
   max-width: 85%; /* Make bubbles wider as requested */
   word-wrap: break-word;
 }
 
-/* WhatsApp style bot message bubble (left side) - Updated with smoother corners */
+/* WhatsApp style bot message bubble (left side) */
 .bot-bubble {
   background-color: hsl(var(--bot-bubble));
   color: white;
@@ -172,12 +171,11 @@ html, body, #root {
   border-top-left-radius: 0;
   box-shadow: 0 1px 0.5px rgba(0,0,0,0.13);
   position: relative;
-  padding-right: 4.5rem; /* Extra space for timestamp */
   max-width: 85%; /* Make bubbles wider as requested */
   word-wrap: break-word;
 }
 
-/* WhatsApp style agent message bubble (left side) - Updated with smoother corners */
+/* WhatsApp style agent message bubble (left side) */
 .agent-bubble {
   background-color: hsl(var(--agent-bubble));
   color: white;
@@ -185,7 +183,6 @@ html, body, #root {
   border-top-left-radius: 0;
   box-shadow: 0 1px 0.5px rgba(0,0,0,0.13);
   position: relative;
-  padding-right: 4.5rem; /* Extra space for timestamp */
   max-width: 85%; /* Make bubbles wider as requested */
   word-wrap: break-word;
 }
@@ -196,16 +193,21 @@ html, body, #root {
   border: none;
 }
 
+/* Improved timestamp that doesn't interfere with message content */
 .chat-timestamp {
-  position: absolute;
-  bottom: 4px;
-  right: 8px;
   font-size: 11px;
   opacity: 0.7;
-  display: flex;
-  align-items: center;
+  display: inline-block;
+  float: right;
+  margin-left: 4px;
+  margin-top: 2px;
   line-height: 1;
   white-space: nowrap;
+}
+
+/* Message content that allows space for timestamp without breaking layout */
+.message-content {
+  display: inline;
 }
 
 .avatar-border {
