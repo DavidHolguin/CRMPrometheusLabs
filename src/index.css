@@ -134,7 +134,7 @@ html, body, #root {
   background-size: 120%; /* Reduced size of pattern to make it smaller (was 150%) */
   position: relative;
   background-blend-mode: overlay;
-  background-color: rgba(2, 8, 23, 0.75); /* Increased opacity by 10% (was 0.85) */
+  background-color: rgba(2, 8, 23, 0.95); /* Updated opacity to 0.95 (was 0.75) */
 }
 
 /* Conversation background - for agent conversations interface, solid dark color */
