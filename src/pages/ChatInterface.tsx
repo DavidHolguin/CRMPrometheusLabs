@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -51,7 +50,6 @@ const ChatInterface = () => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Create or retrieve session ID from localStorage
     let storedSessionId = localStorage.getItem(`chatbot_session_${chatbotId}`);
     if (!storedSessionId) {
       storedSessionId = uuidv4();
@@ -59,7 +57,6 @@ const ChatInterface = () => {
     }
     setSessionId(storedSessionId);
     
-    // Get lead_id from localStorage if it exists
     const storedLeadId = localStorage.getItem(`chatbot_lead_${chatbotId}`);
     const storedName = localStorage.getItem(`chatbot_name_${chatbotId}`);
     const storedPhone = localStorage.getItem(`chatbot_phone_${chatbotId}`);
@@ -72,7 +69,6 @@ const ChatInterface = () => {
     if (storedName) setUserName(storedName);
     if (storedPhone) setUserPhone(storedPhone);
 
-    // Get conversation_id from localStorage if it exists
     const storedConversationId = localStorage.getItem(`chatbot_conversation_${chatbotId}`);
     if (storedConversationId) {
       setConversationId(storedConversationId);
@@ -81,7 +77,6 @@ const ChatInterface = () => {
 
     fetchChatbotInfo();
 
-    // Check if user info needs to be collected
     if (!storedLeadId && !storedName && !storedPhone) {
       setShowUserForm(true);
     }
@@ -93,7 +88,6 @@ const ChatInterface = () => {
         channelRef.current = null;
       }
       
-      // Clean up audio recording if active
       if (mediaRecorderRef.current && isRecording) {
         mediaRecorderRef.current.stop();
       }
@@ -102,7 +96,6 @@ const ChatInterface = () => {
 
   useEffect(() => {
     if (conversationId) {
-      // Set up real-time listener for new messages
       setupRealtimeSubscription(conversationId);
     }
   }, [conversationId]);
@@ -147,13 +140,11 @@ const ChatInterface = () => {
   };
 
   const setupRealtimeSubscription = (convoId: string) => {
-    // Remove existing channel if there is one
     if (channelRef.current) {
       console.log("Removing existing channel subscription");
       supabase.removeChannel(channelRef.current);
     }
     
-    // Create new channel with timestamp to make it unique
     const channelName = `public-chat-${convoId}-${Date.now()}`;
     console.log(`Setting up realtime subscription for conversation: ${convoId} with channel: ${channelName}`);
     
@@ -168,8 +159,6 @@ const ChatInterface = () => {
           filter: `conversacion_id=eq.${convoId} AND origen=eq.agente`
         },
         (payload) => {
-          console.log("Realtime message event received:", payload);
-          
           if (payload.eventType === 'INSERT') {
             console.log("New agent message received:", payload.new);
             
@@ -205,17 +194,14 @@ const ChatInterface = () => {
     }
 
     try {
-      // Save user info in localStorage
       localStorage.setItem(`chatbot_name_${chatbotId}`, userName);
       localStorage.setItem(`chatbot_phone_${chatbotId}`, userPhone);
       
       setUserFormSubmitted(true);
       setShowUserForm(false);
       
-      // Initialize chat with welcome message
       const welcomeMessage = `Hola ${userName}, bienvenido/a a nuestro chat. ¿En qué podemos ayudarte hoy?`;
       
-      // Add chatbot welcome message to UI
       const welcomeMsgObj = {
         id: uuidv4(),
         contenido: welcomeMessage,
@@ -225,9 +211,7 @@ const ChatInterface = () => {
       
       setMessages([welcomeMsgObj]);
       
-      // This will be processed by the backend to create a lead
       await sendMessage(`Nombre: ${userName}, Teléfono: ${userPhone}`);
-      
     } catch (error) {
       console.error("Error al iniciar chat:", error);
       toast.error("Hubo un problema al iniciar el chat. Intente de nuevo.");
@@ -241,7 +225,6 @@ const ChatInterface = () => {
     }
 
     try {
-      // Here you would send the rating to your backend
       toast.success("¡Gracias por tu opinión!");
       setShowRatingDrawer(false);
     } catch (error) {
@@ -258,14 +241,12 @@ const ChatInterface = () => {
     setSending(true);
     
     try {
-      // Get empresa_id from the chatbot info
       const empresaId = chatbotInfo?.empresa_id;
       
       if (!empresaId) {
         throw new Error("No se pudo determinar la empresa del chatbot");
       }
       
-      // Optimistically add message to UI
       const optimisticId = uuidv4();
       const optimisticMsg = {
         id: optimisticId,
@@ -276,7 +257,6 @@ const ChatInterface = () => {
       
       setMessages(prev => [...prev, optimisticMsg]);
       
-      // Reset textarea
       if (!customContent) {
         setMessage("");
         if (textareaRef.current) {
@@ -292,7 +272,6 @@ const ChatInterface = () => {
         lead_id: leadId || undefined,
       });
       
-      // Send message to API
       const apiEndpoint = import.meta.env.VITE_API_BASE_URL || 'https://web-production-01457.up.railway.app';
       const response = await fetch(`${apiEndpoint}/api/v1/channels/web`, {
         method: 'POST',
@@ -321,22 +300,17 @@ const ChatInterface = () => {
       const data = await response.json();
       console.log("API response:", data);
       
-      // Remove optimistic message and add confirmed messages
       setMessages(prev => {
-        // Filter out optimistic message
         const filtered = prev.filter(msg => msg.id !== optimisticId);
         
-        // Check if the user message already exists (from realtime)
         const userMsgExists = filtered.some(msg => 
           msg.id === data.mensaje_id && msg.origen === "usuario");
         
-        // Check if bot response already exists (from realtime)
         const botResponseExists = filtered.some(msg => 
           msg.contenido === data.respuesta && msg.origen === "chatbot");
         
         let newMessages = [...filtered];
         
-        // Add user message if it doesn't exist
         if (!userMsgExists) {
           newMessages.push({
             id: data.mensaje_id,
@@ -346,10 +320,9 @@ const ChatInterface = () => {
           });
         }
         
-        // Add bot response if it doesn't exist and we have one
         if (!botResponseExists && data.respuesta) {
           newMessages.push({
-            id: uuidv4(), // Generate ID for bot message
+            id: uuidv4(),
             contenido: data.respuesta,
             origen: "chatbot",
             created_at: new Date().toISOString(),
@@ -360,16 +333,13 @@ const ChatInterface = () => {
         return newMessages;
       });
       
-      // Save conversation_id to localStorage if it's new
       if (data.conversacion_id && data.conversacion_id !== conversationId) {
         setConversationId(data.conversacion_id);
         localStorage.setItem(`chatbot_conversation_${chatbotId}`, data.conversacion_id);
         
-        // Set up realtime subscription for new conversation
         setupRealtimeSubscription(data.conversacion_id);
       }
       
-      // Save lead_id to localStorage if it's provided
       if (data.lead_id && data.lead_id !== leadId) {
         setLeadId(data.lead_id);
         localStorage.setItem(`chatbot_lead_${chatbotId}`, data.lead_id);
@@ -379,7 +349,6 @@ const ChatInterface = () => {
       console.error("Error sending message:", error);
       toast.error("No se pudo enviar el mensaje. Intente de nuevo.");
       
-      // Remove the optimistic message if it failed
       setMessages(prev => prev.filter(msg => msg.contenido !== messageContent || msg.origen !== "usuario"));
     } finally {
       setSending(false);
@@ -412,7 +381,6 @@ const ChatInterface = () => {
   const toggleRecording = async () => {
     try {
       if (!isRecording) {
-        // Start recording
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         const mediaRecorder = new MediaRecorder(stream);
         
@@ -426,23 +394,18 @@ const ChatInterface = () => {
         };
         
         mediaRecorder.onstop = () => {
-          // Recording stopped, create audio blob
           const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
           
-          // Convert to base64 and send, or save for later
           const reader = new FileReader();
           reader.readAsDataURL(audioBlob);
           reader.onloadend = () => {
             const base64Audio = reader.result?.toString().split(',')[1];
-            // We would send the base64Audio to an endpoint
             toast.info("Audio recording feature coming soon!");
             
-            // Reset recording state
             setIsRecording(false);
             audioChunksRef.current = [];
           };
           
-          // Release microphone
           const tracks = stream.getTracks();
           tracks.forEach(track => track.stop());
         };
@@ -451,7 +414,6 @@ const ChatInterface = () => {
         setIsRecording(true);
         toast.info("Grabando... Toca de nuevo para detener.");
       } else {
-        // Stop recording
         if (mediaRecorderRef.current) {
           mediaRecorderRef.current.stop();
         }
@@ -471,7 +433,6 @@ const ChatInterface = () => {
     if (origen === 'chatbot' || origen === 'bot') return "bot";
     if (origen === 'agente' || origen === 'agent') return "agent";
     
-    // Fallback
     return origen === "agente" ? "agent" : (origen === "chatbot" ? "bot" : "user");
   };
 
@@ -498,6 +459,14 @@ const ChatInterface = () => {
     ));
   };
 
+  const handleSendButtonClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (message.trim()) {
+      sendMessage();
+    } else {
+      toggleRecording();
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -519,7 +488,6 @@ const ChatInterface = () => {
       className="flex flex-col h-screen bg-background"
       ref={containerRef}
     >
-      {/* WhatsApp-like header */}
       <header className="p-3 bg-card shadow-sm flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-3">
           <div className="relative">
@@ -529,7 +497,6 @@ const ChatInterface = () => {
                 <Bot className="h-6 w-6" />
               </AvatarFallback>
             </Avatar>
-            {/* Online indicator */}
             <div className="absolute -bottom-1 -right-1 h-3.5 w-3.5 bg-green-500 rounded-full border-2 border-background"></div>
           </div>
           <div>
@@ -592,7 +559,6 @@ const ChatInterface = () => {
         </Popover>
       </header>
 
-      {/* Chat messages with whatsapp-like background */}
       <ScrollArea 
         className="flex-1 p-4 bg-[#E5DDD5] dark:bg-gray-900 relative overflow-y-auto"
         style={{
@@ -653,7 +619,6 @@ const ChatInterface = () => {
                       {isUser && <Check className="h-3 w-3" />}
                     </span>
                     
-                    {/* Message tail */}
                     <div 
                       className={`absolute top-0 w-2 h-2 overflow-hidden
                         ${isUser 
@@ -674,7 +639,6 @@ const ChatInterface = () => {
         </div>
       </ScrollArea>
 
-      {/* WhatsApp-like input */}
       <div className="p-2 border-t bg-card">
         <div className="flex items-end gap-1">
           <Popover>
@@ -699,7 +663,7 @@ const ChatInterface = () => {
               disabled={sending || isRecording || showUserForm}
             />
             <Button 
-              onClick={message.trim() ? sendMessage : toggleRecording}
+              onClick={handleSendButtonClick}
               className="absolute right-1 bottom-1 h-8 w-8 rounded-full bg-primary hover:bg-primary/90 flex items-center justify-center"
               disabled={sending || showUserForm}
             >
@@ -713,7 +677,6 @@ const ChatInterface = () => {
         </div>
       </div>
 
-      {/* User info collection modal for first interaction */}
       {showUserForm && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-card rounded-lg shadow-lg max-w-md w-full p-6 space-y-4 relative">
@@ -771,7 +734,6 @@ const ChatInterface = () => {
         </div>
       )}
 
-      {/* Sidebar for user profile */}
       <Sheet open={showProfile} onOpenChange={setShowProfile}>
         <SheetContent side="right" className="sm:max-w-md">
           <SheetHeader className="mb-4">
@@ -853,7 +815,6 @@ const ChatInterface = () => {
         </SheetContent>
       </Sheet>
       
-      {/* Rating drawer */}
       <Drawer open={showRatingDrawer} onOpenChange={setShowRatingDrawer}>
         <DrawerContent className="max-w-md mx-auto">
           <DrawerHeader>
