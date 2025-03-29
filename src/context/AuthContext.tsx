@@ -41,72 +41,98 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const getSession = async () => {
+    const initAuth = async () => {
       try {
         setLoading(true);
-        const { data: { session } } = await supabase.auth.getSession();
-        setSession(session);
+        console.log("Auth initialization started");
 
-        if (session) {
-          const { data: profileData, error: profileError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
+        // Primero configuramos el listener para cambios en el estado de autenticación
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+          console.log("Auth state changed:", _event);
+          setSession(newSession);
 
-          if (profileError) {
-            throw profileError;
+          if (newSession) {
+            try {
+              const { data: profileData, error: profileError } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', newSession.user.id)
+                .single();
+
+              if (profileError) {
+                console.error("Error fetching profile:", profileError);
+                return;
+              }
+
+              // Add camelCase aliases to the profile data
+              const enhancedProfile: Profile = {
+                ...profileData,
+                name: profileData.full_name,
+                avatarUrl: profileData.avatar_url,
+                companyId: profileData.empresa_id,
+                onboardingStep: profileData.onboarding_step,
+                onboardingCompleted: profileData.onboarding_completed
+              };
+              
+              setUser(enhancedProfile);
+            } catch (error) {
+              console.error("Error processing profile after auth change:", error);
+            }
+          } else {
+            setUser(null);
           }
+        });
 
-          // Add camelCase aliases to the profile data
-          const enhancedProfile: Profile = {
-            ...profileData,
-            name: profileData.full_name,
-            avatarUrl: profileData.avatar_url,
-            companyId: profileData.empresa_id,
-            onboardingStep: profileData.onboarding_step,
-            onboardingCompleted: profileData.onboarding_completed
-          };
-          
-          setUser(enhancedProfile);
+        // Después intentamos obtener la sesión actual
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        console.log("Current session:", currentSession ? "exists" : "none");
+        setSession(currentSession);
+
+        if (currentSession) {
+          try {
+            const { data: profileData, error: profileError } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', currentSession.user.id)
+              .single();
+
+            if (profileError) {
+              console.error("Error fetching profile on init:", profileError);
+              setUser(null);
+            } else {
+              // Add camelCase aliases to the profile data
+              const enhancedProfile: Profile = {
+                ...profileData,
+                name: profileData.full_name,
+                avatarUrl: profileData.avatar_url,
+                companyId: profileData.empresa_id,
+                onboardingStep: profileData.onboarding_step,
+                onboardingCompleted: profileData.onboarding_completed
+              };
+              
+              setUser(enhancedProfile);
+            }
+          } catch (error) {
+            console.error("Error processing profile on init:", error);
+            setUser(null);
+          }
         }
+
+        // Cleanup function to unsubscribe
+        return () => {
+          subscription.unsubscribe();
+        };
       } catch (error) {
-        console.error("Error getting session:", error);
+        console.error("Error initializing auth:", error);
+        setUser(null);
+        setSession(null);
       } finally {
+        console.log("Auth initialization completed");
         setLoading(false);
       }
     };
 
-    getSession();
-
-    supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
-      if (session) {
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
-
-        if (profileError) {
-          throw profileError;
-        }
-        
-        // Add camelCase aliases to the profile data
-        const enhancedProfile: Profile = {
-          ...profileData,
-          name: profileData.full_name,
-          avatarUrl: profileData.avatar_url,
-          companyId: profileData.empresa_id,
-          onboardingStep: profileData.onboarding_step,
-          onboardingCompleted: profileData.onboarding_completed
-        };
-        
-        setUser(enhancedProfile);
-      } else {
-        setUser(null);
-      }
-    });
+    initAuth();
   }, []);
 
   const signUp = async (data: any) => {
@@ -380,6 +406,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setLoading(true);
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
+        options: {
+          redirectTo: window.location.origin
+        }
       });
 
       if (error) {
