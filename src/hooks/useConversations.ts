@@ -9,6 +9,7 @@ export interface Lead {
   apellido: string | null;
   email: string | null;
   telefono: string | null;
+  score: number | null; // Added score property to fix TypeScript error
 }
 
 export interface Message {
@@ -26,6 +27,7 @@ export interface Conversation {
   chatbot_id: string | null;
   unread_count: number;
   last_message: Message | null;
+  canal_identificador: string | null; // Added canal_identificador property to fix TypeScript error
 }
 
 export function useConversations() {
@@ -44,7 +46,7 @@ export function useConversations() {
       // First get all leads for the company
       const { data: leads, error: leadsError } = await supabase
         .from("leads")
-        .select("id, nombre, apellido, email, telefono")
+        .select("id, nombre, apellido, email, telefono, score") // Added score to the selection
         .eq("empresa_id", user.companyId);
       
       if (leadsError) {
@@ -59,8 +61,9 @@ export function useConversations() {
           id, 
           ultimo_mensaje, 
           lead_id,
-          chatbot_id
-        `)
+          chatbot_id,
+          canal_identificador
+        `) // Added canal_identificador to the selection
         .in("lead_id", leads.map(lead => lead.id))
         .order("ultimo_mensaje", { ascending: false });
       
