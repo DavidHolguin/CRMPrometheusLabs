@@ -97,7 +97,9 @@ export function useChatMessages(conversationId: string | null) {
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current)
           .then(response => {
-            console.log(`Enhanced realtime subscription status for conversation ${conversationId}: ${response.status}`);
+            // Fix: The removeChannel response doesn't have a status property
+            // Instead, it returns one of these strings: "ok" | "timed out" | "error"
+            console.log(`Enhanced realtime subscription cleanup for conversation ${conversationId}: ${response}`);
           })
           .catch(err => {
             console.error(`Error removing channel for conversation ${conversationId}:`, err);
