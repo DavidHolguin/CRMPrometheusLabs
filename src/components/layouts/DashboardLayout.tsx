@@ -5,6 +5,7 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/dashboard/AppSidebar";
 import { AppHeader } from "@/components/dashboard/AppHeader";
 import { useAuth } from "@/context/AuthContext";
+
 const DashboardLayout = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const {
@@ -37,6 +38,7 @@ const DashboardLayout = () => {
     console.log("DashboardLayout - Onboarding not completed, redirecting to onboarding");
     return <Navigate to="/onboarding" replace />;
   }
+  
   return <SidebarProvider defaultCollapsed={true}>
       <div className="min-h-screen flex w-full">
         <AppSidebar isMobileOpen={isMobileSidebarOpen} setIsMobileOpen={setIsMobileSidebarOpen} />
@@ -51,4 +53,5 @@ const DashboardLayout = () => {
       </div>
     </SidebarProvider>;
 };
+
 export default DashboardLayout;

@@ -66,56 +66,47 @@ export function useMessages(conversationId: string | undefined) {
     },
   });
 
-  // Send message
+  // Send message via API endpoint instead of direct Supabase call
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
       if (!conversationId || !user?.id) {
         throw new Error("Falta información para enviar mensaje");
       }
       
-      // Get the conversation to check if we need to update chatbot status
-      const { data: conversation, error: convError } = await supabase
-        .from("conversaciones")
-        .select("*")
-        .eq("id", conversationId)
-        .single();
+      const apiEndpoint = import.meta.env.VITE_API_BASE_URL || '';
+      const url = `${apiEndpoint}/api/v1/agent/message`;
       
-      if (convError) {
-        console.error("Error obteniendo conversación:", convError);
-        throw convError;
+      // Create the payload for the API
+      const payload = {
+        conversation_id: conversationId,
+        agent_id: user.id,
+        mensaje: content,
+        deactivate_chatbot: false, // By default, don't deactivate chatbot
+        metadata: {
+          agent_name: user.fullName || "Agente",
+          rol: "Agente humano"
+        }
+      };
+      
+      console.log("Enviando mensaje a la API:", payload);
+      
+      // Make the API request
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabase.auth.getSession().then(res => res.data.session?.access_token)}`
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("Error en la respuesta de la API:", errorData);
+        throw new Error(`Error al enviar mensaje: ${response.statusText}`);
       }
       
-      // Insert new message
-      const { data, error } = await supabase
-        .from("mensajes")
-        .insert({
-          conversacion_id: conversationId,
-          contenido: content,
-          origen: "agente",
-          remitente_id: user.id,
-          leido: true
-        })
-        .select()
-        .single();
-      
-      if (error) {
-        console.error("Error enviando mensaje:", error);
-        throw error;
-      }
-      
-      // Update conversation's last message timestamp
-      const { error: updateError } = await supabase
-        .from("conversaciones")
-        .update({ 
-          ultimo_mensaje: new Date().toISOString()
-        })
-        .eq("id", conversationId);
-      
-      if (updateError) {
-        console.error("Error actualizando timestamp de conversación:", updateError);
-      }
-      
-      return data;
+      return await response.json();
     },
     onSuccess: () => {
       // Invalidate related queries to refresh data
