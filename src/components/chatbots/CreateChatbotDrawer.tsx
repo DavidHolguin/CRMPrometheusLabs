@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerFooter } from "@/components/ui/drawer";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,9 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import { Upload, UserCircle, MessageSquare, Bot, Settings } from "lucide-react";
+import { Upload, UserCircle, MessageSquare, Bot, Settings, Trash2, Image } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 // Steps for the form
 type Step = "basic" | "personality" | "context" | "keypoints" | "examples";
@@ -50,6 +52,8 @@ export function CreateChatbotDrawer({ open, onOpenChange, onSuccess }: CreateCha
   const [currentStep, setCurrentStep] = useState<Step>("basic");
   const [newKeyPoint, setNewKeyPoint] = useState("");
   const [newQAPair, setNewQAPair] = useState({ question: "", answer: "" });
+  const [previewAvatar, setPreviewAvatar] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
 
   const form = useForm<FormValues>({
@@ -95,6 +99,66 @@ export function CreateChatbotDrawer({ open, onOpenChange, onSuccess }: CreateCha
   const removeQAPair = (index: number) => {
     const currentQAPairs = form.getValues().qa_examples || [];
     form.setValue('qa_examples', currentQAPairs.filter((_, i) => i !== index));
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("La imagen es demasiado grande. Máximo 5MB.");
+      return;
+    }
+
+    try {
+      // Mostrar vista previa
+      const fileUrl = URL.createObjectURL(file);
+      setPreviewAvatar(fileUrl);
+
+      // Si hay una empresa ID, intentamos subir el archivo a Supabase
+      if (user?.companyId) {
+        const fileName = `chatbot-avatar-${Date.now()}-${file.name.replace(/\s+/g, '-')}`;
+        const { data, error } = await supabase.storage
+          .from('avatars')
+          .upload(`chatbots/${user.companyId}/${fileName}`, file);
+
+        if (error) {
+          throw error;
+        }
+
+        if (data) {
+          const { data: urlData } = await supabase.storage
+            .from('avatars')
+            .getPublicUrl(`chatbots/${user.companyId}/${fileName}`);
+
+          form.setValue('avatar_url', urlData.publicUrl);
+          toast.success("Imagen subida exitosamente");
+        }
+      } else {
+        // Si no hay ID de empresa, solo usamos la URL para el formulario
+        form.setValue('avatar_url', fileUrl);
+      }
+    } catch (error) {
+      console.error("Error al subir la imagen:", error);
+      toast.error("Error al subir la imagen. Intente de nuevo.");
+    }
+  };
+
+  const handleAvatarUrlChange = (url: string) => {
+    form.setValue('avatar_url', url);
+    if (url) {
+      setPreviewAvatar(url);
+    } else {
+      setPreviewAvatar(null);
+    }
+  };
+
+  const clearAvatar = () => {
+    form.setValue('avatar_url', '');
+    setPreviewAvatar(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   async function onSubmit(values: FormValues) {
@@ -143,6 +207,7 @@ export function CreateChatbotDrawer({ open, onOpenChange, onSuccess }: CreateCha
       if (contextError) throw contextError;
       
       form.reset();
+      setPreviewAvatar(null);
       onOpenChange(false);
       onSuccess();
       toast.success("Chatbot creado con éxito");
@@ -182,8 +247,8 @@ export function CreateChatbotDrawer({ open, onOpenChange, onSuccess }: CreateCha
     ];
 
     return (
-      <div className="flex justify-center mb-6">
-        <div className="inline-flex items-center">
+      <div className="flex justify-center mb-6 overflow-x-auto">
+        <div className="inline-flex items-center flex-nowrap">
           {steps.map((step, index) => (
             <div key={step.id} className="flex items-center">
               <div 
@@ -191,7 +256,7 @@ export function CreateChatbotDrawer({ open, onOpenChange, onSuccess }: CreateCha
                   currentStep === step.id 
                     ? "bg-primary text-primary-foreground border-primary" 
                     : "bg-muted text-muted-foreground border-muted-foreground"
-                }`}
+                } cursor-pointer`}
                 onClick={() => setCurrentStep(step.id as Step)}
               >
                 {step.icon}
@@ -254,22 +319,58 @@ export function CreateChatbotDrawer({ open, onOpenChange, onSuccess }: CreateCha
               name="avatar_url"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>URL del Avatar</FormLabel>
+                  <FormLabel>Avatar del Chatbot</FormLabel>
                   <FormControl>
-                    <div className="flex gap-2">
-                      <Input 
-                        placeholder="URL de la imagen del avatar" 
-                        {...field} 
-                        value={field.value || ""}
+                    <div className="space-y-4">
+                      <div className="flex gap-2">
+                        <Input 
+                          placeholder="URL de la imagen del avatar" 
+                          value={field.value || ""}
+                          onChange={(e) => handleAvatarUrlChange(e.target.value)}
+                        />
+                        <Button 
+                          type="button" 
+                          size="icon" 
+                          variant="outline"
+                          onClick={() => fileInputRef.current?.click()}
+                        >
+                          <Upload size={16} />
+                        </Button>
+                      </div>
+                      
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        className="hidden"
+                        accept="image/*"
+                        onChange={handleFileChange}
                       />
-                      <Button type="button" size="icon" variant="outline">
-                        <Upload size={16} />
-                      </Button>
+
+                      {previewAvatar && (
+                        <div className="relative w-20 h-20">
+                          <Avatar className="w-20 h-20">
+                            <AvatarImage src={previewAvatar} alt="Avatar preview" />
+                            <AvatarFallback className="text-xl">
+                              {form.getValues().nombre?.charAt(0) || "A"}
+                            </AvatarFallback>
+                          </Avatar>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="destructive"
+                            className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
+                            onClick={clearAvatar}
+                          >
+                            <Trash2 size={12} />
+                          </Button>
+                        </div>
+                      )}
+
+                      <p className="text-xs text-muted-foreground">
+                        Sube una imagen o proporciona una URL para el avatar del chatbot
+                      </p>
                     </div>
                   </FormControl>
-                  <FormDescription>
-                    Imagen que representará a tu chatbot
-                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -416,6 +517,10 @@ export function CreateChatbotDrawer({ open, onOpenChange, onSuccess }: CreateCha
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Contexto General</FormLabel>
+                  <div className="mb-2 flex flex-wrap gap-2">
+                    <Badge variant="outline" className="bg-primary/10">Información de empresa</Badge>
+                    <Badge variant="outline" className="bg-primary/10">Productos y servicios</Badge>
+                  </div>
                   <FormControl>
                     <Textarea 
                       placeholder="Contexto general sobre la empresa, productos, servicios, etc." 
@@ -425,7 +530,7 @@ export function CreateChatbotDrawer({ open, onOpenChange, onSuccess }: CreateCha
                     />
                   </FormControl>
                   <FormDescription>
-                    Información general que el chatbot debe conocer
+                    Información general que el chatbot debe conocer. Incluye automáticamente datos de tu empresa y servicios.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -473,7 +578,7 @@ export function CreateChatbotDrawer({ open, onOpenChange, onSuccess }: CreateCha
                 <Button type="button" onClick={addKeyPoint}>Agregar</Button>
               </div>
               
-              <div className="space-y-2 mt-4">
+              <div className="space-y-2 mt-4 max-h-[300px] overflow-y-auto">
                 {form.getValues().key_points?.map((point, index) => (
                   <div key={index} className="flex items-center justify-between p-3 bg-muted rounded-md">
                     <span className="text-sm">{point}</span>
@@ -518,7 +623,7 @@ export function CreateChatbotDrawer({ open, onOpenChange, onSuccess }: CreateCha
                 <Button type="button" onClick={addQAPair} className="w-full">Agregar Par Q&A</Button>
               </div>
               
-              <div className="space-y-4 mt-4">
+              <div className="space-y-4 mt-4 max-h-[300px] overflow-y-auto">
                 {form.getValues().qa_examples?.map((pair, index) => (
                   <div key={index} className="p-4 bg-muted rounded-md space-y-2">
                     <div className="flex items-center justify-between">
@@ -564,8 +669,8 @@ export function CreateChatbotDrawer({ open, onOpenChange, onSuccess }: CreateCha
         {renderStepIndicator()}
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)}>
-            <ScrollArea className="px-6 max-h-[calc(90vh-200px)]">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col h-full">
+            <ScrollArea className="px-6 flex-1" style={{ maxHeight: "calc(90vh - 200px)" }}>
               <div className="space-y-6 py-2 pr-4">
                 {renderStepContent()}
               </div>

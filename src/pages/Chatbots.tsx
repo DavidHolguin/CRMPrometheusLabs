@@ -10,7 +10,6 @@ import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { CreateChatbotDrawer } from "@/components/chatbots/CreateChatbotDrawer";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
 const Chatbots = () => {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
