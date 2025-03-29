@@ -97,9 +97,11 @@ export function useChatbots() {
             if (Array.isArray(rawExamples)) {
               qaExamples = rawExamples.map(example => {
                 if (typeof example === 'object' && example !== null) {
+                  // Accedemos a las propiedades de manera segura usando type assertion
+                  const exampleObj = example as Record<string, any>;
                   return {
-                    question: String(example.question || ''),
-                    answer: String(example.answer || '')
+                    question: String(exampleObj.question || ''),
+                    answer: String(exampleObj.answer || '')
                   };
                 }
                 return { question: '', answer: '' };
@@ -178,9 +180,11 @@ export function useChatbot(id: string | undefined) {
           if (Array.isArray(rawExamples)) {
             qaExamples = rawExamples.map(example => {
               if (typeof example === 'object' && example !== null) {
+                // Accedemos a las propiedades de manera segura usando type assertion
+                const exampleObj = example as Record<string, any>;
                 return {
-                  question: String(example.question || ''),
-                  answer: String(example.answer || '')
+                  question: String(exampleObj.question || ''),
+                  answer: String(exampleObj.answer || '')
                 };
               }
               return { question: '', answer: '' };
