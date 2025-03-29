@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -80,7 +79,7 @@ const OnboardingChatbot = () => {
   ]);
   
   // Cargar información del contexto de la empresa para las etiquetas
-  useState(() => {
+  useEffect(() => {
     const loadCompanyInfo = async () => {
       if (user?.companyId) {
         try {
@@ -600,4 +599,3 @@ const OnboardingChatbot = () => {
 };
 
 export default OnboardingChatbot;
-

@@ -2,6 +2,7 @@
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { Json } from "@/integrations/supabase/types";
 
 export interface Chatbot {
   id: string;
@@ -16,12 +17,12 @@ export interface Chatbot {
   created_at: string;
   updated_at: string;
   contexto?: {
-    generalContext?: string;
-    welcomeMessage?: string;
-    mainPurpose?: string;
-    communicationTone?: string;
-    personality?: string;
-    specialInstructions?: string;
+    generalContext?: string | null;
+    welcomeMessage?: string | null;
+    mainPurpose?: string | null;
+    communicationTone?: string | null;
+    personality?: string | null;
+    specialInstructions?: string | null;
     qaExamples?: Array<{question: string, answer: string}>;
   } | null;
 }
@@ -86,6 +87,29 @@ export function useChatbots() {
       const processedData = data?.map(chatbot => {
         // Transformar el contexto si existe
         const contextoItems = chatbot.contexto || [];
+        
+        // Asegurar que qaExamples sea un array de objetos con question y answer
+        let qaExamples: Array<{question: string, answer: string}> = [];
+        
+        if (contextoItems.length > 0 && contextoItems[0]?.qa_examples) {
+          try {
+            const rawExamples = contextoItems[0].qa_examples;
+            if (Array.isArray(rawExamples)) {
+              qaExamples = rawExamples.map(example => {
+                if (typeof example === 'object' && example !== null) {
+                  return {
+                    question: String(example.question || ''),
+                    answer: String(example.answer || '')
+                  };
+                }
+                return { question: '', answer: '' };
+              });
+            }
+          } catch (e) {
+            console.error("Error procesando qa_examples:", e);
+          }
+        }
+        
         const contexto = contextoItems.length > 0 ? {
           generalContext: contextoItems[0]?.general_context || null,
           welcomeMessage: contextoItems[0]?.welcome_message || null,
@@ -93,7 +117,7 @@ export function useChatbots() {
           communicationTone: contextoItems[0]?.communication_tone || null,
           personality: contextoItems[0]?.personality || null,
           specialInstructions: contextoItems[0]?.special_instructions || null,
-          qaExamples: contextoItems[0]?.qa_examples || [],
+          qaExamples
         } : null;
         
         return {
@@ -144,6 +168,29 @@ export function useChatbot(id: string | undefined) {
       
       // Procesar contexto
       const contextoItems = data.contexto || [];
+      
+      // Asegurar que qaExamples sea un array de objetos con question y answer
+      let qaExamples: Array<{question: string, answer: string}> = [];
+      
+      if (contextoItems.length > 0 && contextoItems[0]?.qa_examples) {
+        try {
+          const rawExamples = contextoItems[0].qa_examples;
+          if (Array.isArray(rawExamples)) {
+            qaExamples = rawExamples.map(example => {
+              if (typeof example === 'object' && example !== null) {
+                return {
+                  question: String(example.question || ''),
+                  answer: String(example.answer || '')
+                };
+              }
+              return { question: '', answer: '' };
+            });
+          }
+        } catch (e) {
+          console.error("Error procesando qa_examples:", e);
+        }
+      }
+      
       const contexto = contextoItems.length > 0 ? {
         generalContext: contextoItems[0]?.general_context || null,
         welcomeMessage: contextoItems[0]?.welcome_message || null,
@@ -151,7 +198,7 @@ export function useChatbot(id: string | undefined) {
         communicationTone: contextoItems[0]?.communication_tone || null,
         personality: contextoItems[0]?.personality || null,
         specialInstructions: contextoItems[0]?.special_instructions || null,
-        qaExamples: contextoItems[0]?.qa_examples || [],
+        qaExamples
       } : null;
       
       return {
