@@ -2,6 +2,7 @@
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 
 export interface Message {
   id: string;
@@ -18,6 +19,68 @@ export interface Message {
 export function useMessages(conversationId: string | undefined) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const channelRef = useRef<any>(null);
+  
+  // Clean up realtime listener when component unmounts or conversationId changes
+  useEffect(() => {
+    return () => {
+      if (channelRef.current) {
+        console.log(`Cleaning up realtime subscription for conversation: ${conversationId}`);
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    };
+  }, [conversationId]);
+  
+  // Set up real-time listener for messages
+  useEffect(() => {
+    if (!conversationId) return;
+    
+    console.log(`Setting up enhanced realtime subscription for conversation: ${conversationId}`);
+    
+    // Remove existing channel if there is one
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+    }
+    
+    // Create new channel
+    const channel = supabase
+      .channel(`messages-${conversationId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'mensajes',
+          filter: `conversacion_id=eq.${conversationId}`
+        },
+        (payload) => {
+          console.log("Real-time message received:", payload);
+          // Update the query cache with the new message
+          queryClient.setQueryData(["messages", conversationId], (oldData: Message[] = []) => {
+            // Check if the message already exists to avoid duplicates
+            const messageExists = oldData.some(msg => msg.id === payload.new.id);
+            if (messageExists) {
+              console.log("Message already exists in cache, skipping update");
+              return oldData;
+            }
+            
+            console.log("Adding new message to cache:", payload.new);
+            return [...oldData, payload.new as Message];
+          });
+          
+          // Also invalidate conversations to refresh the list
+          queryClient.invalidateQueries({ queryKey: ["conversations"] });
+        }
+      )
+      .subscribe((status) => {
+        console.log(`Enhanced realtime subscription status for conversation ${conversationId}:`, status);
+      });
+    
+    // Save channel reference for cleanup
+    channelRef.current = channel;
+    
+  }, [conversationId, queryClient]);
   
   const messagesQuery = useQuery({
     queryKey: ["messages", conversationId],
@@ -44,54 +107,7 @@ export function useMessages(conversationId: string | undefined) {
     },
     enabled: !!conversationId,
     refetchInterval: 5000, // Refresh every 5 seconds
-    onSuccess: (data) => {
-      // Set up real-time listener when the data is first loaded
-      if (conversationId && data) {
-        setupRealtimeListener(conversationId, queryClient);
-      }
-    }
   });
-
-  // Set up real-time listener for new messages
-  const setupRealtimeListener = (convId: string, queryClient: any) => {
-    console.log(`Setting up enhanced realtime subscription for conversation: ${convId}`);
-    
-    const channel = supabase
-      .channel(`messages-${convId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'mensajes',
-          filter: `conversacion_id=eq.${convId}`
-        },
-        (payload) => {
-          console.log("Real-time message received:", payload);
-          // Update the query cache with the new message
-          queryClient.setQueryData(["messages", convId], (oldData: Message[] = []) => {
-            // Check if the message already exists to avoid duplicates
-            const messageExists = oldData.some(msg => msg.id === payload.new.id);
-            if (messageExists) {
-              console.log("Message already exists in cache, skipping update");
-              return oldData;
-            }
-            
-            console.log("Adding new message to cache:", payload.new);
-            return [...oldData, payload.new as Message];
-          });
-          
-          // Also invalidate conversations to refresh the list
-          queryClient.invalidateQueries({ queryKey: ["conversations"] });
-        }
-      )
-      .subscribe((status) => {
-        console.log(`Enhanced realtime subscription status for conversation ${convId}:`, status);
-      });
-    
-    // Return channel for cleanup
-    return channel;
-  };
 
   // Mark messages as read
   const markAsReadMutation = useMutation({
