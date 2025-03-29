@@ -33,8 +33,10 @@ export function LeadCard({ lead, isDragging }: LeadCardProps) {
   return (
     <Card 
       className={cn(
-        "overflow-hidden hover:shadow-md transition-shadow mb-2 w-full cursor-move", 
-        isDragging ? "opacity-50 shadow-lg border-dashed" : ""
+        "overflow-hidden transition-all duration-200 mb-2 w-full cursor-move", 
+        isDragging 
+          ? "opacity-80 shadow-lg ring-2 ring-primary ring-opacity-50 scale-[1.02] border-dashed" 
+          : "hover:shadow-md hover:border-primary/30"
       )}
     >
       <CardHeader className="pb-2 pt-3">

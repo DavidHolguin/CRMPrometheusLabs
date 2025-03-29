@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Lead } from "@/hooks/useLeads";
+import { useEffect } from "react";
 
 export function usePipelineLeads(pipelineId: string | null) {
   const { user } = useAuth();
@@ -147,10 +148,41 @@ export function usePipelineLeads(pipelineId: string | null) {
   });
 
   const updateLeadStage = useMutation({
-    mutationFn: async ({ leadId, stageId }: { leadId: string; stageId: string }) => {
+    mutationFn: async ({ 
+      leadId, 
+      stageId 
+    }: { 
+      leadId: string; 
+      stageId: string 
+    }) => {
+      // First log the change to lead_history
+      if (user?.id) {
+        const { data: lead } = await supabase
+          .from("leads")
+          .select("stage_id")
+          .eq("id", leadId)
+          .single();
+        
+        if (lead?.stage_id) {
+          await supabase
+            .from("lead_history")
+            .insert({
+              lead_id: leadId,
+              campo: "stage_id",
+              valor_anterior: lead.stage_id,
+              valor_nuevo: stageId,
+              usuario_id: user.id
+            });
+        }
+      }
+      
+      // Then update the lead stage
       const { data, error } = await supabase
         .from("leads")
-        .update({ stage_id: stageId })
+        .update({ 
+          stage_id: stageId,
+          ultima_interaccion: new Date().toISOString() 
+        })
         .eq("id", leadId)
         .select()
         .single();
@@ -171,6 +203,31 @@ export function usePipelineLeads(pipelineId: string | null) {
     },
   });
 
+  // Set up real-time subscription to leads changes
+  useEffect(() => {
+    if (!pipelineId || !user?.companyId) return;
+    
+    const channel = supabase
+      .channel('pipeline-changes')
+      .on('postgres_changes', 
+        {
+          event: '*',
+          schema: 'public',
+          table: 'leads',
+          filter: `pipeline_id=eq.${pipelineId}`
+        }, 
+        () => {
+          // Invalidate query to refresh data
+          queryClient.invalidateQueries({ queryKey: ["pipeline-leads", pipelineId] });
+        }
+      )
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [pipelineId, user?.companyId, queryClient]);
+
   return {
     leadsByStage: leadsQuery.data || {},
     isLoading: leadsQuery.isLoading,
@@ -178,5 +235,6 @@ export function usePipelineLeads(pipelineId: string | null) {
     error: leadsQuery.error,
     refetch: leadsQuery.refetch,
     updateLeadStage: updateLeadStage.mutate,
+    isUpdating: updateLeadStage.isPending,
   };
 }
