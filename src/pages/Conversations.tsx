@@ -387,7 +387,7 @@ const ConversationsPage = () => {
               </Button>
             </div>
 
-            <ScrollArea className="flex-1 p-4 overflow-y-auto chat-background">
+            <ScrollArea className="flex-1 p-4 overflow-y-auto conversation-background">
               {messagesLoading ? (
                 <div className="h-full flex items-center justify-center">
                   <p className="text-muted-foreground animate-pulse">Cargando mensajes...</p>
