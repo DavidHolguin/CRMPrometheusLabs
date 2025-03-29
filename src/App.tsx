@@ -17,6 +17,7 @@ import OnboardingServices from "./pages/onboarding/OnboardingServices";
 import OnboardingChatbot from "./pages/onboarding/OnboardingChatbot";
 import Chatbots from "./pages/Chatbots";
 import ChatInterface from "./pages/ChatInterface";
+import ConversationsPage from "./pages/Conversations";
 
 // Layout
 import DashboardLayout from "./components/layouts/DashboardLayout";
@@ -59,7 +60,8 @@ const App = () => {
         <Route path="/dashboard" element={<DashboardLayout />}>
           <Route index element={<Dashboard />} />
           <Route path="leads" element={<Dashboard />} />
-          <Route path="conversations" element={<Dashboard />} />
+          <Route path="conversations" element={<ConversationsPage />} />
+          <Route path="conversations/:conversationId" element={<ConversationsPage />} />
           <Route path="chatbots" element={<Chatbots />} />
           <Route path="settings" element={<Dashboard />} />
         </Route>
