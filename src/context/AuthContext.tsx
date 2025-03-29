@@ -1,505 +1,329 @@
+import { createContext, useContext, useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
+import { Profile } from "@/types/profile";
+import { ChatbotCreationData } from "@/types/chatbot";
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { toast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { User, Session } from '@supabase/supabase-js';
-
-// Tipos
-type UserWithMeta = User & {
-  onboardingCompleted: boolean;
-  companyId?: string;
-  name?: string;
-  avatarUrl?: string;
-};
-
-type AuthContextType = {
-  user: UserWithMeta | null;
-  session: Session | null;
+interface AuthContextType {
+  user: Profile | null;
+  session: any | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  loginWithGoogle: () => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
-  updateUser: (data: Partial<UserWithMeta>) => void;
-  setOnboardingCompleted: () => void;
-  createCompany: (companyData: any) => Promise<string>;
-  createChatbot: (chatbotData: any) => Promise<string>;
-  saveServices: (servicesData: any[]) => Promise<void>;
-};
+  signUp: (data: any) => Promise<any>;
+  signIn: (data: any) => Promise<any>;
+  signOut: () => Promise<void>;
+  updateUser: (data: any) => Promise<void>;
+  createChatbot: (chatbotData: ChatbotCreationData) => Promise<void>;
+  setOnboardingCompleted: () => Promise<void>;
+}
 
-// Creamos el contexto
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Proveedor de autenticación
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return context;
+};
+
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<UserWithMeta | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState<Profile | null>(null);
+  const [session, setSession] = useState<any | null>(null);
+  const [isLoading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, newSession) => {
-        console.log("Auth state changed:", event);
-        setSession(newSession);
-        
-        if (newSession?.user) {
-          setTimeout(async () => {
-            try {
-              const { data: profileData } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', newSession.user.id)
-                .single();
-              
-              setUser({
-                ...newSession.user,
-                name: profileData?.full_name || newSession.user.email?.split('@')[0] || '',
-                onboardingCompleted: profileData?.onboarding_completed || false,
-                companyId: profileData?.empresa_id || undefined,
-                avatarUrl: profileData?.avatar_url || undefined
-              });
-            } catch (error) {
-              console.error("Error fetching profile:", error);
-            }
-          }, 0);
-        } else {
-          setUser(null);
-        }
-      }
-    );
-
-    const checkSession = async () => {
+    const getSession = async () => {
       try {
-        const { data: { session: currentSession } } = await supabase.auth.getSession();
-        setSession(currentSession);
-        
-        if (currentSession?.user) {
-          const { data: profileData } = await supabase
+        setLoading(true);
+        const { data: { session } } = await supabase.auth.getSession();
+        setSession(session);
+
+        if (session) {
+          const { data: profileData, error: profileError } = await supabase
             .from('profiles')
             .select('*')
-            .eq('id', currentSession.user.id)
+            .eq('id', session.user.id)
             .single();
-          
-          setUser({
-            ...currentSession.user,
-            name: profileData?.full_name || currentSession.user.email?.split('@')[0] || '',
-            onboardingCompleted: profileData?.onboarding_completed || false,
-            companyId: profileData?.empresa_id || undefined,
-            avatarUrl: profileData?.avatar_url || undefined
-          });
+
+          if (profileError) {
+            throw profileError;
+          }
+
+          setUser(profileData);
         }
       } catch (error) {
-        console.error("Error checking session:", error);
+        console.error("Error getting session:", error);
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
     };
 
-    checkSession();
+    getSession();
 
-    return () => {
-      subscription.unsubscribe();
-    };
+    supabase.auth.onAuthStateChange(async (_event, session) => {
+      setSession(session);
+      if (session) {
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+
+        if (profileError) {
+          throw profileError;
+        }
+        setUser(profileData);
+      } else {
+        setUser(null);
+      }
+    });
   }, []);
 
-  const loginWithGoogle = async () => {
+  const signUp = async (data: any) => {
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: window.location.origin
-        }
-      });
-      
-      if (error) throw error;
-    } catch (error: any) {
-      console.error("Error logging in with Google:", error);
-      toast({
-        title: "Error",
-        description: error.message || "No se pudo iniciar sesión con Google",
-        variant: "destructive"
-      });
-      throw error;
-    }
-  };
-
-  const login = async (email: string, password: string) => {
-    setIsLoading(true);
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
-
-      if (error) throw error;
-      
-      toast({
-        title: "Inicio de sesión exitoso",
-        description: "Bienvenido a Prometheus CRM Nexus"
-      });
-    } catch (error: any) {
-      console.error(error);
-      toast({
-        title: "Error de inicio de sesión",
-        description: error.message || "Credenciales inválidas",
-        variant: "destructive"
-      });
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const register = async (name: string, email: string, password: string) => {
-    setIsLoading(true);
-    try {
-      const { error, data } = await supabase.auth.signUp({
-        email,
-        password,
+      setLoading(true);
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: data.email,
+        password: data.password,
         options: {
           data: {
-            full_name: name,
+            full_name: data.fullName,
           },
-          emailRedirectTo: `${window.location.origin}/onboarding`
-        }
+        },
       });
 
-      if (error) throw error;
-      
-      toast({
-        title: "Registro exitoso",
-        description: "Bienvenido a Prometheus CRM Nexus"
-      });
-      
-      // No hace falta iniciar sesión porque signUp ya establece la sesión
+      if (authError) {
+        throw authError;
+      }
+
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .insert({
+          id: authData.user?.id,
+          email: data.email,
+          full_name: data.fullName,
+        })
+        .select()
+        .single();
+
+      if (profileError) {
+        throw profileError;
+      }
+
+      setUser(profileData);
+      navigate('/onboarding');
     } catch (error: any) {
-      console.error(error);
       toast({
-        title: "Error de registro",
-        description: error.message || "No se pudo crear la cuenta",
-        variant: "destructive"
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
       });
-      throw error;
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  const logout = async () => {
+  const signIn = async (data: any) => {
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      
+      setLoading(true);
+      const { error } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
+      });
+
+      if (error) {
+        throw error;
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const signOut = async () => {
+    try {
+      setLoading(true);
+      await supabase.auth.signOut();
       setUser(null);
       setSession(null);
-      
-      toast({
-        title: "Sesión cerrada",
-        description: "Has cerrado sesión correctamente"
-      });
-    } catch (error) {
-      console.error("Error during logout:", error);
+      navigate('/login');
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "No se pudo cerrar la sesión",
-        variant: "destructive"
+        description: error.message,
+        variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const updateUser = (data: Partial<UserWithMeta>) => {
-    if (user) {
-      const updatedUser = { ...user, ...data };
-      setUser(updatedUser);
-    }
-  };
-
-  const createCompany = async (companyData: any) => {
-    if (!session?.user) throw new Error("Usuario no autenticado");
-    
+  const updateUser = async (data: any) => {
     try {
-      const { data, error } = await supabase
-        .from('empresas')
-        .insert([{
-          nombre: companyData.name,
-          descripcion: companyData.description,
-          email: companyData.email,
-          telefono: companyData.phone,
-          sitio_web: companyData.website,
-          direccion: companyData.address,
-          logo_url: companyData.logoUrl,
-          ciudad: companyData.city,
-          pais: companyData.country,
-          codigo_postal: companyData.postalCode,
-          created_by: session.user.id // Set the created_by field to the current user's ID
-        }])
-        .select('id')
-        .single();
-        
-      if (error) throw error;
-      
-      if (data.id) {
-        updateUser({ companyId: data.id });
+      setLoading(true);
+
+      const updates = {
+        id: user?.id,
+        full_name: data.fullName,
+        avatar_url: data.avatarUrl,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { error } = await supabase.from('profiles').upsert(updates);
+
+      if (error) {
+        throw error;
       }
-      
-      toast({
-        title: "Empresa creada",
-        description: "Información de empresa guardada correctamente"
-      });
-      
-      return data.id;
+
+      setUser({ ...user, ...data });
     } catch (error: any) {
-      console.error("Error creating company:", error);
       toast({
         title: "Error",
-        description: "No se pudo guardar la información de la empresa",
-        variant: "destructive"
+        description: error.message,
+        variant: "destructive",
       });
-      throw error;
+    } finally {
+      setLoading(false);
     }
   };
-  
-  const saveServices = async (servicesData: any[]) => {
-    if (!user?.companyId) throw new Error("No hay empresa asociada al usuario");
-    
+
+  const createChatbot = async (chatbotData: ChatbotCreationData) => {
     try {
-      const formattedServices = servicesData.map(service => ({
-        empresa_id: user.companyId,
-        nombre: service.name,
-        descripcion: service.description,
-        caracteristicas: service.features
-      }));
+      setLoading(true);
       
-      const { error } = await supabase
-        .from('empresa_productos')
-        .insert(formattedServices);
-        
-      if (error) throw error;
-      
-      toast({
-        title: "Servicios guardados",
-        description: "Los servicios se han guardado correctamente"
-      });
-    } catch (error: any) {
-      console.error("Error saving services:", error);
-      toast({
-        title: "Error",
-        description: "No se pudieron guardar los servicios",
-        variant: "destructive"
-      });
-      throw error;
-    }
-  };
-  
-  const createChatbot = async (chatbotData: any) => {
-    if (!user?.companyId) throw new Error("No hay empresa asociada al usuario");
-    
-    try {
-      let uploadedAvatarUrl = null;
-      
+      // Upload avatar if provided
+      let avatarUrl = null;
       if (chatbotData.avatarFile) {
-        try {
-          console.log("Preparing to upload avatar file to storage");
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('avatars')
+          .upload(`chatbot-${Date.now()}`, chatbotData.avatarFile, {
+            cacheControl: '3600',
+            upsert: false
+          });
           
-          const { data: bucketData, error: bucketError } = await supabase.storage
-            .getBucket('avatars');
-            
-          if (bucketError) {
-            console.error("Error checking avatars bucket:", bucketError.message);
-            console.log("Will continue without avatar upload");
-          } else {
-            console.log("Avatars bucket exists, proceeding with file upload");
-            
-            const fileExt = chatbotData.avatarFile.name.split('.').pop();
-            const fileName = `chatbot-${Date.now()}.${fileExt}`;
-            const filePath = `${fileName}`;
-            
-            const { error: uploadError, data } = await supabase.storage
-              .from('avatars')
-              .upload(filePath, chatbotData.avatarFile);
-              
-            if (uploadError) {
-              console.error("Error uploading avatar:", uploadError);
-            } else {
-              console.log("Avatar uploaded successfully");
-              
-              const { data: { publicUrl } } = supabase.storage
-                .from('avatars')
-                .getPublicUrl(filePath);
-                
-              uploadedAvatarUrl = publicUrl;
-              console.log("Public URL for avatar:", uploadedAvatarUrl);
-            }
-          }
-        } catch (uploadError) {
-          console.error("Error during avatar upload process:", uploadError);
-          // Continue with chatbot creation even if avatar upload fails
-        }
-      }
-      
-      let websiteChannelId = null;
-      const { data: channelData, error: channelError } = await supabase
-        .from('canales')
-        .select('id')
-        .eq('tipo', 'website')
-        .maybeSingle();
+        if (uploadError) throw uploadError;
         
-      if (channelError) {
-        console.error("Error fetching website channel:", channelError);
-      } else if (channelData) {
-        websiteChannelId = channelData.id;
-        console.log("Found website channel with ID:", websiteChannelId);
-      } else {
-        console.log("No website channel found in database");
+        const { data: urlData } = supabase.storage
+          .from('avatars')
+          .getPublicUrl(uploadData.path);
+          
+        avatarUrl = urlData.publicUrl;
       }
       
-      console.log("Creating chatbot with data:", {
-        empresa_id: user.companyId,
-        nombre: chatbotData.name,
-        personalidad: chatbotData.persona,
-        instrucciones: chatbotData.customInstructions,
-        avatar_url: uploadedAvatarUrl
-      });
-      
-      const { data: chatbotResult, error: chatbotError } = await supabase
+      // Create the chatbot
+      const { data: chatbotData, error: chatbotError } = await supabase
         .from('chatbots')
-        .insert([{
-          empresa_id: user.companyId,
+        .insert({
           nombre: chatbotData.name,
           personalidad: chatbotData.persona,
-          instrucciones: chatbotData.customInstructions,
-          avatar_url: uploadedAvatarUrl
-        }])
-        .select('id')
+          instrucciones: chatbotData.customInstructions || null,
+          avatar_url: avatarUrl,
+          empresa_id: user?.companyId
+        })
+        .select()
         .single();
         
-      if (chatbotError) {
-        console.error("Error creating chatbot:", chatbotError);
-        throw chatbotError;
-      }
+      if (chatbotError) throw chatbotError;
       
-      console.log("Chatbot created with ID:", chatbotResult.id);
-      const chatbotId = chatbotResult.id;
-      
-      if (websiteChannelId) {
-        console.log("Setting up chatbot channel integration with channel ID:", websiteChannelId);
+      // Create the chatbot context with the new fields
+      const { error: contextError } = await supabase
+        .from('chatbot_contextos')
+        .insert({
+          chatbot_id: chatbotData.id,
+          tipo: 'primary',
+          contenido: chatbotData.customInstructions || '',
+          welcome_message: chatbotData.welcomeMessage,
+          personality: chatbotData.persona,
+          communication_tone: 'professional',
+          main_purpose: 'customer_support',
+          key_points: JSON.stringify(chatbotData.faqs.map(faq => faq.question)),
+          special_instructions: chatbotData.customInstructions || '',
+          orden: 0
+        });
         
-        const { error: canalError } = await supabase
-          .from('chatbot_canales')
-          .insert([{
-            chatbot_id: chatbotId,
-            canal_id: websiteChannelId,
-            configuracion: {
-              mensaje_bienvenida: chatbotData.welcomeMessage
-            },
-            is_active: true
-          }]);
-            
-        if (canalError) {
-          console.error("Error creating chatbot channel integration:", canalError);
-        } else {
-          console.log("Chatbot channel integration created successfully");
-        }
-      }
+      if (contextError) throw contextError;
       
-      const validFaqs = chatbotData.faqs.filter((faq: any) => 
-        faq.question.trim() && faq.answer.trim()
-      );
-      
-      if (validFaqs.length > 0) {
-        console.log("Creating FAQs for the company");
+      // Create FAQs as additional context entries if provided
+      if (chatbotData.faqs && chatbotData.faqs.length > 0) {
+        const validFaqs = chatbotData.faqs.filter(faq => faq.question.trim() && faq.answer.trim());
         
-        const { error: faqError } = await supabase
-          .from('empresa_faqs')
-          .insert(validFaqs.map((faq: any, index: number) => ({
-            empresa_id: user.companyId,
-            pregunta: faq.question,
-            respuesta: faq.answer,
-            orden: index
-          })));
+        if (validFaqs.length > 0) {
+          // Add FAQs to empresa_faqs table
+          const { error: faqsError } = await supabase
+            .from('empresa_faqs')
+            .insert(
+              validFaqs.map((faq, index) => ({
+                empresa_id: user?.companyId,
+                pregunta: faq.question,
+                respuesta: faq.answer,
+                orden: index
+              }))
+            );
             
-        if (faqError) {
-          console.error("Error creating FAQs:", faqError);
-        } else {
-          console.log("FAQs created successfully");
+          if (faqsError) throw faqsError;
           
-          const faqsText = validFaqs.map((faq: any) => 
-            `Pregunta: ${faq.question}\nRespuesta: ${faq.answer}`
-          ).join('\n\n');
-          
-          const { error: contextoError } = await supabase
+          // Also add FAQ examples to qa_examples in the context
+          const { error: qaError } = await supabase
             .from('chatbot_contextos')
-            .insert([{
-              chatbot_id: chatbotId,
-              tipo: 'faqs',
-              contenido: faqsText,
-              orden: 1
-            }]);
-              
-          if (contextoError) {
-            console.error("Error creating chatbot context:", contextoError);
-          } else {
-            console.log("Chatbot context created successfully");
-          }
+            .update({ 
+              qa_examples: JSON.stringify(validFaqs.map(faq => ({
+                question: faq.question,
+                answer: faq.answer
+              })))
+            })
+            .eq('chatbot_id', chatbotData.id)
+            .eq('tipo', 'primary');
+            
+          if (qaError) throw qaError;
         }
       }
-      
-      await setOnboardingCompleted();
       
       toast({
         title: "Chatbot creado",
-        description: "El chatbot ha sido configurado correctamente"
+        description: "Su chatbot ha sido configurado correctamente"
       });
       
-      return chatbotId;
-    } catch (error: any) {
-      console.error("Error creating chatbot:", error);
+    } catch (error) {
+      console.error("Error al crear chatbot:", error);
       toast({
         title: "Error",
-        description: "No se pudo configurar el chatbot: " + (error.message || "Error desconocido"),
+        description: "No se pudo crear el chatbot. Por favor, intente nuevamente.",
         variant: "destructive"
       });
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
   const setOnboardingCompleted = async () => {
-    if (!user) {
-      console.error("No user found when trying to complete onboarding");
-      return Promise.reject("No user found");
-    }
-    
     try {
-      console.log(`Marking onboarding as completed for user ${user.id}`);
-      
+      setLoading(true);
       const { error } = await supabase
-        .from('profiles')
-        .update({
-          onboarding_completed: true,
-          onboarding_step: 'completed'
-        })
-        .eq('id', user.id);
-        
+        .from('empresas')
+        .update({ onboarding_completed: true })
+        .eq('id', user?.companyId);
+
       if (error) {
-        console.error("Error updating profile:", error);
-        return Promise.reject(error);
+        throw error;
       }
-      
-      // Update local user state
-      const updatedUser = { ...user, onboardingCompleted: true };
-      setUser(updatedUser);
-      
-      console.log("Onboarding completed successfully");
-      
+
+      setUser({ ...user, onboardingCompleted: true } as Profile);
+    } catch (error: any) {
       toast({
-        title: "Configuración completada",
-        description: "¡Ahora puedes comenzar a utilizar todas las funciones!"
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
       });
-      
-      return Promise.resolve();
-    } catch (error) {
-      console.error("Error in setOnboardingCompleted:", error);
-      return Promise.reject(error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -507,24 +331,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     user,
     session,
     isLoading,
-    login,
-    loginWithGoogle,
-    register,
-    logout,
+    signUp,
+    signIn,
+    signOut,
     updateUser,
+    createChatbot,
     setOnboardingCompleted,
-    createCompany,
-    saveServices,
-    createChatbot
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-};
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
 };

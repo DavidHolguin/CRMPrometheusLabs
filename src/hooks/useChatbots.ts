@@ -2,6 +2,7 @@
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { ChatbotContext } from "@/types/chatbot";
 
 export interface Chatbot {
   id: string;
@@ -15,6 +16,7 @@ export interface Chatbot {
   instrucciones: string | null;
   created_at: string;
   updated_at: string;
+  context?: ChatbotContext;
 }
 
 export function useChatbots() {
@@ -42,6 +44,30 @@ export function useChatbots() {
       }
       
       console.log("Chatbots obtenidos:", data?.length || 0);
+      
+      // Fetch contexts for all chatbots
+      if (data && data.length > 0) {
+        const chatbotIds = data.map(chatbot => chatbot.id);
+        const { data: contexts, error: contextsError } = await supabase
+          .from("chatbot_contextos")
+          .select("*")
+          .in("chatbot_id", chatbotIds)
+          .eq("tipo", "primary");
+          
+        if (contextsError) {
+          console.error("Error obteniendo contextos de chatbots:", contextsError);
+        } else if (contexts) {
+          // Map contexts to their respective chatbots
+          return data.map(chatbot => {
+            const context = contexts.find(ctx => ctx.chatbot_id === chatbot.id);
+            return {
+              ...chatbot,
+              context: context || undefined
+            };
+          });
+        }
+      }
+      
       return data || [];
     },
     enabled: !!user?.companyId,
@@ -69,8 +95,51 @@ export function useChatbot(id: string | undefined) {
         throw error;
       }
       
+      // Fetch the chatbot context
+      const { data: contextData, error: contextError } = await supabase
+        .from("chatbot_contextos")
+        .select("*")
+        .eq("chatbot_id", id)
+        .eq("tipo", "primary")
+        .maybeSingle();
+        
+      if (contextError) {
+        console.error("Error obteniendo contexto del chatbot:", contextError);
+      } else if (contextData) {
+        return {
+          ...data,
+          context: contextData
+        };
+      }
+      
       return data;
     },
     enabled: !!id,
+  });
+}
+
+export function useChatbotContext(chatbotId: string | undefined) {
+  return useQuery({
+    queryKey: ["chatbot-context", chatbotId],
+    queryFn: async (): Promise<ChatbotContext | null> => {
+      if (!chatbotId) {
+        return null;
+      }
+      
+      const { data, error } = await supabase
+        .from("chatbot_contextos")
+        .select("*")
+        .eq("chatbot_id", chatbotId)
+        .eq("tipo", "primary")
+        .maybeSingle();
+      
+      if (error) {
+        console.error("Error obteniendo contexto del chatbot:", error);
+        throw error;
+      }
+      
+      return data;
+    },
+    enabled: !!chatbotId,
   });
 }

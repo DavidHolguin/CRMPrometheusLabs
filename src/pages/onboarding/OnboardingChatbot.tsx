@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -30,12 +29,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { CheckIcon } from "lucide-react";
-
-interface FAQ {
-  id: string;
-  question: string;
-  answer: string;
-}
+import { FAQ } from "@/types/chatbot";
 
 const OnboardingChatbot = () => {
   const navigate = useNavigate();
@@ -50,7 +44,10 @@ const OnboardingChatbot = () => {
     welcomeMessage: "¡Hola! Soy el asistente virtual. ¿En qué puedo ayudarte hoy?",
     persona: "helpful",
     channels: ["website"],
-    customInstructions: ""
+    customInstructions: "",
+    generalContext: "",
+    communicationTone: "professional",
+    mainPurpose: "customer_support"
   });
   
   const [faqs, setFaqs] = useState<FAQ[]>([
@@ -123,6 +120,27 @@ const OnboardingChatbot = () => {
     setAvatarUrl(null);
   };
 
+  const personaDescriptions = {
+    friendly: "Amigable y cercano, conversacional y empático",
+    professional: "Profesional y formal, preciso y directo",
+    helpful: "Servicial y útil, enfocado en soluciones prácticas",
+    enthusiastic: "Entusiasta y enérgico, motivador y positivo"
+  };
+
+  const purposeOptions = [
+    { value: "customer_support", label: "Soporte al cliente" },
+    { value: "sales", label: "Ventas y conversión" },
+    { value: "lead_generation", label: "Generación de leads" },
+    { value: "information", label: "Información y FAQ" }
+  ];
+
+  const toneOptions = [
+    { value: "casual", label: "Casual e informal" },
+    { value: "professional", label: "Profesional y formal" },
+    { value: "friendly", label: "Amigable y cercano" },
+    { value: "technical", label: "Técnico y detallado" }
+  ];
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -150,7 +168,7 @@ const OnboardingChatbot = () => {
     try {
       const validFaqs = faqs.filter(faq => faq.question.trim() && faq.answer.trim());
       
-      // Create the chatbot
+      // Create the chatbot with enhanced context data
       await createChatbot({
         ...chatbot,
         avatarFile: avatarFile,
@@ -257,6 +275,63 @@ const OnboardingChatbot = () => {
               <p className="text-xs text-muted-foreground">
                 Este mensaje se mostrará cuando un usuario inicie una conversación con su chatbot.
               </p>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="generalContext">Contexto general</Label>
+              <Textarea
+                id="generalContext"
+                name="generalContext"
+                value={chatbot.generalContext}
+                onChange={handleChange}
+                placeholder="Información general sobre tu empresa, productos o servicios que el chatbot debe conocer."
+                rows={4}
+              />
+              <p className="text-xs text-muted-foreground">
+                Proporciona contexto general que el chatbot debe conocer sobre tu negocio.
+              </p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="mainPurpose">Propósito principal</Label>
+                <Select
+                  value={chatbot.mainPurpose}
+                  onValueChange={(value) => handleSelectChange("mainPurpose", value)}
+                >
+                  <SelectTrigger id="mainPurpose">
+                    <SelectValue placeholder="Seleccione el propósito" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {purposeOptions.map(option => (
+                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Define el objetivo principal de este chatbot.
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="communicationTone">Tono de comunicación</Label>
+                <Select
+                  value={chatbot.communicationTone}
+                  onValueChange={(value) => handleSelectChange("communicationTone", value)}
+                >
+                  <SelectTrigger id="communicationTone">
+                    <SelectValue placeholder="Seleccione un tono" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {toneOptions.map(option => (
+                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Define cómo debe comunicarse el chatbot con los usuarios.
+                </p>
+              </div>
             </div>
             
             <div className="space-y-2">
