@@ -13,7 +13,6 @@ import { useForm } from "react-hook-form";
 import { Smile, Send, ArrowLeft, MessagesSquare, Bot, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useMessages } from "@/hooks/useMessages";
 import { v4 as uuidv4 } from 'uuid';
 
 interface Message {
@@ -42,6 +41,7 @@ const ChatInterface = () => {
   const [sessionId, setSessionId] = useState<string>("");
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const channelRef = useRef<any>(null);
   const navigate = useNavigate();
   
   const userForm = useForm<UserFormValues>({
@@ -96,6 +96,15 @@ const ChatInterface = () => {
     if (chatbot) {
       checkUserSession();
     }
+
+    // Cleanup on unmount
+    return () => {
+      if (channelRef.current) {
+        console.log("Cleaning up realtime subscription on unmount");
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    };
   }, [chatbot, chatbotId]);
 
   // Load message history from Supabase
@@ -151,7 +160,7 @@ const ChatInterface = () => {
   const getSenderType = (origen: string, metadata: any): "user" | "bot" | "agent" => {
     console.log("Determining sender type for:", origen, metadata);
     
-    if (origen === "usuario") return "user";
+    if (origen === "usuario" || origen === "lead") return "user";
     
     // Check for agent first with more detailed logic
     if (origen === "agente") return "agent";
@@ -171,80 +180,108 @@ const ChatInterface = () => {
   useEffect(() => {
     if (!conversationId) return;
     
-    console.log("Setting up realtime subscription for conversation:", conversationId);
+    console.log("Setting up enhanced realtime subscription for conversation:", conversationId);
     
-    // Subscribe to new messages in this conversation
+    // Remove existing channel if there is one
+    if (channelRef.current) {
+      console.log("Removing existing channel subscription");
+      supabase.removeChannel(channelRef.current);
+    }
+    
+    // Subscribe to all changes in this conversation (INSERT, UPDATE, DELETE)
     const channel = supabase
-      .channel(`conversation-${conversationId}`)
+      .channel(`chat-messages-${conversationId}`)
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*', // Listen to all events
           schema: 'public',
           table: 'mensajes',
           filter: `conversacion_id=eq.${conversationId}`
         },
         (payload) => {
-          const newMessage = payload.new;
+          console.log("Real-time message event received:", payload);
           
-          // Check if message already exists in our state
-          const messageExists = messages.some(msg => msg.id === newMessage.id);
+          // Only process INSERT events
+          if (payload.eventType === 'INSERT') {
+            const newMessage = payload.new;
             
-          if (!messageExists) {
-            console.log("New real-time message received:", newMessage);
-            
-            const sender = getSenderType(newMessage.origen, newMessage.metadata);
-            console.log("Determined sender type:", sender);
-            
-            const message: Message = {
-              id: newMessage.id,
-              content: newMessage.contenido,
-              sender: sender,
-              timestamp: new Date(newMessage.created_at)
-            };
-            
-            console.log("Adding message to UI:", message);
-            setMessages(prev => [...prev, message]);
+            // Check if message already exists in our state to avoid duplicates
+            const messageExists = messages.some(msg => msg.id === newMessage.id);
+              
+            if (!messageExists) {
+              console.log("New real-time message received:", newMessage);
+              
+              const sender = getSenderType(newMessage.origen, newMessage.metadata);
+              console.log("Determined sender type:", sender);
+              
+              const message: Message = {
+                id: newMessage.id,
+                content: newMessage.contenido,
+                sender: sender,
+                timestamp: new Date(newMessage.created_at)
+              };
+              
+              console.log("Adding message to UI:", message);
+              setMessages(prev => [...prev, message]);
+              
+              // Auto scroll to bottom when new message arrives
+              setTimeout(() => {
+                messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+              }, 100);
+            } else {
+              console.log("Message already exists in state, skipping:", newMessage.id);
+            }
           }
         }
       )
       .subscribe((status) => {
-        console.log("Supabase realtime subscription status:", status);
+        console.log("Enhanced Supabase realtime subscription status:", status);
       });
       
+    // Save the channel reference for cleanup
+    channelRef.current = channel;
+    
     return () => {
-      console.log("Removing realtime subscription");
+      console.log("Removing realtime subscription for conversation:", conversationId);
       supabase.removeChannel(channel);
     };
-  }, [conversationId, messages]);
+  }, [conversationId, messages.length]); // Only recreate when conversationId changes or messages array length changes
 
   const handleSendMessage = async () => {
     if (!userMessage.trim() || !leadId || !conversationId || !chatbot) return;
     
-    const userMsg = {
-      id: Date.now().toString(),
-      content: userMessage,
-      sender: "user" as const,
-      timestamp: new Date(),
-    };
-    
-    setMessages((prev) => [...prev, userMsg]);
+    const message = userMessage.trim();
     setUserMessage("");
     setIsSubmitting(true);
     
     try {
       console.log("Saving message to Supabase:", {
-        contenido: userMessage,
+        contenido: message,
         conversacion_id: conversationId,
         origen: "usuario",
         remitente_id: leadId,
       });
       
-      // Guardar mensaje en Supabase
+      // Add optimistic UI update
+      const tempId = Date.now().toString();
+      setMessages(prev => [...prev, {
+        id: tempId,
+        content: message,
+        sender: "user",
+        timestamp: new Date()
+      }]);
+      
+      // Immediately scroll to bottom
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 50);
+      
+      // Wait for message to be saved
       const { data: msgData, error: msgError } = await supabase
         .from("mensajes")
         .insert({
-          contenido: userMessage,
+          contenido: message,
           conversacion_id: conversationId,
           origen: "usuario",
           remitente_id: leadId,
@@ -258,44 +295,12 @@ const ChatInterface = () => {
       
       console.log("Message saved to Supabase:", msgData);
       
-      // Enviar mensaje al endpoint
-      const response = await fetch('https://web-production-01457.up.railway.app/api/v1/channels/web', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          empresa_id: chatbot.empresa_id,
-          chatbot_id: chatbot.id,
-          mensaje: userMessage,
-          session_id: sessionId,
-          lead_id: leadId,
-          metadata: {
-            source: 'web_chat',
-            browser: navigator.userAgent
-          }
-        })
-      });
-      
-      if (!response.ok) {
-        throw new Error('Error al enviar mensaje al API');
-      }
-      
-      // The bot response should be handled by the real-time subscription now
+      // The server will send the lead message to the API and handle the chatbot response
+      // The response will come through the realtime subscription
       
     } catch (error) {
       console.error("Error sending message:", error);
       toast.error("Error al enviar el mensaje. Por favor intente de nuevo.");
-      
-      // Mensaje de error como respuesta del bot
-      const errorMsg = {
-        id: Date.now().toString(),
-        content: "Lo siento, hubo un problema al procesar tu mensaje. Por favor intenta de nuevo más tarde.",
-        sender: "bot" as const,
-        timestamp: new Date(),
-      };
-      
-      setMessages((prev) => [...prev, errorMsg]);
     } finally {
       setIsSubmitting(false);
     }
@@ -350,7 +355,6 @@ const ChatInterface = () => {
       localStorage.setItem(`lead_${chatbotId}`, newLeadId);
       
       // Now send a first message to the API to start the conversation
-      // The server will create the conversation for us
       console.log("Sending first message to API to start conversation");
       
       // Initial message to API
