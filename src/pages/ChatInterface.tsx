@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,7 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Drawer, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
+import { Drawer, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { EmojiPicker } from "@/components/conversations/EmojiPicker";
 
 interface Message {
@@ -41,6 +42,7 @@ const ChatInterface = () => {
   const [showRatingDrawer, setShowRatingDrawer] = useState(false);
   const [userRating, setUserRating] = useState(0);
   const [userFeedback, setUserFeedback] = useState("");
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<any>(null);
@@ -48,6 +50,7 @@ const ChatInterface = () => {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
+  const inputContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let storedSessionId = localStorage.getItem(`chatbot_session_${chatbotId}`);
@@ -200,6 +203,7 @@ const ChatInterface = () => {
       setUserFormSubmitted(true);
       setShowUserForm(false);
       
+      // Add a welcome message directly to the messages state
       const welcomeMessage = `Hola ${userName}, bienvenido/a a nuestro chat. ¿En qué podemos ayudarte hoy?`;
       
       const welcomeMsgObj = {
@@ -211,10 +215,76 @@ const ChatInterface = () => {
       
       setMessages([welcomeMsgObj]);
       
-      await sendMessage(`Nombre: ${userName}, Teléfono: ${userPhone}`);
+      // Important: When user submits form, we don't want to send the data as a message
+      // Instead, we'll start a conversation but we'll handle this data differently
+      await startConversation();
     } catch (error) {
       console.error("Error al iniciar chat:", error);
       toast.error("Hubo un problema al iniciar el chat. Intente de nuevo.");
+    }
+  };
+
+  // New function to start a conversation without sending the user data as a message
+  const startConversation = async () => {
+    try {
+      const empresaId = chatbotInfo?.empresa_id;
+      
+      if (!empresaId) {
+        throw new Error("No se pudo determinar la empresa del chatbot");
+      }
+      
+      console.log("Starting conversation with API:", {
+        empresa_id: empresaId,
+        chatbot_id: chatbotId,
+        session_id: sessionId,
+        metadata: {
+          browser: navigator.userAgent,
+          page: window.location.pathname,
+          name: userName || undefined,
+          phone: userPhone || undefined
+        }
+      });
+      
+      const apiEndpoint = import.meta.env.VITE_API_BASE_URL || 'https://web-production-01457.up.railway.app';
+      const response = await fetch(`${apiEndpoint}/api/v1/channels/web/init`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          empresa_id: empresaId,
+          chatbot_id: chatbotId,
+          session_id: sessionId,
+          metadata: {
+            browser: navigator.userAgent,
+            page: window.location.pathname,
+            name: userName || undefined,
+            phone: userPhone || undefined
+          }
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error al iniciar conversación: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log("API init response:", data);
+      
+      if (data.conversacion_id) {
+        setConversationId(data.conversacion_id);
+        localStorage.setItem(`chatbot_conversation_${chatbotId}`, data.conversacion_id);
+        setupRealtimeSubscription(data.conversacion_id);
+      }
+      
+      if (data.lead_id) {
+        setLeadId(data.lead_id);
+        localStorage.setItem(`chatbot_lead_${chatbotId}`, data.lead_id);
+      }
+      
+    } catch (error) {
+      console.error("Error starting conversation:", error);
+      toast.error("No se pudo iniciar la conversación. Intente de nuevo.");
     }
   };
 
@@ -376,6 +446,7 @@ const ChatInterface = () => {
     if (textareaRef.current) {
       textareaRef.current.focus();
     }
+    setShowEmojiPicker(false);
   };
 
   const toggleRecording = async () => {
@@ -490,14 +561,13 @@ const ChatInterface = () => {
     >
       <header className="p-3 bg-card shadow-sm flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-3">
-          <div className="relative">
-            <Avatar className="h-10 w-10 border-2 border-background">
+          <div className="avatar-border">
+            <Avatar className="h-10 w-10 border-2 border-primary/10">
               <AvatarImage src={chatbotInfo.avatar_url} />
               <AvatarFallback>
                 <Bot className="h-6 w-6" />
               </AvatarFallback>
             </Avatar>
-            <div className="absolute -bottom-1 -right-1 h-3.5 w-3.5 bg-green-500 rounded-full border-2 border-background"></div>
           </div>
           <div>
             <h1 className="text-base font-medium">{chatbotInfo.nombre}</h1>
@@ -560,14 +630,9 @@ const ChatInterface = () => {
       </header>
 
       <ScrollArea 
-        className="flex-1 p-4 bg-[#E5DDD5] dark:bg-gray-900 relative overflow-y-auto"
-        style={{
-          backgroundImage: 'url(https://static.whatsapp.net/rsrc.php/v4/yl/r/gi_DckOUM5a.png)',
-          backgroundRepeat: 'repeat',
-          backgroundSize: '210px'
-        }}
+        className="flex-1 chat-background"
       >
-        <div className="space-y-2 max-w-3xl mx-auto pb-2">
+        <div className="space-y-2 max-w-3xl mx-auto pb-2 p-4 chat-message-container">
           {messages.length === 0 ? (
             <div className="text-center py-8">
               <Bot className="h-12 w-12 mx-auto text-muted-foreground mb-4 opacity-50" />
@@ -585,51 +650,32 @@ const ChatInterface = () => {
               return (
                 <div 
                   key={msg.id} 
-                  className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}
+                  className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-2`}
                 >
+                  {!isUser && (
+                    <div className="flex flex-col items-start mr-1">
+                      <span className="text-xs font-medium mb-1 text-primary">
+                        {isBot ? chatbotInfo.nombre : msg.metadata?.agent_name || 'Agente'}
+                      </span>
+                    </div>
+                  )}
+                  
                   <div 
                     className={`
-                      max-w-[80%] px-3 py-2 rounded-lg relative shadow-sm
+                      relative px-3 py-2 shadow-sm max-w-[80%]
                       ${isUser 
-                        ? 'bg-[#d9fdd3] text-gray-800 rounded-tr-none' 
+                        ? 'user-bubble' 
                         : isBot 
-                          ? 'bg-white text-gray-800 rounded-tl-none' 
-                          : 'bg-[#e2f7fd] text-gray-800 rounded-tl-none'
+                          ? 'bot-bubble' 
+                          : 'agent-bubble'
                       }
                     `}
                   >
-                    {!isUser && (
-                      <div className="text-xs mb-1 font-medium flex items-center">
-                        {isBot ? (
-                          <>
-                            <Bot className="h-3 w-3 mr-1 text-primary" />
-                            <span className="text-primary font-semibold">{chatbotInfo.nombre}</span>
-                          </>
-                        ) : (
-                          <>
-                            <User className="h-3 w-3 mr-1 text-blue-500" />
-                            <span className="text-blue-500 font-semibold">{msg.metadata?.agent_name || 'Agente'}</span>
-                          </>
-                        )}
-                      </div>
-                    )}
                     <p className="whitespace-pre-wrap break-words text-sm font-normal">{msg.contenido}</p>
-                    <span className="text-[10px] text-gray-500 float-right mt-1 ml-2 flex items-center gap-1">
+                    <span className="text-[10px] text-opacity-70 float-right mt-1 ml-2 flex items-center gap-1">
                       {formatTime(msg.created_at)}
                       {isUser && <Check className="h-3 w-3" />}
                     </span>
-                    
-                    <div 
-                      className={`absolute top-0 w-2 h-2 overflow-hidden
-                        ${isUser 
-                          ? 'right-[-8px] border-t-8 border-t-[#d9fdd3] border-l-8 border-l-transparent' 
-                          : 'left-[-8px] border-t-8 border-t-white border-r-8 border-r-transparent'
-                        }
-                      `}
-                      style={{
-                        borderTopColor: isUser ? '#d9fdd3' : isBot ? 'white' : '#e2f7fd'
-                      }}
-                    />
                   </div>
                 </div>
               );
@@ -639,49 +685,52 @@ const ChatInterface = () => {
         </div>
       </ScrollArea>
 
-      <div className="p-2 border-t bg-card">
-        <div className="flex items-end gap-1">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full shrink-0">
-                <Smile className="h-5 w-5 text-gray-500" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <EmojiPicker onEmojiSelect={handleEmojiSelect} />
-            </PopoverContent>
-          </Popover>
+      <div className="p-2 border-t bg-gray-900">
+        <div className="flex items-center gap-1 chat-input relative rounded-full bg-gray-800 px-2" ref={inputContainerRef}>
+          <Button 
+            onClick={() => setShowEmojiPicker(!showEmojiPicker)} 
+            variant="ghost" 
+            size="icon" 
+            className="h-9 w-9 text-gray-400 hover:text-gray-200"
+          >
+            <Smile className="h-5 w-5" />
+          </Button>
           
-          <div className="flex-1 bg-background rounded-full border relative">
-            <Textarea
-              ref={textareaRef}
-              value={message}
-              onChange={handleTextareaChange}
-              onKeyDown={handleKeyDown}
-              placeholder="Escribe un mensaje..."
-              className="min-h-[40px] max-h-[120px] resize-none border-none rounded-full py-2 pr-12 focus-visible:ring-0 focus-visible:ring-offset-0 overflow-hidden"
-              disabled={sending || isRecording || showUserForm}
-            />
-            <Button 
-              onClick={handleSendButtonClick}
-              className="absolute right-1 bottom-1 h-8 w-8 rounded-full bg-primary hover:bg-primary/90 flex items-center justify-center"
-              disabled={sending || showUserForm}
-            >
-              {message.trim() ? (
-                <Send className="h-4 w-4 text-white" />
-              ) : (
-                <Mic className={`h-4 w-4 text-white ${isRecording ? 'animate-pulse' : ''}`} />
-              )}
-            </Button>
-          </div>
+          <Textarea
+            ref={textareaRef}
+            value={message}
+            onChange={handleTextareaChange}
+            onKeyDown={handleKeyDown}
+            placeholder="Escribe un mensaje..."
+            className="min-h-[40px] max-h-[120px] resize-none border-none bg-transparent py-2 focus-visible:ring-0 focus-visible:ring-offset-0 text-gray-200"
+            disabled={sending || isRecording || showUserForm}
+          />
+          
+          <Button 
+            onClick={handleSendButtonClick}
+            className="h-9 w-9 rounded-full bg-primary hover:bg-primary/90 flex items-center justify-center"
+            disabled={sending || showUserForm}
+          >
+            {message.trim() ? (
+              <Send className="h-4 w-4" />
+            ) : (
+              <Mic className={`h-4 w-4 ${isRecording ? 'animate-pulse' : ''}`} />
+            )}
+          </Button>
         </div>
       </div>
+      
+      {showEmojiPicker && (
+        <div className="absolute bottom-14 left-2 z-50">
+          <EmojiPicker onEmojiSelect={handleEmojiSelect} />
+        </div>
+      )}
 
       {showUserForm && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-card rounded-lg shadow-lg max-w-md w-full p-6 space-y-4 relative">
             <div className="text-center mb-4">
-              <Avatar className="h-16 w-16 mx-auto mb-2">
+              <Avatar className="h-16 w-16 mx-auto mb-2 avatar-border">
                 <AvatarImage src={chatbotInfo.avatar_url} />
                 <AvatarFallback>
                   <Bot className="h-8 w-8" />
@@ -740,7 +789,7 @@ const ChatInterface = () => {
             <SheetTitle>Mi Perfil</SheetTitle>
           </SheetHeader>
           <div className="flex flex-col items-center py-6">
-            <Avatar className="h-24 w-24 mb-4">
+            <Avatar className="h-24 w-24 mb-4 avatar-border">
               <AvatarFallback className="text-2xl">
                 {userName ? userName.charAt(0).toUpperCase() : "U"}
               </AvatarFallback>

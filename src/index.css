@@ -39,6 +39,11 @@
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+    
+    /* Chat bubble colors */
+    --user-bubble: 142, 71%, 45%;
+    --bot-bubble: 0, 0%, 100%;
+    --agent-bubble: 199, 89%, 48%;
   }
 
   .dark {
@@ -75,6 +80,11 @@
     --sidebar-accent-foreground: 210 40% 98%;
     --sidebar-border: 217.2 32.6% 17.5%;
     --sidebar-ring: 224.3 76.3% 48%;
+    
+    /* Chat bubble colors for dark mode */
+    --user-bubble: 142, 40%, 40%;
+    --bot-bubble: 0, 0%, 20%;
+    --agent-bubble: 199, 60%, 40%;
   }
 }
 
@@ -98,8 +108,8 @@ html, body, #root {
 
 /* Scrollbar Styling */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -114,4 +124,104 @@ html, body, #root {
 
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--muted-foreground) / 0.5);
+}
+
+/* Chat styles */
+.chat-background {
+  background-image: url('https://static.whatsapp.net/rsrc.php/v4/yl/r/gi_DckOUM5a.png');
+  background-repeat: repeat;
+  background-size: 210px;
+  position: relative;
+}
+
+.chat-background::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.05);
+  z-index: 0;
+}
+
+.chat-message-container {
+  position: relative;
+  z-index: 1;
+}
+
+.user-bubble {
+  background-color: hsl(var(--user-bubble));
+  color: #ffffff;
+  border-radius: 0.75rem 0 0.75rem 0.75rem;
+  box-shadow: 0 1px 0.5px rgba(0,0,0,0.13);
+}
+
+.user-bubble::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: -8px;
+  width: 0;
+  height: 0;
+  border-left: 8px solid hsl(var(--user-bubble));
+  border-top: 8px solid transparent;
+}
+
+.bot-bubble {
+  background-color: hsl(var(--bot-bubble));
+  color: hsl(var(--foreground));
+  border-radius: 0 0.75rem 0.75rem 0.75rem;
+  box-shadow: 0 1px 0.5px rgba(0,0,0,0.13);
+}
+
+.bot-bubble::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -8px;
+  width: 0;
+  height: 0;
+  border-right: 8px solid hsl(var(--bot-bubble));
+  border-top: 8px solid transparent;
+}
+
+.agent-bubble {
+  background-color: hsl(var(--agent-bubble));
+  color: #ffffff;
+  border-radius: 0 0.75rem 0.75rem 0.75rem;
+  box-shadow: 0 1px 0.5px rgba(0,0,0,0.13);
+}
+
+.agent-bubble::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -8px;
+  width: 0;
+  height: 0;
+  border-right: 8px solid hsl(var(--agent-bubble));
+  border-top: 8px solid transparent;
+}
+
+.chat-input {
+  border-radius: 100px;
+  background-color: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+}
+
+.avatar-border {
+  position: relative;
+}
+
+.avatar-border::after {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background-color: #4CAF50;
+  border-radius: 50%;
+  bottom: -2px;
+  right: -2px;
+  border: 2px solid hsl(var(--background));
 }
