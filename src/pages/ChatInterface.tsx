@@ -13,7 +13,6 @@ import { Separator } from "@/components/ui/separator";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Drawer, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { EmojiPicker } from "@/components/conversations/EmojiPicker";
-
 interface Message {
   id: string;
   contenido: string;
@@ -21,9 +20,10 @@ interface Message {
   created_at: string;
   metadata?: any;
 }
-
 const ChatInterface = () => {
-  const { chatbotId } = useParams();
+  const {
+    chatbotId
+  } = useParams();
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [message, setMessage] = useState("");
@@ -42,7 +42,6 @@ const ChatInterface = () => {
   const [userRating, setUserRating] = useState(0);
   const [userFeedback, setUserFeedback] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<any>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -51,7 +50,6 @@ const ChatInterface = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const inputContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-
   useEffect(() => {
     let storedSessionId = localStorage.getItem(`chatbot_session_${chatbotId}`);
     if (!storedSessionId) {
@@ -59,64 +57,50 @@ const ChatInterface = () => {
       localStorage.setItem(`chatbot_session_${chatbotId}`, storedSessionId);
     }
     setSessionId(storedSessionId);
-    
     const storedLeadId = localStorage.getItem(`chatbot_lead_${chatbotId}`);
     const storedName = localStorage.getItem(`chatbot_name_${chatbotId}`);
     const storedPhone = localStorage.getItem(`chatbot_phone_${chatbotId}`);
-    
     if (storedLeadId) {
       setLeadId(storedLeadId);
       setUserFormSubmitted(true);
     }
-    
     if (storedName) setUserName(storedName);
     if (storedPhone) setUserPhone(storedPhone);
-
     const storedConversationId = localStorage.getItem(`chatbot_conversation_${chatbotId}`);
     if (storedConversationId) {
       setConversationId(storedConversationId);
       fetchMessages(storedConversationId);
     }
-
     fetchChatbotInfo();
-
     if (!storedLeadId && !storedName && !storedPhone) {
       setShowUserForm(true);
     }
-
     return () => {
       if (channelRef.current) {
         console.log(`Removing realtime subscription for conversation: ${conversationId}`);
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
       }
-      
       if (mediaRecorderRef.current && isRecording) {
         mediaRecorderRef.current.stop();
       }
     };
   }, [chatbotId]);
-
   useEffect(() => {
     if (conversationId) {
       setupRealtimeSubscription(conversationId);
     }
   }, [conversationId]);
-
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
-
   const fetchChatbotInfo = async () => {
     try {
-      const { data, error } = await supabase
-        .from("chatbots")
-        .select("*")
-        .eq("id", chatbotId)
-        .single();
-
+      const {
+        data,
+        error
+      } = await supabase.from("chatbots").select("*").eq("id", chatbotId).single();
       if (error) throw error;
-      
       setChatbotInfo(data);
       setLoading(false);
     } catch (error) {
@@ -124,111 +108,84 @@ const ChatInterface = () => {
       setLoading(false);
     }
   };
-
   const fetchMessages = async (convoId: string) => {
     try {
-      const { data, error } = await supabase
-        .from("mensajes")
-        .select("*")
-        .eq("conversacion_id", convoId)
-        .order("created_at", { ascending: true });
-
+      const {
+        data,
+        error
+      } = await supabase.from("mensajes").select("*").eq("conversacion_id", convoId).order("created_at", {
+        ascending: true
+      });
       if (error) throw error;
-      
       console.log("Fetched messages:", data);
       setMessages(data || []);
     } catch (error) {
       console.error("Error fetching messages:", error);
     }
   };
-
   const setupRealtimeSubscription = (convoId: string) => {
     if (channelRef.current) {
       console.log("Removing existing channel subscription");
       supabase.removeChannel(channelRef.current);
     }
-    
     const channelName = `public-chat-${convoId}-${Date.now()}`;
     console.log(`Setting up realtime subscription for conversation: ${convoId} with channel: ${channelName}`);
-    
-    const channel = supabase
-      .channel(channelName)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'mensajes',
-          filter: `conversacion_id=eq.${convoId} AND origen=eq.agente`
-        },
-        (payload) => {
-          if (payload.eventType === 'INSERT') {
-            console.log("New agent message received:", payload.new);
-            
-            const newMsg = payload.new as Message;
-            if (newMsg.metadata && newMsg.metadata.is_system_message === true) {
-              console.log("Skipping system message:", newMsg);
-              return;
-            }
-            
-            setMessages(currentMessages => {
-              const messageExists = currentMessages.some(msg => msg.id === payload.new.id);
-              
-              if (messageExists) {
-                return currentMessages;
-              }
-              
-              return [...currentMessages, newMsg];
-            });
-          }
+    const channel = supabase.channel(channelName).on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'mensajes',
+      filter: `conversacion_id=eq.${convoId} AND origen=eq.agente`
+    }, payload => {
+      if (payload.eventType === 'INSERT') {
+        console.log("New agent message received:", payload.new);
+        const newMsg = payload.new as Message;
+        if (newMsg.metadata && newMsg.metadata.is_system_message === true) {
+          console.log("Skipping system message:", newMsg);
+          return;
         }
-      )
-      .subscribe((status) => {
-        console.log(`Realtime subscription status: ${status}`);
-      });
-    
+        setMessages(currentMessages => {
+          const messageExists = currentMessages.some(msg => msg.id === payload.new.id);
+          if (messageExists) {
+            return currentMessages;
+          }
+          return [...currentMessages, newMsg];
+        });
+      }
+    }).subscribe(status => {
+      console.log(`Realtime subscription status: ${status}`);
+    });
     channelRef.current = channel;
   };
-
   const submitUserForm = async () => {
     if (!userName.trim() || !userPhone.trim()) {
       toast.error("Por favor, ingresa tu nombre y número de teléfono");
       return;
     }
-
     try {
       localStorage.setItem(`chatbot_name_${chatbotId}`, userName);
       localStorage.setItem(`chatbot_phone_${chatbotId}`, userPhone);
-      
       setUserFormSubmitted(true);
       setShowUserForm(false);
-      
       const welcomeMessage = `Hola ${userName}, bienvenido/a a nuestro chat. ¿En qué podemos ayudarte hoy?`;
-      
       const welcomeMsgObj = {
         id: uuidv4(),
         contenido: welcomeMessage,
         origen: "chatbot",
-        created_at: new Date().toISOString(),
+        created_at: new Date().toISOString()
       };
-      
       setMessages([welcomeMsgObj]);
-      
       await startConversation();
     } catch (error) {
       console.error("Error al iniciar chat:", error);
       toast.error("Hubo un problema al iniciar el chat. Intente de nuevo.");
     }
   };
-
   const startConversation = async () => {
     try {
       const empresaId = chatbotInfo?.empresa_id;
-      
       if (!empresaId) {
         throw new Error("No se pudo determinar la empresa del chatbot");
       }
-      
       console.log("Starting conversation with API:", {
         empresa_id: empresaId,
         chatbot_id: chatbotId,
@@ -240,12 +197,11 @@ const ChatInterface = () => {
           phone: userPhone || undefined
         }
       });
-      
       const apiEndpoint = import.meta.env.VITE_API_BASE_URL || 'https://web-production-01457.up.railway.app';
       const response = await fetch(`${apiEndpoint}/api/v1/channels/web/init`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           empresa_id: empresaId,
@@ -259,37 +215,30 @@ const ChatInterface = () => {
           }
         })
       });
-      
       if (!response.ok) {
         throw new Error(`Error al iniciar conversación: ${response.statusText}`);
       }
-      
       const data = await response.json();
       console.log("API init response:", data);
-      
       if (data.conversacion_id) {
         setConversationId(data.conversacion_id);
         localStorage.setItem(`chatbot_conversation_${chatbotId}`, data.conversacion_id);
         setupRealtimeSubscription(data.conversacion_id);
       }
-      
       if (data.lead_id) {
         setLeadId(data.lead_id);
         localStorage.setItem(`chatbot_lead_${chatbotId}`, data.lead_id);
       }
-      
     } catch (error) {
       console.error("Error starting conversation:", error);
       toast.error("No se pudo iniciar la conversación. Intente de nuevo.");
     }
   };
-
   const submitRating = async () => {
     if (userRating === 0) {
       toast.error("Por favor, seleccione una calificación");
       return;
     }
-
     try {
       toast.success("¡Gracias por tu opinión!");
       setShowRatingDrawer(false);
@@ -298,51 +247,41 @@ const ChatInterface = () => {
       toast.error("No se pudo enviar la calificación. Intente de nuevo.");
     }
   };
-
   const sendMessage = async (customContent?: string) => {
     const messageContent = customContent || message.trim();
-    
     if (!messageContent && !isRecording && audioChunksRef.current.length === 0) return;
-    
     setSending(true);
-    
     try {
       const empresaId = chatbotInfo?.empresa_id;
-      
       if (!empresaId) {
         throw new Error("No se pudo determinar la empresa del chatbot");
       }
-      
       const optimisticId = uuidv4();
       const optimisticMsg = {
         id: optimisticId,
         contenido: messageContent,
         origen: "usuario",
-        created_at: new Date().toISOString(),
+        created_at: new Date().toISOString()
       };
-      
       setMessages(prev => [...prev, optimisticMsg]);
-      
       if (!customContent) {
         setMessage("");
         if (textareaRef.current) {
           textareaRef.current.style.height = "auto";
         }
       }
-      
       console.log("Sending message to API:", {
         empresa_id: empresaId,
         chatbot_id: chatbotId,
         mensaje: messageContent,
         session_id: sessionId,
-        lead_id: leadId || undefined,
+        lead_id: leadId || undefined
       });
-      
       const apiEndpoint = import.meta.env.VITE_API_BASE_URL || 'https://web-production-01457.up.railway.app';
       const response = await fetch(`${apiEndpoint}/api/v1/channels/web`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           empresa_id: empresaId,
@@ -358,34 +297,24 @@ const ChatInterface = () => {
           }
         })
       });
-      
       if (!response.ok) {
         throw new Error(`Error al enviar mensaje: ${response.statusText}`);
       }
-      
       const data = await response.json();
       console.log("API response:", data);
-      
       setMessages(prev => {
         const filtered = prev.filter(msg => msg.id !== optimisticId);
-        
-        const userMsgExists = filtered.some(msg => 
-          msg.id === data.mensaje_id && msg.origen === "usuario");
-        
-        const botResponseExists = filtered.some(msg => 
-          msg.contenido === data.respuesta && msg.origen === "chatbot");
-        
+        const userMsgExists = filtered.some(msg => msg.id === data.mensaje_id && msg.origen === "usuario");
+        const botResponseExists = filtered.some(msg => msg.contenido === data.respuesta && msg.origen === "chatbot");
         let newMessages = [...filtered];
-        
         if (!userMsgExists) {
           newMessages.push({
             id: data.mensaje_id,
             contenido: messageContent,
             origen: "usuario",
-            created_at: new Date().toISOString(),
+            created_at: new Date().toISOString()
           });
         }
-        
         if (!botResponseExists && data.respuesta) {
           newMessages.push({
             id: uuidv4(),
@@ -395,43 +324,34 @@ const ChatInterface = () => {
             metadata: data.metadata
           });
         }
-        
         return newMessages;
       });
-      
       if (data.conversacion_id && data.conversacion_id !== conversationId) {
         setConversationId(data.conversacion_id);
         localStorage.setItem(`chatbot_conversation_${chatbotId}`, data.conversacion_id);
-        
         setupRealtimeSubscription(data.conversacion_id);
       }
-      
       if (data.lead_id && data.lead_id !== leadId) {
         setLeadId(data.lead_id);
         localStorage.setItem(`chatbot_lead_${chatbotId}`, data.lead_id);
       }
-      
     } catch (error) {
       console.error("Error sending message:", error);
       toast.error("No se pudo enviar el mensaje. Intente de nuevo.");
-      
       setMessages(prev => prev.filter(msg => msg.contenido !== messageContent || msg.origen !== "usuario"));
     } finally {
       setSending(false);
     }
   };
-
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
     }
   };
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setMessage(e.target.value);
   };
-
   const handleEmojiSelect = (emoji: string) => {
     setMessage(prev => prev + emoji);
     if (inputRef.current) {
@@ -439,39 +359,35 @@ const ChatInterface = () => {
     }
     setShowEmojiPicker(false);
   };
-
   const toggleRecording = async () => {
     try {
       if (!isRecording) {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true
+        });
         const mediaRecorder = new MediaRecorder(stream);
-        
         mediaRecorderRef.current = mediaRecorder;
         audioChunksRef.current = [];
-        
-        mediaRecorder.ondataavailable = (event) => {
+        mediaRecorder.ondataavailable = event => {
           if (event.data.size > 0) {
             audioChunksRef.current.push(event.data);
           }
         };
-        
         mediaRecorder.onstop = () => {
-          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-          
+          const audioBlob = new Blob(audioChunksRef.current, {
+            type: 'audio/webm'
+          });
           const reader = new FileReader();
           reader.readAsDataURL(audioBlob);
           reader.onloadend = () => {
             const base64Audio = reader.result?.toString().split(',')[1];
             toast.info("Audio recording feature coming soon!");
-            
             setIsRecording(false);
             audioChunksRef.current = [];
           };
-          
           const tracks = stream.getTracks();
           tracks.forEach(track => track.stop());
         };
-        
         mediaRecorder.start();
         setIsRecording(true);
         toast.info("Grabando... Toca de nuevo para detener.");
@@ -485,42 +401,36 @@ const ChatInterface = () => {
       toast.error("No se pudo acceder al micrófono. Verifique los permisos.");
     }
   };
-
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    messagesEndRef.current?.scrollIntoView({
+      behavior: "smooth"
+    });
   };
-
   const getSenderType = (origen: string, metadata: any): "user" | "bot" | "agent" => {
     if (origen === 'usuario' || origen === 'lead' || origen === 'user') return "user";
     if (origen === 'chatbot' || origen === 'bot') return "bot";
     if (origen === 'agente' || origen === 'agent') return "agent";
-    
-    return origen === "agente" ? "agent" : (origen === "chatbot" ? "bot" : "user");
+    return origen === "agente" ? "agent" : origen === "chatbot" ? "bot" : "user";
   };
-
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
-
   const getLastActiveTime = () => {
     if (messages.length === 0) return "Ahora";
     const lastMessage = messages[messages.length - 1];
     return formatTime(lastMessage.created_at);
   };
-
   const renderStars = () => {
-    return Array.from({ length: 5 }).map((_, i) => (
-      <button 
-        key={i} 
-        className={`p-2 ${i < userRating ? 'text-yellow-400' : 'text-gray-300'}`}
-        onClick={() => setUserRating(i + 1)}
-      >
+    return Array.from({
+      length: 5
+    }).map((_, i) => <button key={i} className={`p-2 ${i < userRating ? 'text-yellow-400' : 'text-gray-300'}`} onClick={() => setUserRating(i + 1)}>
         <Star className="h-8 w-8" fill={i < userRating ? "currentColor" : "none"} />
-      </button>
-    ));
+      </button>);
   };
-
   const handleSendButtonClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     if (message.trim()) {
@@ -529,32 +439,21 @@ const ChatInterface = () => {
       toggleRecording();
     }
   };
-
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
+    return <div className="flex items-center justify-center h-screen">
         <p>Cargando chatbot...</p>
-      </div>
-    );
+      </div>;
   }
-
   if (!chatbotInfo) {
-    return (
-      <div className="flex items-center justify-center h-screen">
+    return <div className="flex items-center justify-center h-screen">
         <p>Chatbot no encontrado.</p>
-      </div>
-    );
+      </div>;
   }
-
-  return (
-    <div 
-      className="flex flex-col h-screen bg-[#0e1621]"
-      ref={containerRef}
-    >
+  return <div className="flex flex-col h-screen bg-[#0e1621]" ref={containerRef}>
       <header className="p-3 bg-[#1f2c34] shadow-sm flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-3">
           <div className="avatar-border">
-            <Avatar className="h-10 w-10 border-2 border-transparent">
+            <Avatar className="h-10 w-10 border-2 border-transparent text-green-500">
               <AvatarImage src={chatbotInfo.avatar_url} />
               <AvatarFallback>
                 <Bot className="h-6 w-6" />
@@ -575,42 +474,22 @@ const ChatInterface = () => {
           </PopoverTrigger>
           <PopoverContent className="w-56 bg-[#1f2c34] border-0 text-white" align="end">
             <div className="space-y-1">
-              <Button 
-                variant="ghost" 
-                className="w-full justify-start text-gray-200 hover:bg-[#2a3942]" 
-                size="sm"
-                onClick={() => setShowProfile(true)}
-              >
+              <Button variant="ghost" className="w-full justify-start text-gray-200 hover:bg-[#2a3942]" size="sm" onClick={() => setShowProfile(true)}>
                 <User className="mr-2 h-4 w-4" />
                 <span>Mi perfil</span>
               </Button>
-              <Button 
-                variant="ghost" 
-                className="w-full justify-start text-gray-200 hover:bg-[#2a3942]" 
-                size="sm"
-                onClick={() => setShowRatingDrawer(true)}
-              >
+              <Button variant="ghost" className="w-full justify-start text-gray-200 hover:bg-[#2a3942]" size="sm" onClick={() => setShowRatingDrawer(true)}>
                 <Star className="mr-2 h-4 w-4" />
                 <span>Calificar chatbot</span>
               </Button>
               <Separator className="my-2 bg-gray-700" />
-              <Button 
-                variant="ghost" 
-                className="w-full justify-start text-xs text-gray-400 hover:bg-[#2a3942]" 
-                size="sm"
-                asChild
-              >
+              <Button variant="ghost" className="w-full justify-start text-xs text-gray-400 hover:bg-[#2a3942]" size="sm" asChild>
                 <a href="#" target="_blank" rel="noopener noreferrer">
                   <Shield className="mr-2 h-4 w-4" />
                   <span>Políticas de privacidad</span>
                 </a>
               </Button>
-              <Button 
-                variant="ghost" 
-                className="w-full justify-start text-xs text-gray-400 hover:bg-[#2a3942]" 
-                size="sm"
-                asChild
-              >
+              <Button variant="ghost" className="w-full justify-start text-xs text-gray-400 hover:bg-[#2a3942]" size="sm" asChild>
                 <a href="#" target="_blank" rel="noopener noreferrer">
                   <Info className="mr-2 h-4 w-4" />
                   <span>Términos de uso</span>
@@ -623,91 +502,51 @@ const ChatInterface = () => {
 
       <ScrollArea className="flex-1 chat-background">
         <div className="space-y-2 max-w-3xl mx-auto pb-2 p-4 chat-message-container">
-          {messages.length === 0 ? (
-            <div className="text-center py-8">
+          {messages.length === 0 ? <div className="text-center py-8">
               <Bot className="h-12 w-12 mx-auto text-gray-500 mb-4 opacity-50" />
               <p className="text-gray-400 text-sm bg-[#1f2c34]/50 p-3 rounded-lg backdrop-blur-sm inline-block">
                 Inicia una conversación con el chatbot.
               </p>
-            </div>
-          ) : (
-            messages.filter(msg => !(msg.metadata && msg.metadata.is_system_message === true)).map((msg) => {
-              const isUser = msg.origen === 'usuario' || msg.origen === 'lead' || msg.origen === 'user';
-              const isBot = msg.origen === 'chatbot' || msg.origen === 'bot';
-              const isAgent = msg.origen === 'agente' || msg.origen === 'agent';
-              
-              return (
-                <div 
-                  key={msg.id} 
-                  className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-3`}
-                >
-                  <div 
-                    className={`
+            </div> : messages.filter(msg => !(msg.metadata && msg.metadata.is_system_message === true)).map(msg => {
+          const isUser = msg.origen === 'usuario' || msg.origen === 'lead' || msg.origen === 'user';
+          const isBot = msg.origen === 'chatbot' || msg.origen === 'bot';
+          const isAgent = msg.origen === 'agente' || msg.origen === 'agent';
+          return <div key={msg.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-3`}>
+                  <div className={`
                       relative px-3 py-2 shadow-sm max-w-[80%]
-                      ${isUser 
-                        ? 'user-bubble' 
-                        : isBot 
-                          ? 'bot-bubble' 
-                          : 'agent-bubble'
-                      }
-                    `}
-                  >
+                      ${isUser ? 'user-bubble' : isBot ? 'bot-bubble' : 'agent-bubble'}
+                    `}>
                     <p className="whitespace-pre-wrap break-words text-sm font-normal">{msg.contenido}</p>
                     <span className="chat-timestamp">
                       {formatTime(msg.created_at)}
                       {isUser && <Check className="ml-1 h-3 w-3" />}
                     </span>
                   </div>
-                </div>
-              );
-            })
-          )}
+                </div>;
+        })}
           <div ref={messagesEndRef} />
         </div>
       </ScrollArea>
 
       <div className="p-2 bg-[#0e1621] border-t border-[#1f2c34]">
         <div className="whatsapp-input-container" ref={inputContainerRef}>
-          <button 
-            onClick={() => setShowEmojiPicker(!showEmojiPicker)} 
-            className="whatsapp-button"
-          >
+          <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="whatsapp-button">
             <Smile className="h-6 w-6" />
           </button>
           
-          <input
-            ref={inputRef}
-            type="text"
-            value={message}
-            onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
-            placeholder="Mensaje"
-            className="whatsapp-input"
-            disabled={sending || isRecording || showUserForm}
-          />
+          <input ref={inputRef} type="text" value={message} onChange={handleInputChange} onKeyDown={handleKeyDown} placeholder="Mensaje" className="whatsapp-input" disabled={sending || isRecording || showUserForm} />
           
-          <button 
-            onClick={handleSendButtonClick}
-            className={`whatsapp-button ${message.trim() ? 'whatsapp-send-button' : ''}`}
-            disabled={sending || showUserForm}
-          >
-            {message.trim() ? (
-              <Send className="h-5 w-5" />
-            ) : (
-              <Mic className={`h-6 w-6 ${isRecording ? 'animate-pulse' : ''}`} />
-            )}
+          <button onClick={handleSendButtonClick} className={`whatsapp-button ${message.trim() ? 'whatsapp-send-button' : ''}`} disabled={sending || showUserForm}>
+            {message.trim() ? <Send className="h-5 w-5" /> : <Mic className={`h-6 w-6 ${isRecording ? 'animate-pulse' : ''}`} />}
           </button>
         </div>
       </div>
       
-      {showEmojiPicker && (
-        <div className="absolute bottom-14 left-2 z-50">
+      {showEmojiPicker && <div className="absolute bottom-14 left-2 z-50">
           <EmojiPicker onEmojiSelect={handleEmojiSelect} />
-        </div>
-      )}
+        </div>}
 
-      {showUserForm && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      {showUserForm && <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-card rounded-lg shadow-lg max-w-md w-full p-6 space-y-4 relative">
             <div className="text-center mb-4">
               <Avatar className="h-16 w-16 mx-auto mb-2 avatar-border">
@@ -726,42 +565,23 @@ const ChatInterface = () => {
                 <label htmlFor="userName" className="text-sm font-medium">
                   Nombre completo
                 </label>
-                <input
-                  id="userName"
-                  type="text"
-                  value={userName}
-                  onChange={(e) => setUserName(e.target.value)}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  placeholder="Ingresa tu nombre"
-                />
+                <input id="userName" type="text" value={userName} onChange={e => setUserName(e.target.value)} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" placeholder="Ingresa tu nombre" />
               </div>
               <div className="space-y-1">
                 <label htmlFor="userPhone" className="text-sm font-medium">
                   Número de teléfono
                 </label>
-                <input
-                  id="userPhone"
-                  type="tel"
-                  value={userPhone}
-                  onChange={(e) => setUserPhone(e.target.value)}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  placeholder="Ingresa tu número de teléfono"
-                />
+                <input id="userPhone" type="tel" value={userPhone} onChange={e => setUserPhone(e.target.value)} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" placeholder="Ingresa tu número de teléfono" />
               </div>
             </div>
-            <Button 
-              className="w-full mt-4" 
-              onClick={submitUserForm}
-              disabled={!userName.trim() || !userPhone.trim()}
-            >
+            <Button className="w-full mt-4" onClick={submitUserForm} disabled={!userName.trim() || !userPhone.trim()}>
               Iniciar chat
             </Button>
             <p className="text-xs text-center text-muted-foreground mt-4">
               Al continuar, aceptas nuestras políticas de privacidad y términos de uso.
             </p>
           </div>
-        </div>
-      )}
+        </div>}
 
       <Sheet open={showProfile} onOpenChange={setShowProfile}>
         <SheetContent side="right" className="sm:max-w-md">
@@ -799,12 +619,7 @@ const ChatInterface = () => {
             <div>
               <h4 className="text-sm font-medium mb-2">Acciones</h4>
               <div className="space-y-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="w-full justify-start"
-                  onClick={() => setShowRatingDrawer(true)}
-                >
+                <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => setShowRatingDrawer(true)}>
                   <Star className="mr-2 h-4 w-4" />
                   <span>Calificar chatbot</span>
                 </Button>
@@ -814,24 +629,14 @@ const ChatInterface = () => {
             <div>
               <h4 className="text-sm font-medium mb-2">Legal</h4>
               <div className="space-y-2">
-                <Button 
-                  variant="link" 
-                  size="sm" 
-                  className="w-full justify-start p-0 h-auto"
-                  asChild
-                >
+                <Button variant="link" size="sm" className="w-full justify-start p-0 h-auto" asChild>
                   <a href="#" target="_blank" rel="noopener noreferrer">
                     <Shield className="mr-2 h-4 w-4" />
                     <span>Políticas de privacidad</span>
                     <ExternalLink className="ml-auto h-3 w-3" />
                   </a>
                 </Button>
-                <Button 
-                  variant="link" 
-                  size="sm" 
-                  className="w-full justify-start p-0 h-auto"
-                  asChild
-                >
+                <Button variant="link" size="sm" className="w-full justify-start p-0 h-auto" asChild>
                   <a href="#" target="_blank" rel="noopener noreferrer">
                     <Info className="mr-2 h-4 w-4" />
                     <span>Términos de uso</span>
@@ -858,12 +663,7 @@ const ChatInterface = () => {
             </div>
           </div>
           <div className="p-4 pt-0">
-            <Textarea
-              placeholder="Comentarios (opcional)"
-              value={userFeedback}
-              onChange={(e) => setUserFeedback(e.target.value)}
-              className="min-h-[80px]"
-            />
+            <Textarea placeholder="Comentarios (opcional)" value={userFeedback} onChange={e => setUserFeedback(e.target.value)} className="min-h-[80px]" />
           </div>
           <DrawerFooter>
             <Button onClick={submitRating} disabled={userRating === 0}>
@@ -872,8 +672,6 @@ const ChatInterface = () => {
           </DrawerFooter>
         </DrawerContent>
       </Drawer>
-    </div>
-  );
+    </div>;
 };
-
 export default ChatInterface;
