@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useChatbot } from "@/hooks/useChatbots";
@@ -53,7 +52,7 @@ const ChatInterface = () => {
   });
 
   useEffect(() => {
-    // Generar un sessionId único si no existe
+    // Generate a unique sessionId if it doesn't exist
     const storedSessionId = localStorage.getItem(`session_${chatbotId}`);
     if (storedSessionId) {
       setSessionId(storedSessionId);
@@ -316,12 +315,12 @@ const ChatInterface = () => {
       
       if (checkError) throw checkError;
       
-      let lead;
+      let leadId;
       
       if (existingLeads && existingLeads.length > 0) {
         // Use existing lead
         console.log("Using existing lead with id:", existingLeads[0].id);
-        lead = existingLeads[0];
+        leadId = existingLeads[0].id;
       } else {
         // Create new lead
         console.log("Creating new lead");
@@ -332,87 +331,85 @@ const ChatInterface = () => {
             telefono: values.telefono,
             canal_origen: "chatbot_directo",
             empresa_id: chatbot.empresa_id,
-          })
-          .select()
-          .single();
-        
-        if (leadError) throw leadError;
-        lead = newLead;
-      }
-      
-      // Now check if a conversation already exists for this lead with this chatbot
-      console.log("Checking for existing conversation", {
-        lead_id: lead.id,
-        chatbot_id: chatbot.id,
-        estado: "activa"
-      });
-      
-      const { data: existingConvs, error: convCheckError } = await supabase
-        .from("conversaciones")
-        .select("id")
-        .eq("lead_id", lead.id)
-        .eq("chatbot_id", chatbot.id)
-        .eq("estado", "activa");
-        
-      if (convCheckError) throw convCheckError;
-      
-      let conversation;
-      
-      if (existingConvs && existingConvs.length > 0) {
-        // Use existing conversation
-        console.log("Using existing conversation with id:", existingConvs[0].id);
-        conversation = existingConvs[0];
-      } else {
-        // Create new conversation
-        console.log("Creating new conversation");
-        const { data: newConv, error: convError } = await supabase
-          .from("conversaciones")
-          .insert({
-            lead_id: lead.id,
-            chatbot_id: chatbot.id,
-            estado: "activa",
-            canal_identificador: values.telefono, // Usa el teléfono como identificador
-            metadata: {
+            datos_adicionales: {
               source: 'web_chat',
-              user_agent: navigator.userAgent,
-              nombre: values.nombre,
-              telefono: values.telefono
+              session_id: sessionId,
+              chatbot_id: chatbot.id
             }
           })
           .select()
           .single();
         
-        if (convError) throw convError;
-        conversation = newConv;
+        if (leadError) throw leadError;
+        leadId = newLead.id;
       }
       
-      // Store in localStorage
-      localStorage.setItem(`lead_${chatbotId}`, lead.id);
-      localStorage.setItem(`conversation_${chatbotId}`, conversation.id);
+      // Now send a first message to the API to start the conversation
+      // The server will create the conversation for us
+      console.log("Sending first message to API to start conversation");
       
-      console.log("Session data saved", {
-        leadId: lead.id, 
-        conversationId: conversation.id
+      // Initial message to API
+      const response = await fetch('https://web-production-01457.up.railway.app/api/v1/channels/web', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          empresa_id: chatbot.empresa_id,
+          chatbot_id: chatbot.id,
+          mensaje: "Hola, quisiera información",
+          session_id: sessionId,
+          lead_id: leadId,
+          metadata: {
+            source: 'web_chat',
+            browser: navigator.userAgent,
+            nombre: values.nombre,
+            telefono: values.telefono,
+            initial_message: true
+          }
+        })
       });
       
-      setLeadId(lead.id);
-      setConversationId(conversation.id);
+      if (!response.ok) {
+        throw new Error('Error al iniciar la conversación');
+      }
+      
+      const responseData = await response.json();
+      console.log("API response:", responseData);
+      
+      // Now get the conversation that was created by the server
+      const { data: conversations, error: convsError } = await supabase
+        .from("conversaciones")
+        .select("id")
+        .eq("lead_id", leadId)
+        .eq("chatbot_id", chatbot.id)
+        .eq("estado", "activa")
+        .order("created_at", { ascending: false })
+        .limit(1);
+      
+      if (convsError || !conversations || conversations.length === 0) {
+        throw new Error('No se pudo encontrar la conversación creada');
+      }
+      
+      const conversationId = conversations[0].id;
+      console.log("Found conversation:", conversationId);
+      
+      // Store in localStorage
+      localStorage.setItem(`lead_${chatbotId}`, leadId);
+      localStorage.setItem(`conversation_${chatbotId}`, conversationId);
+      
+      console.log("Session data saved", {
+        leadId: leadId, 
+        conversationId: conversationId
+      });
+      
+      setLeadId(leadId);
+      setConversationId(conversationId);
       setShowUserForm(false);
       
-      // Load messages if using existing conversation
-      if (existingConvs && existingConvs.length > 0) {
-        await loadMessageHistory(conversation.id);
-      } else {
-        // Set welcome message for new conversation
-        setMessages([
-          {
-            id: "welcome-after-register",
-            content: `¡Gracias ${values.nombre}! ¿En qué puedo ayudarte hoy?`,
-            sender: "bot",
-            timestamp: new Date(),
-          },
-        ]);
-      }
+      // Load messages for the new conversation
+      await loadMessageHistory(conversationId);
+      
     } catch (error) {
       console.error("Error registering user:", error);
       toast.error("Error al registrar tus datos. Por favor intente de nuevo.");
