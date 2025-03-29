@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import ReactMarkdown from 'react-markdown';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Send, Bot, User, Mic, MicOff, Smile, ChevronLeft, MoreVertical, Check, Star, Phone, Users, Info, Shield, ExternalLink } from "lucide-react";
@@ -479,7 +480,9 @@ const ChatInterface = () => {
                       relative px-3 py-2 shadow-sm
                       ${isUser ? 'user-bubble' : isBot ? 'bot-bubble' : 'agent-bubble'}
                     `}>
-                      <p className="whitespace-pre-wrap break-words text-sm font-normal">{msg.contenido}</p>
+                      <ReactMarkdown className="whitespace-pre-wrap break-words text-sm font-normal">
+                        {msg.contenido}
+                      </ReactMarkdown>
                       <span className="chat-timestamp">
                         {formatTime(msg.created_at)}
                         {isUser && <Check className="ml-1 h-3 w-3" />}

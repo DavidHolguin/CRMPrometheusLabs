@@ -38,7 +38,7 @@ export function useChatMessages(conversationId: string | null) {
     fetchMessages();
   }, [conversationId]);
 
-  // Set up real-time listener for all messages
+  // Set up real-time listener for agent messages only
   useEffect(() => {
     if (!conversationId) return;
     
@@ -54,20 +54,17 @@ export function useChatMessages(conversationId: string | null) {
     const channelName = `realtime-messages-${conversationId}-${timestamp}`;
     console.log(`Setting up realtime subscription on channel: ${channelName}`);
     
-    // Enable realtime on the mensajes table if not already done
-    // This happens on the server side so we don't need to do it here
-    
     const channel = supabase
       .channel(channelName)
       .on('postgres_changes', 
         { 
           event: 'INSERT', 
           schema: 'public', 
-          table: 'mensajes', 
+          table: 'mensajes_agentes', 
           filter: `conversacion_id=eq.${conversationId}` 
         },
         (payload) => {
-          console.log("New message received from realtime:", payload.new);
+          console.log("New agent message received from realtime:", payload.new);
           
           // Check if message already exists to avoid duplicates
           setMessages(currentMessages => {
@@ -83,27 +80,13 @@ export function useChatMessages(conversationId: string | null) {
       )
       .subscribe(status => {
         console.log(`Realtime subscription status on ${channelName}: ${status}`);
-        if (status === 'SUBSCRIBED') {
-          console.log(`Successfully subscribed to messages for conversation: ${conversationId}`);
-        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-          console.error(`Enhanced realtime subscription status for conversation ${conversationId}: ${status}`);
-        }
       });
     
     channelRef.current = channel;
     
     return () => {
-      console.log(`Cleaning up realtime subscription for conversation: ${conversationId}`);
       if (channelRef.current) {
-        supabase.removeChannel(channelRef.current)
-          .then(response => {
-            // Fix: The removeChannel response doesn't have a status property
-            // Instead, it returns one of these strings: "ok" | "timed out" | "error"
-            console.log(`Enhanced realtime subscription cleanup for conversation ${conversationId}: ${response}`);
-          })
-          .catch(err => {
-            console.error(`Error removing channel for conversation ${conversationId}:`, err);
-          });
+        supabase.removeChannel(channelRef.current);
         channelRef.current = null;
       }
     };
