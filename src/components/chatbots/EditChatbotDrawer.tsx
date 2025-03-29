@@ -32,6 +32,7 @@ const formSchema = z.object({
   welcome_message: z.string().optional(),
   main_purpose: z.string().optional(),
   communication_tone: z.string().optional(),
+  prompt_template: z.string().optional(),
   key_points: z.array(z.string()).default([]),
   qa_examples: z.array(z.object({
     question: z.string(),
@@ -70,6 +71,7 @@ export function EditChatbotDrawer({ chatbot, open, onOpenChange, onSuccess }: Ed
       welcome_message: chatbot.contexto?.welcomeMessage || "",
       main_purpose: chatbot.contexto?.mainPurpose || "",
       communication_tone: chatbot.contexto?.communicationTone || "",
+      prompt_template: "",
       key_points: chatbot.contexto?.keyPoints || [],
       qa_examples: chatbot.contexto?.qaExamples || []
     },
@@ -91,6 +93,7 @@ export function EditChatbotDrawer({ chatbot, open, onOpenChange, onSuccess }: Ed
         welcome_message: chatbot.contexto?.welcomeMessage || "",
         main_purpose: chatbot.contexto?.mainPurpose || "",
         communication_tone: chatbot.contexto?.communicationTone || "",
+        prompt_template: "",
         key_points: chatbot.contexto?.keyPoints || [],
         qa_examples: chatbot.contexto?.qaExamples || []
       });
@@ -224,6 +227,7 @@ export function EditChatbotDrawer({ chatbot, open, onOpenChange, onSuccess }: Ed
             communication_tone: values.communication_tone || values.tono || "",
             main_purpose: values.main_purpose || "",
             special_instructions: values.instrucciones || "",
+            prompt_template: values.prompt_template || "",
             key_points: values.key_points || [],
             qa_examples: values.qa_examples || [],
             updated_at: new Date().toISOString(),
@@ -245,6 +249,7 @@ export function EditChatbotDrawer({ chatbot, open, onOpenChange, onSuccess }: Ed
             communication_tone: values.communication_tone || values.tono || "",
             main_purpose: values.main_purpose || "",
             special_instructions: values.instrucciones || "",
+            prompt_template: values.prompt_template || "",
             key_points: values.key_points || [],
             qa_examples: values.qa_examples || []
           });
@@ -593,6 +598,28 @@ export function EditChatbotDrawer({ chatbot, open, onOpenChange, onSuccess }: Ed
                 </FormItem>
               )}
             />
+
+            <FormField
+              control={form.control}
+              name="prompt_template"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Plantilla de Prompt</FormLabel>
+                  <FormControl>
+                    <Textarea 
+                      placeholder="Plantilla personalizada para generar los prompts del chatbot" 
+                      className="min-h-[120px]"
+                      {...field} 
+                      value={field.value || ""}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Plantilla avanzada para personalizar cómo se generan los prompts (opcional)
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </>
         );
       case "keypoints":
@@ -706,8 +733,8 @@ export function EditChatbotDrawer({ chatbot, open, onOpenChange, onSuccess }: Ed
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col h-full">
-            <ScrollArea className="px-6 flex-1 overflow-y-auto" style={{ maxHeight: "calc(90vh - 220px)" }}>
-              <div className="space-y-6 py-2 pr-4">
+            <ScrollArea className="px-6 flex-1 overflow-y-auto">
+              <div className="space-y-6 py-2 pr-4 pb-16">
                 {renderStepContent()}
               </div>
             </ScrollArea>

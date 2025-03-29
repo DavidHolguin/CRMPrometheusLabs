@@ -23,6 +23,7 @@ export interface Chatbot {
     communicationTone?: string | null;
     personality?: string | null;
     specialInstructions?: string | null;
+    promptTemplate?: string | null;
     keyPoints?: string[] | null;
     qaExamples?: Array<{question: string, answer: string}>;
   } | null;
@@ -39,6 +40,7 @@ export interface ChatbotContext {
   communication_tone: string | null;
   main_purpose: string | null;
   special_instructions: string | null;
+  prompt_template: string | null;
   key_points: any[] | null;
   qa_examples: any[] | null;
   created_at: string;
@@ -70,6 +72,7 @@ export function useChatbots() {
             communication_tone,
             main_purpose,
             special_instructions,
+            prompt_template,
             key_points,
             qa_examples
           )
@@ -139,6 +142,7 @@ export function useChatbots() {
           communicationTone: contextoItems[0]?.communication_tone || null,
           personality: contextoItems[0]?.personality || null,
           specialInstructions: contextoItems[0]?.special_instructions || null,
+          promptTemplate: contextoItems[0]?.prompt_template || null,
           keyPoints,
           qaExamples
         } : null;
@@ -177,6 +181,7 @@ export function useChatbot(id: string | undefined) {
             communication_tone,
             main_purpose,
             special_instructions,
+            prompt_template,
             key_points,
             qa_examples
           )
@@ -242,6 +247,7 @@ export function useChatbot(id: string | undefined) {
         communicationTone: contextoItems[0]?.communication_tone || null,
         personality: contextoItems[0]?.personality || null,
         specialInstructions: contextoItems[0]?.special_instructions || null,
+        promptTemplate: contextoItems[0]?.prompt_template || null,
         keyPoints,
         qaExamples
       } : null;
