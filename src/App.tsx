@@ -19,6 +19,7 @@ import Chatbots from "./pages/Chatbots";
 import ChatInterface from "./pages/ChatInterface";
 import ConversationsPage from "./pages/Conversations";
 import Leads from "./pages/Leads";
+import PipelineManagement from "./pages/PipelineManagement";
 
 // Layout
 import DashboardLayout from "./components/layouts/DashboardLayout";
@@ -61,6 +62,7 @@ const App = () => {
         <Route path="/dashboard" element={<DashboardLayout />}>
           <Route index element={<Dashboard />} />
           <Route path="leads" element={<Leads />} />
+          <Route path="crm" element={<PipelineManagement />} />
           <Route path="conversations" element={<ConversationsPage />} />
           <Route path="conversations/:conversationId" element={<ConversationsPage />} />
           <Route path="chatbots" element={<Chatbots />} />
