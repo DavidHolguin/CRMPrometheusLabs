@@ -43,7 +43,7 @@ const DashboardLayout = () => {
         <div className="flex flex-col flex-1 transition-all duration-300 ease-in-out ml-[70px] md:ml-[70px] max-w-[calc(100%-70px)]">
           <AppHeader toggleSidebar={toggleMobileSidebar} />
           
-          <main className="flex-1 overflow-auto p-4 md:p-6 px-0 py-0">
+          <main className="flex-1 overflow-auto md:p-6 px-0 py-0">
             <Outlet />
           </main>
         </div>
