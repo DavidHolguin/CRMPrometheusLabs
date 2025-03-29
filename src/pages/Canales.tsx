@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useCanales, ChatbotCanal } from "@/hooks/useCanales";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -55,11 +54,10 @@ export default function Canales() {
     useDeleteChatbotCanalMutation
   } = useCanales();
   
-  const { useChatbotsQuery } = useChatbots();
+  const { data: chatbots = [] } = useChatbots();
   
   const { data: canales = [], isLoading: isLoadingCanales } = useCanalesQuery();
   const { data: chatbotCanales = [], isLoading: isLoadingChatbotCanales } = useChatbotCanalesQuery();
-  const { data: chatbots = [] } = useChatbotsQuery();
   
   const { mutate: addChatbotCanal } = useAddChatbotCanalMutation();
   const { mutate: updateChatbotCanal } = useUpdateChatbotCanalMutation();

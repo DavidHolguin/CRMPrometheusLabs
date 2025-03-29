@@ -4,11 +4,9 @@ import {
   MessageSquare, 
   Facebook, 
   Instagram, 
-  Telegram, 
+  MessageCircle, 
   Smartphone, 
   Globe, 
-  WhatsApp,
-  MessageCircle,
   Mail
 } from "lucide-react";
 
@@ -35,13 +33,13 @@ export function CanalIcon({ tipo, size = 24, className = "" }: CanalIconProps) {
   
   switch (tipo.toLowerCase()) {
     case "whatsapp":
-      return <WhatsApp size={size} className={combinedClassName} />;
+      return <MessageCircle size={size} className={combinedClassName} />;
     case "messenger":
       return <Facebook size={size} className={combinedClassName} />;
     case "instagram":
       return <Instagram size={size} className={combinedClassName} />;
     case "telegram":
-      return <Telegram size={size} className={combinedClassName} />;
+      return <MessageCircle size={size} className={combinedClassName} />;
     case "sms":
       return <Smartphone size={size} className={combinedClassName} />;
     case "web":

@@ -1,20 +1,14 @@
-
-import { useState, useEffect } from "react";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogDescription,
-  DialogFooter,
-  DialogTrigger
-} from "@/components/ui/dialog";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Canal } from "@/hooks/useCanales";
-import { CanalIcon, getCanalColor } from "./CanalIcon";
 import { Plus } from "lucide-react";
-import { useChatbots } from "@/hooks/useChatbots";
-import { Card } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -22,7 +16,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
+import { Canal } from "@/hooks/useCanales";
+import { useChatbots } from "@/hooks/useChatbots";
+import { CanalIcon } from "./CanalIcon";
 
 type AddCanalDialogProps = {
   canales: Canal[];
@@ -31,25 +27,17 @@ type AddCanalDialogProps = {
 
 export default function AddCanalDialog({ canales, onAdd }: AddCanalDialogProps) {
   const [open, setOpen] = useState(false);
-  const [selectedCanalId, setSelectedCanalId] = useState<string>("");
-  const [selectedChatbotId, setSelectedChatbotId] = useState<string>("");
+  const [selectedCanal, setSelectedCanal] = useState("");
+  const [selectedChatbot, setSelectedChatbot] = useState("");
   
-  const { useChatbotsQuery } = useChatbots();
-  const { data: chatbots = [] } = useChatbotsQuery();
+  const { data: chatbots = [] } = useChatbots();
 
-  // Reset selecciones al abrir
-  useEffect(() => {
-    if (open) {
-      setSelectedCanalId("");
-      setSelectedChatbotId("");
-    }
-  }, [open]);
-
-  // Manejar agregar
   const handleAdd = () => {
-    if (selectedCanalId && selectedChatbotId) {
-      onAdd(selectedCanalId, selectedChatbotId);
+    if (selectedCanal && selectedChatbot) {
+      onAdd(selectedCanal, selectedChatbot);
       setOpen(false);
+      setSelectedCanal("");
+      setSelectedChatbot("");
     }
   };
 
@@ -72,7 +60,7 @@ export default function AddCanalDialog({ canales, onAdd }: AddCanalDialogProps) 
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <Label htmlFor="chatbot-select">Selecciona un chatbot</Label>
-            <Select value={selectedChatbotId} onValueChange={setSelectedChatbotId}>
+            <Select value={selectedChatbot} onValueChange={setSelectedChatbot}>
               <SelectTrigger id="chatbot-select">
                 <SelectValue placeholder="Seleccionar chatbot" />
               </SelectTrigger>
@@ -91,7 +79,7 @@ export default function AddCanalDialog({ canales, onAdd }: AddCanalDialogProps) 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
               {canales.map((canal) => {
                 const bgColor = getCanalColor(canal.tipo);
-                const isSelected = selectedCanalId === canal.id;
+                const isSelected = selectedCanal === canal.id;
                 
                 return (
                   <Card 
@@ -99,7 +87,7 @@ export default function AddCanalDialog({ canales, onAdd }: AddCanalDialogProps) 
                     className={`p-3 cursor-pointer transition-all hover:shadow-md ${
                       isSelected ? 'ring-2 ring-primary' : ''
                     }`}
-                    onClick={() => setSelectedCanalId(canal.id)}
+                    onClick={() => setSelectedCanal(canal.id)}
                   >
                     <div className="flex items-center gap-3">
                       <div className={`p-2 rounded-full ${bgColor}`}>
@@ -124,7 +112,7 @@ export default function AddCanalDialog({ canales, onAdd }: AddCanalDialogProps) 
           <Button 
             type="button" 
             onClick={handleAdd}
-            disabled={!selectedCanalId || !selectedChatbotId}
+            disabled={!selectedCanal || !selectedChatbot}
           >
             Conectar canal
           </Button>
