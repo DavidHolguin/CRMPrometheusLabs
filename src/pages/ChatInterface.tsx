@@ -1,344 +1,730 @@
-
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Send, User, Bot, Smile } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Send, Bot, User, Mic, MicOff, Smile, ChevronLeft, MoreVertical, Check, Star, Phone, Users, Info, Shield, ExternalLink } from "lucide-react";
+import { v4 as uuidv4 } from "uuid";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { useChatMessages } from "@/hooks/useChatMessages";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Separator } from "@/components/ui/separator";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Drawer, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
+import { EmojiPicker } from "@/components/conversations/EmojiPicker";
+
+interface Message {
+  id: string;
+  contenido: string;
+  origen: string;
+  created_at: string;
+  metadata?: any;
+}
 
 const ChatInterface = () => {
-  const { chatbotId } = useParams();
+  const {
+    chatbotId
+  } = useParams();
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
   const [message, setMessage] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [leadInfo, setLeadInfo] = useState({ name: "", email: "", phone: "" });
+  const [sessionId, setSessionId] = useState("");
+  const [leadId, setLeadId] = useState("");
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [chatbotInfo, setChatbotInfo] = useState<any>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+  const [userName, setUserName] = useState("");
+  const [userPhone, setUserPhone] = useState("");
+  const [showUserForm, setShowUserForm] = useState(false);
+  const [userFormSubmitted, setUserFormSubmitted] = useState(false);
+  const [showRatingDrawer, setShowRatingDrawer] = useState(false);
+  const [userRating, setUserRating] = useState(0);
+  const [userFeedback, setUserFeedback] = useState("");
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const channelRef = useRef<any>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const [conversationId, setConversationId] = useState<string | undefined>(undefined);
-  
-  // Use the new hook to get messages with real-time updates
-  const { messages, isLoading: messagesLoading } = useChatMessages(conversationId);
-  
+
   useEffect(() => {
-    // Focus the input field when the component mounts
-    inputRef.current?.focus();
-    
-    // Try to get a conversation ID from local storage
-    const storedConversationId = localStorage.getItem(`conversation_${chatbotId}`);
+    let storedSessionId = localStorage.getItem(`chatbot_session_${chatbotId}`);
+    if (!storedSessionId) {
+      storedSessionId = uuidv4();
+      localStorage.setItem(`chatbot_session_${chatbotId}`, storedSessionId);
+    }
+    setSessionId(storedSessionId);
+    const storedLeadId = localStorage.getItem(`chatbot_lead_${chatbotId}`);
+    const storedName = localStorage.getItem(`chatbot_name_${chatbotId}`);
+    const storedPhone = localStorage.getItem(`chatbot_phone_${chatbotId}`);
+    if (storedLeadId) {
+      setLeadId(storedLeadId);
+      setUserFormSubmitted(true);
+    }
+    if (storedName) setUserName(storedName);
+    if (storedPhone) setUserPhone(storedPhone);
+    const storedConversationId = localStorage.getItem(`chatbot_conversation_${chatbotId}`);
     if (storedConversationId) {
       setConversationId(storedConversationId);
+      fetchMessages(storedConversationId);
     }
+    fetchChatbotInfo();
+    if (!storedLeadId && !storedName && !storedPhone) {
+      setShowUserForm(true);
+    }
+    return () => {
+      if (channelRef.current) {
+        console.log(`Removing realtime subscription for conversation: ${conversationId}`);
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+      if (mediaRecorderRef.current && isRecording) {
+        mediaRecorderRef.current.stop();
+      }
+    };
   }, [chatbotId]);
-  
+
   useEffect(() => {
-    // Scroll to the bottom when messages change
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (conversationId) {
+      setupRealtimeSubscription(conversationId);
+    }
+  }, [conversationId]);
+
+  useEffect(() => {
+    scrollToBottom();
   }, [messages]);
-  
-  const createConversation = async () => {
+
+  const fetchChatbotInfo = async () => {
     try {
-      const { data, error } = await supabase
-        .from("conversaciones")
-        .insert({
-          chatbot_id: chatbotId,
-          canal_id: null,
-          canal_identificador: "web",
-          estado: "activa",
-          chatbot_activo: true,
-        })
-        .select()
-        .single();
-      
+      const {
+        data,
+        error
+      } = await supabase.from("chatbots").select("*").eq("id", chatbotId).single();
       if (error) throw error;
-      
-      console.log("Created conversation:", data);
-      setConversationId(data.id);
-      localStorage.setItem(`conversation_${chatbotId}`, data.id);
-      
-      return data.id;
+      setChatbotInfo(data);
+      setLoading(false);
     } catch (error) {
-      console.error("Error creating conversation:", error);
-      toast.error("Error al iniciar conversación");
-      return null;
+      console.error("Error fetching chatbot info:", error);
+      setLoading(false);
     }
   };
-  
-  const sendMessage = async () => {
-    if (!message.trim()) return;
-    
-    setIsLoading(true);
-    
+
+  const fetchMessages = async (convoId: string) => {
     try {
-      // Create conversation if it doesn't exist
-      let currentConversationId = conversationId;
-      
-      if (!currentConversationId) {
-        currentConversationId = await createConversation();
-        if (!currentConversationId) {
-          throw new Error("Failed to create conversation");
+      const {
+        data,
+        error
+      } = await supabase.from("mensajes").select("*").eq("conversacion_id", convoId).order("created_at", {
+        ascending: true
+      });
+      if (error) throw error;
+      console.log("Fetched messages:", data);
+      setMessages(data || []);
+    } catch (error) {
+      console.error("Error fetching messages:", error);
+    }
+  };
+
+  const setupRealtimeSubscription = (convoId: string) => {
+    if (channelRef.current) {
+      console.log("Removing existing channel subscription");
+      supabase.removeChannel(channelRef.current);
+    }
+    const channelName = `public-chat-${convoId}-${Date.now()}`;
+    console.log(`Setting up realtime subscription for conversation: ${convoId} with channel: ${channelName}`);
+    const channel = supabase.channel(channelName).on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'mensajes',
+      filter: `conversacion_id=eq.${convoId} AND origen=eq.agente`
+    }, payload => {
+      if (payload.eventType === 'INSERT') {
+        console.log("New agent message received:", payload.new);
+        const newMsg = payload.new as Message;
+        if (newMsg.metadata && newMsg.metadata.is_system_message === true) {
+          console.log("Skipping system message:", newMsg);
+          return;
         }
-      }
-      
-      // Extract lead info if name and phone are included in the message
-      const nameMatch = message.match(/nombre:?\s*([^,;]+)/i);
-      const phoneMatch = message.match(/tel[eé]fono:?\s*([^,;]+)/i);
-      const emailMatch = message.match(/email:?\s*([^,;]+)/i);
-      
-      if (nameMatch) {
-        setLeadInfo(prev => ({ ...prev, name: nameMatch[1].trim() }));
-      }
-      
-      if (phoneMatch) {
-        setLeadInfo(prev => ({ ...prev, phone: phoneMatch[1].trim() }));
-      }
-      
-      if (emailMatch) {
-        setLeadInfo(prev => ({ ...prev, email: emailMatch[1].trim() }));
-      }
-      
-      // Send the message
-      const { data: messageData, error: messageError } = await supabase
-        .from("mensajes")
-        .insert({
-          conversacion_id: currentConversationId,
-          origen: "user",
-          contenido: message,
-          tipo_contenido: "text",
-          metadata: {},
-          score_impacto: 1,
-        })
-        .select()
-        .single();
-      
-      if (messageError) throw messageError;
-      
-      // Clear the input
-      setMessage("");
-      
-      console.log("Message sent:", messageData);
-      
-      // Check if we need to create or update a lead
-      if (nameMatch || phoneMatch || emailMatch) {
-        // Get conversation to check if there's already a lead_id
-        const { data: conversation, error: convError } = await supabase
-          .from("conversaciones")
-          .select("*, lead:lead_id(*)")
-          .eq("id", currentConversationId)
-          .single();
-        
-        if (convError) {
-          console.error("Error fetching conversation:", convError);
-        } else {
-          // If lead doesn't exist, create one
-          if (!conversation.lead_id) {
-            const { data: leadData, error: leadError } = await supabase
-              .from("leads")
-              .insert({
-                nombre: leadInfo.name || (nameMatch ? nameMatch[1].trim() : ""),
-                telefono: leadInfo.phone || (phoneMatch ? phoneMatch[1].trim() : ""),
-                email: leadInfo.email || (emailMatch ? emailMatch[1].trim() : ""),
-                canal_origen: "web",
-                estado: "nuevo",
-                empresa_id: conversation.chatbot?.empresa_id,
-              })
-              .select()
-              .single();
-            
-            if (leadError) {
-              console.error("Error creating lead:", leadError);
-            } else {
-              // Update conversation with lead_id
-              const { error: updateError } = await supabase
-                .from("conversaciones")
-                .update({ lead_id: leadData.id })
-                .eq("id", currentConversationId);
-              
-              if (updateError) {
-                console.error("Error updating conversation with lead:", updateError);
-              }
-            }
-          } else {
-            // Update existing lead if we have new information
-            const updates: any = {};
-            if (nameMatch && !conversation.lead.nombre) updates.nombre = nameMatch[1].trim();
-            if (phoneMatch && !conversation.lead.telefono) updates.telefono = phoneMatch[1].trim();
-            if (emailMatch && !conversation.lead.email) updates.email = emailMatch[1].trim();
-            
-            if (Object.keys(updates).length > 0) {
-              const { error: updateError } = await supabase
-                .from("leads")
-                .update(updates)
-                .eq("id", conversation.lead_id);
-              
-              if (updateError) {
-                console.error("Error updating lead:", updateError);
-              }
-            }
+        setMessages(currentMessages => {
+          const messageExists = currentMessages.some(msg => msg.id === payload.new.id);
+          if (messageExists) {
+            return currentMessages;
           }
+          return [...currentMessages, newMsg];
+        });
+      }
+    }).subscribe(status => {
+      console.log(`Realtime subscription status: ${status}`);
+    });
+    channelRef.current = channel;
+  };
+
+  const submitUserForm = async () => {
+    if (!userName.trim() || !userPhone.trim()) {
+      toast.error("Por favor, ingresa tu nombre y número de teléfono");
+      return;
+    }
+    try {
+      localStorage.setItem(`chatbot_name_${chatbotId}`, userName);
+      localStorage.setItem(`chatbot_phone_${chatbotId}`, userPhone);
+      setUserFormSubmitted(true);
+      setShowUserForm(false);
+      const welcomeMessage = `Hola ${userName}, bienvenido/a a nuestro chat. ¿En qué podemos ayudarte hoy?`;
+      const welcomeMsgObj = {
+        id: uuidv4(),
+        contenido: welcomeMessage,
+        origen: "chatbot",
+        created_at: new Date().toISOString()
+      };
+      setMessages([welcomeMsgObj]);
+      await startConversation();
+    } catch (error) {
+      console.error("Error al iniciar chat:", error);
+      toast.error("Hubo un problema al iniciar el chat. Intente de nuevo.");
+    }
+  };
+
+  const startConversation = async () => {
+    try {
+      const empresaId = chatbotInfo?.empresa_id;
+      if (!empresaId) {
+        throw new Error("No se pudo determinar la empresa del chatbot");
+      }
+      console.log("Starting conversation with API:", {
+        empresa_id: empresaId,
+        chatbot_id: chatbotId,
+        session_id: sessionId,
+        metadata: {
+          browser: navigator.userAgent,
+          page: window.location.pathname,
+          name: userName || undefined,
+          phone: userPhone || undefined
         }
+      });
+      const apiEndpoint = import.meta.env.VITE_API_BASE_URL || 'https://web-production-01457.up.railway.app';
+      const response = await fetch(`${apiEndpoint}/api/v1/channels/web/init`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          empresa_id: empresaId,
+          chatbot_id: chatbotId,
+          session_id: sessionId,
+          metadata: {
+            browser: navigator.userAgent,
+            page: window.location.pathname,
+            name: userName || undefined,
+            phone: userPhone || undefined
+          }
+        })
+      });
+      if (!response.ok) {
+        throw new Error(`Error al iniciar conversación: ${response.statusText}`);
+      }
+      const data = await response.json();
+      console.log("API init response:", data);
+      if (data.conversacion_id) {
+        setConversationId(data.conversacion_id);
+        localStorage.setItem(`chatbot_conversation_${chatbotId}`, data.conversacion_id);
+        setupRealtimeSubscription(data.conversacion_id);
+      }
+      if (data.lead_id) {
+        setLeadId(data.lead_id);
+        localStorage.setItem(`chatbot_lead_${chatbotId}`, data.lead_id);
+      }
+    } catch (error) {
+      console.error("Error starting conversation:", error);
+      toast.error("No se pudo iniciar la conversación. Intente de nuevo.");
+    }
+  };
+
+  const submitRating = async () => {
+    if (userRating === 0) {
+      toast.error("Por favor, seleccione una calificación");
+      return;
+    }
+    try {
+      toast.success("¡Gracias por tu opinión!");
+      setShowRatingDrawer(false);
+    } catch (error) {
+      console.error("Error submitting rating:", error);
+      toast.error("No se pudo enviar la calificación. Intente de nuevo.");
+    }
+  };
+
+  const sendMessage = async (customContent?: string) => {
+    const messageContent = customContent || message.trim();
+    if (!messageContent && !isRecording && audioChunksRef.current.length === 0) return;
+    setSending(true);
+    try {
+      const empresaId = chatbotInfo?.empresa_id;
+      if (!empresaId) {
+        throw new Error("No se pudo determinar la empresa del chatbot");
+      }
+      const optimisticId = uuidv4();
+      const optimisticMsg = {
+        id: optimisticId,
+        contenido: messageContent,
+        origen: "usuario",
+        created_at: new Date().toISOString()
+      };
+      setMessages(prev => [...prev, optimisticMsg]);
+      if (!customContent) {
+        setMessage("");
+        if (textareaRef.current) {
+          textareaRef.current.style.height = "auto";
+        }
+      }
+      console.log("Sending message to API:", {
+        empresa_id: empresaId,
+        chatbot_id: chatbotId,
+        mensaje: messageContent,
+        session_id: sessionId,
+        lead_id: leadId || undefined
+      });
+      const apiEndpoint = import.meta.env.VITE_API_BASE_URL || 'https://web-production-01457.up.railway.app';
+      const response = await fetch(`${apiEndpoint}/api/v1/channels/web`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          empresa_id: empresaId,
+          chatbot_id: chatbotId,
+          mensaje: messageContent,
+          session_id: sessionId,
+          lead_id: leadId || undefined,
+          metadata: {
+            browser: navigator.userAgent,
+            page: window.location.pathname,
+            name: userName || undefined,
+            phone: userPhone || undefined
+          }
+        })
+      });
+      if (!response.ok) {
+        throw new Error(`Error al enviar mensaje: ${response.statusText}`);
+      }
+      const data = await response.json();
+      console.log("API response:", data);
+      setMessages(prev => {
+        const filtered = prev.filter(msg => msg.id !== optimisticId);
+        const userMsgExists = filtered.some(msg => msg.id === data.mensaje_id && msg.origen === "usuario");
+        const botResponseExists = filtered.some(msg => msg.contenido === data.respuesta && msg.origen === "chatbot");
+        let newMessages = [...filtered];
+        if (!userMsgExists) {
+          newMessages.push({
+            id: data.mensaje_id,
+            contenido: messageContent,
+            origen: "usuario",
+            created_at: new Date().toISOString()
+          });
+        }
+        if (!botResponseExists && data.respuesta) {
+          newMessages.push({
+            id: uuidv4(),
+            contenido: data.respuesta,
+            origen: "chatbot",
+            created_at: new Date().toISOString(),
+            metadata: data.metadata
+          });
+        }
+        return newMessages;
+      });
+      if (data.conversacion_id && data.conversacion_id !== conversationId) {
+        setConversationId(data.conversacion_id);
+        localStorage.setItem(`chatbot_conversation_${chatbotId}`, data.conversacion_id);
+        setupRealtimeSubscription(data.conversacion_id);
+      }
+      if (data.lead_id && data.lead_id !== leadId) {
+        setLeadId(data.lead_id);
+        localStorage.setItem(`chatbot_lead_${chatbotId}`, data.lead_id);
       }
     } catch (error) {
       console.error("Error sending message:", error);
-      toast.error("Error al enviar mensaje");
+      toast.error("No se pudo enviar el mensaje. Intente de nuevo.");
+      setMessages(prev => prev.filter(msg => msg.contenido !== messageContent || msg.origen !== "usuario"));
     } finally {
-      setIsLoading(false);
+      setSending(false);
     }
   };
-  
-  const getSenderType = (origen: string, metadata: any): "user" | "bot" | "agent" => {
-    if (origen === 'usuario' || origen === 'lead' || origen === 'user') return "user";
-    if (origen === 'chatbot' || origen === 'bot') return "bot";
-    if (origen === 'agente' || origen === 'agent') return "agent";
-    
-    if (metadata) {
-      if (metadata.agent_id || metadata.agent_name || metadata.origin === "agent") {
-        return "agent";
-      }
-      
-      if (metadata.is_bot || metadata.origin === "bot" || metadata.origin === "chatbot") {
-        return "bot";
-      }
-      
-      if (metadata.is_user || metadata.origin === "user" || metadata.origin === "lead") {
-        return "user";
-      }
-    }
-    
-    return origen === "agente" ? "agent" : (origen === "chatbot" ? "bot" : "user");
-  };
-  
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
     }
   };
-  
-  return (
-    <div className="flex flex-col h-screen w-full">
-      <div className="p-3 border-b bg-card/50 shadow-sm flex items-center">
-        <div className="flex-1 flex items-center gap-2">
-          <Bot className="text-primary h-5 w-5" />
-          <h3 className="font-medium">Chatbot</h3>
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setMessage(e.target.value);
+  };
+
+  const handleEmojiSelect = (emoji: string) => {
+    setMessage(prev => prev + emoji);
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+    setShowEmojiPicker(false);
+  };
+
+  const toggleRecording = async () => {
+    try {
+      if (!isRecording) {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true
+        });
+        const mediaRecorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = mediaRecorder;
+        audioChunksRef.current = [];
+        mediaRecorder.ondataavailable = event => {
+          if (event.data.size > 0) {
+            audioChunksRef.current.push(event.data);
+          }
+        };
+        mediaRecorder.onstop = () => {
+          const audioBlob = new Blob(audioChunksRef.current, {
+            type: 'audio/webm'
+          });
+          const reader = new FileReader();
+          reader.readAsDataURL(audioBlob);
+          reader.onloadend = () => {
+            const base64Audio = reader.result?.toString().split(',')[1];
+            toast.info("Audio recording feature coming soon!");
+            setIsRecording(false);
+            audioChunksRef.current = [];
+          };
+          const tracks = stream.getTracks();
+          tracks.forEach(track => track.stop());
+        };
+        mediaRecorder.start();
+        setIsRecording(true);
+        toast.info("Grabando... Toca de nuevo para detener.");
+      } else {
+        if (mediaRecorderRef.current) {
+          mediaRecorderRef.current.stop();
+        }
+      }
+    } catch (error) {
+      console.error("Error accessing microphone:", error);
+      toast.error("No se pudo acceder al micrófono. Verifique los permisos.");
+    }
+  };
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({
+      behavior: "smooth"
+    });
+  };
+
+  const getSenderType = (origen: string, metadata: any): "user" | "bot" | "agent" => {
+    if (origen === 'usuario' || origen === 'lead' || origen === 'user') return "user";
+    if (origen === 'chatbot' || origen === 'bot') return "bot";
+    if (origen === 'agente' || origen === 'agent') return "agent";
+    return origen === "agente" ? "agent" : origen === "chatbot" ? "bot" : "user";
+  };
+
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const getLastActiveTime = () => {
+    if (messages.length === 0) return "Ahora";
+    const lastMessage = messages[messages.length - 1];
+    return formatTime(lastMessage.created_at);
+  };
+
+  const renderStars = () => {
+    return Array.from({
+      length: 5
+    }).map((_, i) => <button key={i} className={`p-2 ${i < userRating ? 'text-yellow-400' : 'text-gray-300'}`} onClick={() => setUserRating(i + 1)}>
+      <Star className="h-8 w-8" fill={i < userRating ? "currentColor" : "none"} />
+    </button>);
+  };
+
+  const handleSendButtonClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    if (message.trim()) {
+      sendMessage();
+    } else {
+      toggleRecording();
+    }
+  };
+
+  if (loading) {
+    return <div className="flex items-center justify-center h-screen">
+        <p>Cargando chatbot...</p>
+      </div>;
+  }
+
+  if (!chatbotInfo) {
+    return <div className="flex items-center justify-center h-screen">
+        <p>Chatbot no encontrado.</p>
+      </div>;
+  }
+
+  return <div className="flex flex-col h-screen bg-[#0e1621]" ref={containerRef}>
+      <header className="p-3 bg-[#1f2c34] shadow-sm flex items-center justify-between sticky top-0 z-10">
+        <div className="flex items-center gap-3">
+          <div className="avatar-border">
+            <Avatar className="h-10 w-10 border-2 border-transparent text-green-500">
+              <AvatarImage src={chatbotInfo.avatar_url} />
+              <AvatarFallback>
+                <Bot className="h-6 w-6" />
+              </AvatarFallback>
+            </Avatar>
+          </div>
+          <div>
+            <h1 className="text-base font-medium text-white">{chatbotInfo.nombre}</h1>
+            <p className="text-xs text-gray-400">en línea</p>
+          </div>
         </div>
-      </div>
-      
-      <div className="flex-1 overflow-auto p-4 chat-background">
-        <div className="h-full flex flex-col justify-end chat-message-container">
-          {messagesLoading ? (
-            <div className="flex items-center justify-center">
-              <p className="text-muted-foreground animate-pulse">Cargando mensajes...</p>
+        
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-9 w-9 text-gray-400">
+              <MoreVertical className="h-5 w-5" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-56 bg-[#1f2c34] border-0 text-white" align="end">
+            <div className="space-y-1">
+              <Button variant="ghost" className="w-full justify-start text-gray-200 hover:bg-[#2a3942]" size="sm" onClick={() => setShowProfile(true)}>
+                <User className="mr-2 h-4 w-4" />
+                <span>Mi perfil</span>
+              </Button>
+              <Button variant="ghost" className="w-full justify-start text-gray-200 hover:bg-[#2a3942]" size="sm" onClick={() => setShowRatingDrawer(true)}>
+                <Star className="mr-2 h-4 w-4" />
+                <span>Calificar chatbot</span>
+              </Button>
+              <Separator className="my-2 bg-gray-700" />
+              <Button variant="ghost" className="w-full justify-start text-xs text-gray-400 hover:bg-[#2a3942]" size="sm" asChild>
+                <a href="#" target="_blank" rel="noopener noreferrer">
+                  <Shield className="mr-2 h-4 w-4" />
+                  <span>Políticas de privacidad</span>
+                </a>
+              </Button>
+              <Button variant="ghost" className="w-full justify-start text-xs text-gray-400 hover:bg-[#2a3942]" size="sm" asChild>
+                <a href="#" target="_blank" rel="noopener noreferrer">
+                  <Info className="mr-2 h-4 w-4" />
+                  <span>Términos de uso</span>
+                </a>
+              </Button>
+            </div>
+          </PopoverContent>
+        </Popover>
+      </header>
+
+      <ScrollArea className="flex-1 chat-background">
+        <div className="space-y-2 max-w-3xl mx-auto pb-2 p-4 chat-message-container">
+          {messages.length === 0 ? (
+            <div className="text-center py-8">
+              <Bot className="h-12 w-12 mx-auto text-gray-500 mb-4 opacity-50" />
+              <p className="text-gray-400 text-sm bg-[#1f2c34]/50 p-3 rounded-lg backdrop-blur-sm inline-block">
+                Inicia una conversación con el chatbot.
+              </p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {messages.length === 0 ? (
-                <div className="flex items-center justify-center">
-                  <div className="text-center p-4">
-                    <Bot className="text-muted-foreground mx-auto mb-2 h-10 w-10" />
-                    <p className="text-muted-foreground">
-                      Escribe un mensaje para comenzar la conversación.
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                messages.map((msg) => {
-                  const senderType = getSenderType(msg.origen, msg.metadata);
-                  const isLead = senderType === "user";
-                  const isChatbot = senderType === "bot";
-                  const isAgent = senderType === "agent";
-                  const messageDate = new Date(msg.created_at);
-                  
-                  if (msg.metadata && msg.metadata.is_system_message === true) {
-                    return null;
-                  }
-                  
-                  return (
-                    <div 
-                      key={msg.id} 
-                      className={`flex ${isLead ? 'justify-end' : 'justify-start'}`}
-                    >
-                      <div 
-                        className={`
-                          px-4 py-3 rounded-lg
-                          ${isLead 
-                            ? 'user-bubble' 
-                            : isChatbot 
-                              ? 'bot-bubble' 
-                              : 'agent-bubble'
-                          }
-                        `}
-                      >
-                        <div className="text-xs mb-1 font-medium flex items-center">
-                          {isLead ? (
-                            <>
-                              <User className="h-3 w-3 mr-1" />
-                              <span>Tú</span>
-                            </>
-                          ) : isChatbot ? (
-                            <>
-                              <Bot className="h-3 w-3 mr-1" />
-                              <span>Chatbot</span>
-                            </>
-                          ) : (
-                            <>
-                              <User className="h-3 w-3 mr-1" />
-                              <span>{msg.metadata?.agent_name || 'Agente'}</span>
-                            </>
-                          )}
-                        </div>
-                        
-                        <div className="flex flex-wrap items-end">
-                          <div className="message-content whitespace-pre-wrap break-words">
-                            {msg.contenido}
-                          </div>
-                          <div className="chat-timestamp">
-                            {messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            {isLead && (
-                              <>
-                                <CheckCheck className="h-3 w-3" />
-                                <CheckCheck className="h-3 w-3" />
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
+            messages
+              .filter(msg => !(msg.metadata && msg.metadata.is_system_message === true))
+              .map(msg => {
+                const senderType = getSenderType(msg.origen, msg.metadata);
+                const isUser = senderType === "user";
+                const isBot = senderType === "bot";
+                const isAgent = senderType === "agent";
+                
+                return (
+                  <div key={msg.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-3`}>
+                    <div className={`
+                      relative px-3 py-2 shadow-sm
+                      ${isUser ? 'user-bubble' : isBot ? 'bot-bubble' : 'agent-bubble'}
+                    `}>
+                      <p className="whitespace-pre-wrap break-words text-sm font-normal">{msg.contenido}</p>
+                      <span className="chat-timestamp">
+                        {formatTime(msg.created_at)}
+                        {isUser && <Check className="ml-1 h-3 w-3" />}
+                      </span>
                     </div>
-                  );
-                })
-              )}
-              <div ref={messagesEndRef} />
-            </div>
+                  </div>
+                );
+              })
           )}
+          <div ref={messagesEndRef} />
+        </div>
+      </ScrollArea>
+
+      <div className="p-2 bg-[#0e1621] border-t border-[#1f2c34]">
+        <div className="whatsapp-input-container" ref={inputContainerRef}>
+          <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="whatsapp-button">
+            <Smile className="h-6 w-6" />
+          </button>
+          
+          <input 
+            ref={inputRef} 
+            type="text" 
+            value={message} 
+            onChange={handleInputChange} 
+            onKeyDown={handleKeyDown} 
+            placeholder="Mensaje" 
+            className="whatsapp-input" 
+            disabled={sending || isRecording || showUserForm} 
+          />
+          
+          <button 
+            onClick={handleSendButtonClick} 
+            className={`whatsapp-button ${message.trim() ? 'whatsapp-send-button' : ''}`} 
+            disabled={sending || showUserForm}
+          >
+            {message.trim() ? <Send className="h-5 w-5" /> : <Mic className={`h-6 w-6 ${isRecording ? 'animate-pulse' : ''}`} />}
+          </button>
         </div>
       </div>
       
-      <div className="p-4 border-t bg-card/50 shadow-md">
-        <div className="flex items-center space-x-2 whatsapp-input-container">
-          <button className="whatsapp-button">
-            <Smile className="h-5 w-5" />
-          </button>
-          <input
-            ref={inputRef}
-            type="text"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Escribe un mensaje..."
-            disabled={isLoading}
-            className="whatsapp-input"
-          />
-          <button
-            onClick={sendMessage}
-            disabled={isLoading || !message.trim()}
-            className={`whatsapp-button ${
-              message.trim() ? "whatsapp-send-button" : ""
-            }`}
-          >
-            <Send className="h-5 w-5" />
-          </button>
+      {showEmojiPicker && (
+        <div className="absolute bottom-14 left-2 z-50">
+          <EmojiPicker onEmojiSelect={handleEmojiSelect} />
         </div>
-      </div>
-    </div>
-  );
+      )}
+
+      {showUserForm && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card rounded-lg shadow-lg max-w-md w-full p-6 space-y-4 relative">
+            <div className="text-center mb-4">
+              <Avatar className="h-16 w-16 mx-auto mb-2 avatar-border">
+                <AvatarImage src={chatbotInfo.avatar_url} />
+                <AvatarFallback>
+                  <Bot className="h-8 w-8" />
+                </AvatarFallback>
+              </Avatar>
+              <h2 className="text-xl font-semibold">{chatbotInfo.nombre}</h2>
+              <p className="text-muted-foreground text-sm mt-1">
+                Para iniciar la conversación, por favor comparte tus datos:
+              </p>
+            </div>
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <label htmlFor="userName" className="text-sm font-medium">
+                  Nombre completo
+                </label>
+                <input id="userName" type="text" value={userName} onChange={e => setUserName(e.target.value)} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" placeholder="Ingresa tu nombre" />
+              </div>
+              <div className="space-y-1">
+                <label htmlFor="userPhone" className="text-sm font-medium">
+                  Número de teléfono
+                </label>
+                <input id="userPhone" type="tel" value={userPhone} onChange={e => setUserPhone(e.target.value)} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" placeholder="Ingresa tu número de teléfono" />
+              </div>
+            </div>
+            <Button className="w-full mt-4" onClick={submitUserForm} disabled={!userName.trim() || !userPhone.trim()}>
+              Iniciar chat
+            </Button>
+            <p className="text-xs text-center text-muted-foreground mt-4">
+              Al continuar, aceptas nuestras políticas de privacidad y términos de uso.
+            </p>
+          </div>
+        </div>
+      )}
+
+      <Sheet open={showProfile} onOpenChange={setShowProfile}>
+        <SheetContent side="right" className="sm:max-w-md">
+          <SheetHeader className="mb-4">
+            <SheetTitle>Mi Perfil</SheetTitle>
+          </SheetHeader>
+          <div className="flex flex-col items-center py-6">
+            <Avatar className="h-24 w-24 mb-4 avatar-border">
+              <AvatarFallback className="text-2xl">
+                {userName ? userName.charAt(0).toUpperCase() : "U"}
+              </AvatarFallback>
+            </Avatar>
+            <h3 className="text-xl font-semibold">{userName || "Usuario"}</h3>
+            <div className="flex items-center text-muted-foreground mt-1">
+              <Phone className="h-4 w-4 mr-2" />
+              <span>{userPhone || "No disponible"}</span>
+            </div>
+          </div>
+          <Separator className="my-4" />
+          <div className="space-y-4">
+            <div>
+              <h4 className="text-sm font-medium mb-2">Datos de contacto</h4>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Nombre:</span>
+                  <span>{userName || "No disponible"}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Teléfono:</span>
+                  <span>{userPhone || "No disponible"}</span>
+                </div>
+              </div>
+            </div>
+            <Separator />
+            <div>
+              <h4 className="text-sm font-medium mb-2">Acciones</h4>
+              <div className="space-y-2">
+                <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => setShowRatingDrawer(true)}>
+                  <Star className="mr-2 h-4 w-4" />
+                  <span>Calificar chatbot</span>
+                </Button>
+              </div>
+            </div>
+            <Separator />
+            <div>
+              <h4 className="text-sm font-medium mb-2">Legal</h4>
+              <div className="space-y-2">
+                <Button variant="link" size="sm" className="w-full justify-start p-0 h-auto" asChild>
+                  <a href="#" target="_blank" rel="noopener noreferrer">
+                    <Shield className="mr-2 h-4 w-4" />
+                    <span>Políticas de privacidad</span>
+                    <ExternalLink className="ml-auto h-3 w-3" />
+                  </a>
+                </Button>
+                <Button variant="link" size="sm" className="w-full justify-start p-0 h-auto" asChild>
+                  <a href="#" target="_blank" rel="noopener noreferrer">
+                    <Info className="mr-2 h-4 w-4" />
+                    <span>Términos de uso</span>
+                    <ExternalLink className="ml-auto h-3 w-3" />
+                  </a>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <Drawer open={showRatingDrawer} onOpenChange={setShowRatingDrawer}>
+        <DrawerContent className="max-w-md mx-auto">
+          <DrawerHeader>
+            <DrawerTitle className="text-center">Calificar chatbot</DrawerTitle>
+            <DrawerDescription className="text-center">
+              ¿Cómo calificarías tu experiencia con {chatbotInfo.nombre}?
+            </DrawerDescription>
+          </DrawerHeader>
+          <div className="flex justify-center p-4">
+            <div className="flex items-center">
+              {renderStars()}
+            </div>
+          </div>
+          <div className="p-4 pt-0">
+            <Textarea placeholder="Comentarios (opcional)" value={userFeedback} onChange={e => setUserFeedback(e.target.value)} className="min-h-[80px]" />
+          </div>
+          <DrawerFooter>
+            <Button onClick={submitRating} disabled={userRating === 0}>
+              Enviar calificación
+            </Button>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
+    </div>;
 };
 
 export default ChatInterface;
