@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -40,10 +39,10 @@
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
     
-    /* WhatsApp style chat bubble colors - updated to use primary for user bubble */
-    --user-bubble: 221.2, 83.2%, 53.3%; /* Theme blue (primary) for user/outgoing messages */
-    --bot-bubble: 0, 0%, 20%; /* Dark gray for bot messages */
-    --agent-bubble: 221.2, 83.2%, 53.3%; /* Primary blue for agent messages */
+    /* WhatsApp style chat bubble colors - updated with requested colors */
+    --user-bubble: 214, 100%, 41%; /* #3570d1 for user/lead messages */
+    --bot-bubble: 220, 74%, 11%; /* #08142e for bot messages */
+    --agent-bubble: 217, 33%, 17%; /* #1e293b for agent messages */
   }
 
   .dark {
@@ -81,10 +80,10 @@
     --sidebar-border: 217.2 32.6% 17.5%;
     --sidebar-ring: 224.3 76.3% 48%;
     
-    /* WhatsApp style chat bubble colors for dark mode - updated to use primary for user bubble */
-    --user-bubble: 217.2, 91.2%, 59.8%; /* Dark theme blue for user/outgoing messages */
-    --bot-bubble: 0, 0%, 20%; /* Dark gray for bot messages */
-    --agent-bubble: 217.2, 91.2%, 59.8%; /* Primary blue for agent messages */
+    /* WhatsApp style chat bubble colors for dark mode - updated with requested colors */
+    --user-bubble: 214, 100%, 41%; /* #3570d1 for user/lead messages */
+    --bot-bubble: 220, 74%, 11%; /* #08142e for bot messages */
+    --agent-bubble: 217, 33%, 17%; /* #1e293b for agent messages */
   }
 }
 
@@ -151,7 +150,7 @@ html, body, #root {
   z-index: 1;
 }
 
-/* WhatsApp style user message bubble (right side) */
+/* User/Lead message bubble (right side) */
 .user-bubble {
   background-color: hsl(var(--user-bubble));
   color: white;
@@ -159,11 +158,11 @@ html, body, #root {
   border-top-right-radius: 0;
   box-shadow: 0 1px 0.5px rgba(0,0,0,0.13);
   position: relative;
-  max-width: 85%; /* Make bubbles wider as requested */
+  max-width: 85%;
   word-wrap: break-word;
 }
 
-/* WhatsApp style bot message bubble (left side) */
+/* Bot message bubble (left side) */
 .bot-bubble {
   background-color: hsl(var(--bot-bubble));
   color: white;
@@ -171,11 +170,11 @@ html, body, #root {
   border-top-left-radius: 0;
   box-shadow: 0 1px 0.5px rgba(0,0,0,0.13);
   position: relative;
-  max-width: 85%; /* Make bubbles wider as requested */
+  max-width: 85%;
   word-wrap: break-word;
 }
 
-/* WhatsApp style agent message bubble (left side) */
+/* Agent message bubble (left side) */
 .agent-bubble {
   background-color: hsl(var(--agent-bubble));
   color: white;
@@ -183,15 +182,11 @@ html, body, #root {
   border-top-left-radius: 0;
   box-shadow: 0 1px 0.5px rgba(0,0,0,0.13);
   position: relative;
-  max-width: 85%; /* Make bubbles wider as requested */
+  max-width: 85%;
   word-wrap: break-word;
 }
 
-.chat-input {
-  background-color: #1f2c34; /* Dark input background like WhatsApp */
-  border-radius: 24px;
-  border: none;
-}
+/* WhatsApp style agent message bubble (left side) */
 
 /* Improved timestamp that doesn't interfere with message content */
 .chat-timestamp {
