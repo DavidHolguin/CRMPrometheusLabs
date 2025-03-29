@@ -12,7 +12,8 @@ export interface ChatMessage {
 
 export function useChatMessages(conversationId: string | null) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const channelRef = useRef<any>(null);
+  const mainChannelRef = useRef<any>(null);
+  const agentChannelRef = useRef<any>(null);
 
   // Fetch initial messages
   useEffect(() => {
@@ -38,20 +39,20 @@ export function useChatMessages(conversationId: string | null) {
     fetchMessages();
   }, [conversationId]);
 
-  // Set up real-time listener for agent messages only using the new table
+  // Set up real-time listener for all messages
   useEffect(() => {
     if (!conversationId) return;
     
     // Clean up any existing subscription
-    if (channelRef.current) {
-      console.log("Removing existing channel subscription");
-      supabase.removeChannel(channelRef.current);
-      channelRef.current = null;
+    if (mainChannelRef.current) {
+      console.log("Removing existing main channel subscription");
+      supabase.removeChannel(mainChannelRef.current);
+      mainChannelRef.current = null;
     }
     
     // Create a unique channel name with timestamp to avoid conflicts
     const timestamp = Date.now();
-    const channelName = `realtime-agent-messages-${conversationId}-${timestamp}`;
+    const channelName = `realtime-messages-${conversationId}-${timestamp}`;
     console.log(`Setting up realtime subscription on channel: ${channelName}`);
     
     const channel = supabase
@@ -60,11 +61,11 @@ export function useChatMessages(conversationId: string | null) {
         { 
           event: 'INSERT', 
           schema: 'public', 
-          table: 'mensajes_agentes', 
+          table: 'mensajes', 
           filter: `conversacion_id=eq.${conversationId}` 
         },
         (payload) => {
-          console.log("New agent message received from realtime:", payload.new);
+          console.log("New message received from realtime:", payload.new);
           
           // Check if message already exists to avoid duplicates
           setMessages(currentMessages => {
@@ -82,12 +83,66 @@ export function useChatMessages(conversationId: string | null) {
         console.log(`Realtime subscription status on ${channelName}: ${status}`);
       });
     
-    channelRef.current = channel;
+    mainChannelRef.current = channel;
     
     return () => {
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
-        channelRef.current = null;
+      if (mainChannelRef.current) {
+        supabase.removeChannel(mainChannelRef.current);
+        mainChannelRef.current = null;
+      }
+    };
+  }, [conversationId]);
+
+  // Set up real-time listener for agent messages from mensajes_agentes table
+  useEffect(() => {
+    if (!conversationId) return;
+    
+    // Clean up any existing subscription
+    if (agentChannelRef.current) {
+      console.log("Removing existing agent channel subscription");
+      supabase.removeChannel(agentChannelRef.current);
+      agentChannelRef.current = null;
+    }
+    
+    // Create a unique channel name with timestamp to avoid conflicts
+    const timestamp = Date.now();
+    const agentChannelName = `realtime-agent-messages-${conversationId}-${timestamp}`;
+    console.log(`Setting up agent realtime subscription on channel: ${agentChannelName}`);
+    
+    const agentChannel = supabase
+      .channel(agentChannelName)
+      .on('postgres_changes', 
+        { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'mensajes_agentes', 
+          filter: `conversacion_id=eq.${conversationId}` 
+        },
+        (payload) => {
+          console.log("New agent message received from realtime:", payload.new);
+          
+          // Check if message already exists to avoid duplicates
+          setMessages(currentMessages => {
+            const messageExists = currentMessages.some(msg => msg.id === payload.new.id);
+            if (messageExists) {
+              console.log("Agent message already exists in state, skipping");
+              return currentMessages;
+            }
+            console.log("Adding new agent message to state");
+            return [...currentMessages, payload.new as ChatMessage];
+          });
+        }
+      )
+      .subscribe(status => {
+        console.log(`Agent realtime subscription status on ${agentChannelName}: ${status}`);
+      });
+    
+    agentChannelRef.current = agentChannel;
+    
+    return () => {
+      if (agentChannelRef.current) {
+        supabase.removeChannel(agentChannelRef.current);
+        agentChannelRef.current = null;
       }
     };
   }, [conversationId]);
