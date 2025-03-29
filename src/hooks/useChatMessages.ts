@@ -97,7 +97,7 @@ export function useChatMessages(conversationId: string | null) {
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current)
           .then(response => {
-            console.log(`Enhanced realtime subscription status for conversation ${conversationId}: ${response.status}`);
+            console.log(`Enhanced realtime subscription status for conversation ${conversationId}: ${response}`);
           })
           .catch(err => {
             console.error(`Error removing channel for conversation ${conversationId}:`, err);
