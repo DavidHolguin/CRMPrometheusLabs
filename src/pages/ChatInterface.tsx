@@ -250,7 +250,8 @@ const ChatInterface = () => {
         }
       }
       
-      console.log("Sending message to API:", {
+      // Prepare the API request with correct lead data
+      const apiRequest = {
         empresa_id: empresaId,
         chatbot_id: chatbotId,
         mensaje: messageContent,
@@ -262,7 +263,9 @@ const ChatInterface = () => {
           name: userName || undefined,
           phone: userPhone || undefined
         }
-      });
+      };
+      
+      console.log("Sending message to API:", apiRequest);
       
       // Send message to API
       const apiEndpoint = import.meta.env.VITE_API_BASE_URL || 'https://web-production-01457.up.railway.app';
@@ -271,19 +274,7 @@ const ChatInterface = () => {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          empresa_id: empresaId,
-          chatbot_id: chatbotId,
-          mensaje: messageContent,
-          session_id: sessionId,
-          lead_id: leadId || undefined,
-          metadata: {
-            browser: navigator.userAgent,
-            page: window.location.pathname,
-            name: userName || undefined,
-            phone: userPhone || undefined
-          }
-        })
+        body: JSON.stringify(apiRequest)
       });
       
       if (!response.ok) {
