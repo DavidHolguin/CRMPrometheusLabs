@@ -22,34 +22,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   }
 });
 
-// Verify storage buckets exist rather than trying to create them automatically
-const verifyStorageBuckets = async () => {
-  try {
-    // Check logos bucket
-    const { data: logosData, error: logosError } = await supabase
-      .storage
-      .getBucket('logos');
-      
-    if (logosError) {
-      console.error('Error verifying logos bucket:', logosError.message);
-    } else {
-      console.log('Logos bucket verified');
-    }
-    
-    // Check avatars bucket
-    const { data: avatarsData, error: avatarsError } = await supabase
-      .storage
-      .getBucket('avatars');
-      
-    if (avatarsError) {
-      console.error('Error verifying avatars bucket:', avatarsError.message);
-    } else {
-      console.log('Avatars bucket verified');
-    }
-  } catch (error) {
-    console.error('Error checking storage buckets:', error);
-  }
-};
-
-// Verify buckets when the client is initialized
-verifyStorageBuckets();
+// No verificamos storage buckets automáticamente
+// ya que esto puede causar errores 400 si no existen
+// La app puede funcionar sin estos buckets
+console.log('Supabase client initialized');
