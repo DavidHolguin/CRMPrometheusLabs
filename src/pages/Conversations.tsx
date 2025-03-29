@@ -169,17 +169,26 @@ const ConversationsPage = () => {
   const getSenderType = (origen: string, metadata: any): "user" | "bot" | "agent" => {
     console.log(`Determining sender type for: ${origen}`, metadata);
     
-    if (origen === 'usuario' || origen === 'lead') return "user";
-    if (origen === 'chatbot') return "bot";
-    if (origen === 'agente') return "agent";
+    if (origen === 'usuario' || origen === 'lead' || origen === 'user') return "user";
+    if (origen === 'chatbot' || origen === 'bot') return "bot";
+    if (origen === 'agente' || origen === 'agent') return "agent";
     
-    // Check for agent via metadata as a fallback
-    if (metadata && (metadata.agent_id || metadata.agent_name || metadata.origin === "agent")) {
-      return "agent";
+    if (metadata) {
+      if (metadata.agent_id || metadata.agent_name || metadata.origin === "agent") {
+        return "agent";
+      }
+      
+      if (metadata.is_bot || metadata.origin === "bot" || metadata.origin === "chatbot") {
+        return "bot";
+      }
+      
+      if (metadata.is_user || metadata.origin === "user" || metadata.origin === "lead") {
+        return "user";
+      }
     }
     
-    // Default to bot for any other case
-    return "bot";
+    console.warn("Could not determine sender type from origin or metadata:", origen, metadata);
+    return origen === "agente" ? "agent" : (origen === "chatbot" ? "bot" : "user");
   };
 
   if (!user?.companyId) {
@@ -377,6 +386,11 @@ const ConversationsPage = () => {
                     const messageDate = new Date(msg.created_at);
                     
                     console.log(`Message from ${msg.origen}, identified as ${senderType}:`, msg.contenido);
+                    
+                    if (msg.metadata && msg.metadata.is_system_message === true) {
+                      console.log("Skipping system message:", msg);
+                      return null;
+                    }
                     
                     return (
                       <div 

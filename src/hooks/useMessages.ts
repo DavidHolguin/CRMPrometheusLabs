@@ -44,9 +44,12 @@ export function useMessages(conversationId: string | undefined) {
       supabase.removeChannel(channelRef.current);
     }
     
-    // Create new channel with improved configuration
+    // Create new channel with improved configuration - added timestamp to make the channel name unique
+    const channelName = `messages-${conversationId}-${Date.now()}`;
+    console.log(`Creating new channel: ${channelName}`);
+    
     const channel = supabase
-      .channel(`messages-${conversationId}-${Date.now()}`) // Add timestamp to make channel name unique
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -62,22 +65,26 @@ export function useMessages(conversationId: string | undefined) {
           if (payload.eventType === 'INSERT') {
             console.log("Processing INSERT event for message:", payload.new);
             
-            // Update the query cache with the new message
-            queryClient.setQueryData(["messages", conversationId], (oldData: Message[] = []) => {
-              // Check if the message already exists to avoid duplicates
-              const messageExists = oldData.some(msg => msg.id === payload.new.id);
-              
-              if (messageExists) {
-                console.log("Message already exists in cache, skipping update");
-                return oldData;
-              }
-              
-              console.log("Adding new message to cache:", payload.new);
-              console.log("Message origin:", payload.new.origen);
-              
-              // Add the message to the cache
-              return [...oldData, payload.new as Message];
-            });
+            // Get current messages from cache
+            const currentMessages = queryClient.getQueryData<Message[]>(["messages", conversationId]) || [];
+            console.log("Current messages in cache:", currentMessages.length);
+            
+            // Check if the message already exists to avoid duplicates
+            const messageExists = currentMessages.some(msg => msg.id === payload.new.id);
+            
+            if (messageExists) {
+              console.log("Message already exists in cache, skipping update");
+              return;
+            }
+            
+            console.log("Adding new message to cache:", payload.new);
+            console.log("Message origin:", payload.new.origen);
+            
+            // Add the message to the cache
+            queryClient.setQueryData(["messages", conversationId], [...currentMessages, payload.new as Message]);
+            
+            // Force refetch to ensure we've got the latest state
+            queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
             
             // Also invalidate conversations to refresh the list
             queryClient.invalidateQueries({ queryKey: ["conversations"] });
@@ -96,10 +103,11 @@ export function useMessages(conversationId: string | undefined) {
         }
       )
       .subscribe((status) => {
-        console.log(`Enhanced realtime subscription status for conversation ${conversationId}:`, status);
+        console.log(`Enhanced realtime subscription status for conversation ${conversationId}: ${status}`);
         
         // Force refetch on successful subscription to ensure we have latest data
         if (status === 'SUBSCRIBED') {
+          console.log("Channel successfully subscribed, fetching latest messages");
           queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
         }
       });
@@ -133,7 +141,7 @@ export function useMessages(conversationId: string | undefined) {
       return data || [];
     },
     enabled: !!conversationId,
-    refetchInterval: 5000, // Still maintain a 5-second refresh as backup
+    refetchInterval: 5000, // Maintain a 5-second refresh as backup
     staleTime: 1000, // Mark data as stale quickly to encourage refetches
   });
 
@@ -212,7 +220,30 @@ export function useMessages(conversationId: string | undefined) {
       
       return await response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log("Message sent successfully, response:", data);
+      // Immediately update the UI with our sent message without waiting for realtime
+      queryClient.setQueryData(["messages", conversationId], (oldData: Message[] = []) => {
+        // Ensure we don't add a duplicate message
+        if (oldData.some(msg => msg.id === data.mensaje_id)) {
+          return oldData;
+        }
+        
+        return [...oldData, {
+          id: data.mensaje_id,
+          conversacion_id: conversationId,
+          contenido: data.mensaje || "",
+          origen: "agente",
+          created_at: new Date().toISOString(),
+          leido: true,
+          remitente_id: user?.id,
+          metadata: {
+            agent_name: user?.name || "Agente",
+            department: "Ventas"
+          }
+        }];
+      });
+      
       // Invalidate related queries to refresh data
       queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
       queryClient.invalidateQueries({ queryKey: ["conversations"] });

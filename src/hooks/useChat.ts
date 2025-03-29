@@ -23,7 +23,6 @@ export function useChat(conversationId: string | undefined) {
           .select("metadata")
           .eq("conversacion_id", conversationId)
           .eq("origen", "agente")
-          .is("metadata->is_system_message", true)
           .order("created_at", { ascending: false })
           .limit(1);
         
@@ -35,7 +34,10 @@ export function useChat(conversationId: string | undefined) {
           
           // Check if the message contains info about chatbot being disabled
           if (latestMessage.metadata && 
-              latestMessage.metadata.is_system_message && 
+              typeof latestMessage.metadata === 'object' &&
+              'is_system_message' in latestMessage.metadata && 
+              'chatbot_state' in latestMessage.metadata &&
+              latestMessage.metadata.is_system_message === true &&
               latestMessage.metadata.chatbot_state === false) {
             setChatbotEnabled(false);
           }
