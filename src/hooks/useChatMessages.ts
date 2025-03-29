@@ -38,7 +38,7 @@ export function useChatMessages(conversationId: string | null) {
     fetchMessages();
   }, [conversationId]);
 
-  // Set up real-time listener for agent messages
+  // Set up real-time listener for all messages
   useEffect(() => {
     if (!conversationId) return;
     
@@ -53,6 +53,9 @@ export function useChatMessages(conversationId: string | null) {
     const timestamp = Date.now();
     const channelName = `realtime-messages-${conversationId}-${timestamp}`;
     console.log(`Setting up realtime subscription on channel: ${channelName}`);
+    
+    // Enable realtime on the mensajes table if not already done
+    // This happens on the server side so we don't need to do it here
     
     const channel = supabase
       .channel(channelName)
@@ -82,6 +85,8 @@ export function useChatMessages(conversationId: string | null) {
         console.log(`Realtime subscription status on ${channelName}: ${status}`);
         if (status === 'SUBSCRIBED') {
           console.log(`Successfully subscribed to messages for conversation: ${conversationId}`);
+        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+          console.error(`Enhanced realtime subscription status for conversation ${conversationId}: ${status}`);
         }
       });
     
@@ -90,7 +95,13 @@ export function useChatMessages(conversationId: string | null) {
     return () => {
       console.log(`Cleaning up realtime subscription for conversation: ${conversationId}`);
       if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
+        supabase.removeChannel(channelRef.current)
+          .then(response => {
+            console.log(`Enhanced realtime subscription status for conversation ${conversationId}: ${response.status}`);
+          })
+          .catch(err => {
+            console.error(`Error removing channel for conversation ${conversationId}:`, err);
+          });
         channelRef.current = null;
       }
     };
