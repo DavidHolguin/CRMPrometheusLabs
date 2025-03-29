@@ -35,6 +35,75 @@ const App = () => {
     setMounted(true);
   }, []);
 
+  // Fix for missing agent messages - this will run once on app load
+  useEffect(() => {
+    const syncAgentMessages = async () => {
+      try {
+        // Check for agent messages that haven't been synchronized
+        const { data: agentMessages, error } = await supabase
+          .from("mensajes")
+          .select("*")
+          .eq("origen", "agent")
+          .order("created_at", { ascending: false })
+          .limit(20);
+        
+        if (error) {
+          console.error("Error checking for unsynchronized agent messages:", error);
+          return;
+        }
+        
+        if (!agentMessages || agentMessages.length === 0) {
+          console.log("No agent messages found to synchronize");
+          return;
+        }
+        
+        console.log(`Found ${agentMessages.length} agent messages to check`);
+        
+        // For each agent message, check if it exists in mensajes_agentes
+        for (const message of agentMessages) {
+          const { data: exists, error: checkError } = await supabase
+            .from("mensajes_agentes")
+            .select("id")
+            .eq("id", message.id)
+            .maybeSingle();
+            
+          if (checkError) {
+            console.error("Error checking message existence:", checkError);
+            continue;
+          }
+          
+          // If message doesn't exist in mensajes_agentes, insert it
+          if (!exists) {
+            console.log(`Synchronizing missing agent message: ${message.id}`);
+            const { error: insertError } = await supabase
+              .from("mensajes_agentes")
+              .insert({
+                id: message.id,
+                conversacion_id: message.conversacion_id,
+                contenido: message.contenido,
+                created_at: message.created_at,
+                metadata: message.metadata,
+                remitente_id: message.remitente_id,
+                origen: "agente"
+              });
+              
+            if (insertError) {
+              console.error("Error inserting agent message:", insertError);
+            } else {
+              console.log(`Successfully synchronized agent message: ${message.id}`);
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Error in syncAgentMessages:", e);
+      }
+    };
+    
+    if (mounted) {
+      syncAgentMessages();
+    }
+  }, [mounted]);
+
   if (!mounted) {
     return null;
   }

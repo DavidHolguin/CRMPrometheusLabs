@@ -38,7 +38,7 @@ export function useChatMessages(conversationId: string | null) {
     fetchMessages();
   }, [conversationId]);
 
-  // Set up real-time listener for agent messages only using the new table
+  // Set up real-time listener for agent messages only using the mensajes_agentes table
   useEffect(() => {
     if (!conversationId) return;
     
