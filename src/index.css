@@ -1,205 +1,164 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
+ 
 @layer base {
   :root {
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
+
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
+ 
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
+ 
+    --primary: 222.2 47.4% 11.2%;
     --primary-foreground: 210 40% 98%;
+ 
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
+ 
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
+ 
     --accent: 210 40% 96.1%;
     --accent-foreground: 222.2 47.4% 11.2%;
+ 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
+
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
+    --ring: 222.2 84% 4.9%;
+ 
     --radius: 0.5rem;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
-    
-    /* WhatsApp style chat bubble colors - updated with requested colors */
-    --user-bubble: 214, 60%, 40%; /* Más sobrio azul para lead messages */
-    --bot-bubble: 215, 32%, 7%; /* #0b141a para bot messages */
-    --agent-bubble: 217, 33%, 17%; /* #1e293b para agent messages */
   }
-
+ 
   .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
+ 
     --card: 222.2 84% 4.9%;
     --card-foreground: 210 40% 98%;
+ 
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
+ 
+    --primary: 210 40% 98%;
     --primary-foreground: 222.2 47.4% 11.2%;
+ 
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
+ 
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
+ 
     --accent: 217.2 32.6% 17.5%;
     --accent-foreground: 210 40% 98%;
+ 
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
+ 
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
-
-    --sidebar-background: 222.2 84% 4.9%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 217.2 91.2% 59.8%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 217.2 32.6% 17.5%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 217.2 32.6% 17.5%;
-    --sidebar-ring: 224.3 76.3% 48%;
-    
-    /* WhatsApp style chat bubble colors for dark mode - updated with requested colors */
-    --user-bubble: 214, 60%, 40%; /* Más sobrio azul para lead messages */
-    --bot-bubble: 215, 32%, 7%; /* #0b141a para bot messages */
-    --agent-bubble: 217, 33%, 17%; /* #1e293b para agent messages */
+    --ring: 212.7 26.8% 83.9%;
   }
 }
-
+ 
 @layer base {
   * {
     @apply border-border;
   }
-
   body {
     @apply bg-background text-foreground;
   }
-
-  a {
-    @apply transition-colors hover:text-primary;
-  }
 }
 
-html, body, #root {
-  height: 100%;
-}
-
-/* Scrollbar Styling */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: hsl(var(--background));
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground) / 0.3);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground) / 0.5);
-}
-
-/* WhatsApp style chat styles */
 .chat-background {
-  background-image: url('https://static.whatsapp.net/rsrc.php/v4/yl/r/gi_DckOUM5a.png');
-  background-repeat: repeat;
-  background-size: 210px;
-  position: relative;
-  background-color: #0b141a; /* Actualizado a #0b141a como solicitado */
+  background-color: #0b141a;
+  background-image: url("data:image/svg+xml,%3Csvg width='84' height='48' viewBox='0 0 84 48' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h12v6H0V0zm28 8h12v6H28V8zm14-8h12v6H42V0zm14 0h12v6H56V0zm0 8h12v6H56V8zM42 8h12v6H42V8zm0 16h12v6H42v-6zm14-8h12v6H56v-6zm14 0h12v6H70v-6zm0-16h12v6H70V0zM28 32h12v6H28v-6zM14 16h12v6H14v-6zM0 24h12v6H0v-6zm0 8h12v6H0v-6zm14 0h12v6H14v-6zm14 8h12v6H28v-6zm-14 0h12v6H14v-6zm28 0h12v6H42v-6zm14-8h12v6H56v-6zm0-8h12v6H56v-6zm14 8h12v6H70v-6zm0 8h12v6H70v-6zM14 24h12v6H14v-6zm14-8h12v6H28v-6zM14 8h12v6H14V8zM0 8h12v6H0V8z' fill='%23172a3a' fill-opacity='0.1' fill-rule='evenodd'/%3E%3C/svg%3E");
+  padding-bottom: 1rem;
 }
 
-.chat-background::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(11, 20, 26, 0.8); /* Actualizado a #0b141a con transparencia */
-  z-index: 0;
-}
-
-.chat-message-container {
-  position: relative;
-  z-index: 1;
-}
-
-/* User/Lead message bubble (right side) */
 .user-bubble {
-  background-color: hsl(var(--user-bubble));
+  background-color: #1f6c85;
   color: white;
-  border-radius: 0.5rem;
-  border-top-right-radius: 0;
-  box-shadow: 0 1px 0.5px rgba(0,0,0,0.13);
+  border-radius: 0.75rem 0 0.75rem 0.75rem;
+  margin-left: auto;
+  max-width: 75%;
   position: relative;
-  max-width: 85%;
-  word-wrap: break-word;
 }
 
-/* Bot message bubble (left side) */
 .bot-bubble {
-  background-color: hsl(var(--bot-bubble));
+  background-color: #0b141a;
   color: white;
-  border-radius: 0.5rem;
-  border-top-left-radius: 0;
-  box-shadow: 0 1px 0.5px rgba(0,0,0,0.13);
+  border-radius: 0 0.75rem 0.75rem 0.75rem;
+  margin-right: auto;
+  max-width: 75%;
   position: relative;
-  max-width: 85%;
-  word-wrap: break-word;
 }
 
-/* Agent message bubble (left side) */
 .agent-bubble {
-  background-color: hsl(var(--agent-bubble));
+  background-color: #0f5d2c;
   color: white;
-  border-radius: 0.5rem;
-  border-top-left-radius: 0;
-  box-shadow: 0 1px 0.5px rgba(0,0,0,0.13);
+  border-radius: 0 0.75rem 0.75rem 0.75rem;
+  margin-right: auto;
+  max-width: 75%;
   position: relative;
-  max-width: 85%;
-  word-wrap: break-word;
 }
 
-/* Improved timestamp that doesn't interfere with message content */
 .chat-timestamp {
-  font-size: 11px;
-  opacity: 0.7;
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 2px;
-  margin-left: 4px;
+  justify-content: flex-end;
+  margin-top: 0.25rem;
   white-space: nowrap;
 }
 
-/* Message content that allows space for timestamp without breaking layout */
-.message-content {
-  display: inline;
+.whatsapp-input-container {
+  display: flex;
+  align-items: center;
+  background-color: #1f2c34;
+  border-radius: 24px;
+  padding: 0 0.25rem;
+}
+
+.whatsapp-input {
+  flex: 1;
+  border: none;
+  background-color: transparent;
+  padding: 0.75rem 1rem;
+  color: white;
+  outline: none;
+}
+
+.whatsapp-input::placeholder {
+  color: #aaa;
+}
+
+.whatsapp-button {
+  background-color: transparent;
+  border: none;
+  color: #8696a0;
+  padding: 0.5rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.whatsapp-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.whatsapp-send-button {
+  color: #00a884;
 }
 
 .avatar-border {
@@ -209,52 +168,11 @@ html, body, #root {
 .avatar-border::after {
   content: '';
   position: absolute;
-  width: 14px;
-  height: 14px;
-  background-color: #4CAF50; /* Keep the green dot as requested */
-  border-radius: 50%;
   bottom: 0;
   right: 0;
-  border: 2px solid hsl(var(--background));
-}
-
-/* WhatsApp-style message input */
-.whatsapp-input-container {
-  display: flex;
-  align-items: center;
-  background-color: #1f2c34;
-  border-radius: 24px;
-  padding: 2px 6px;
-}
-
-.whatsapp-input {
-  background-color: transparent;
-  border: none;
-  flex: 1;
-  color: white;
-  padding: 10px 12px;
-  font-size: 15px;
-}
-
-.whatsapp-input:focus {
-  outline: none;
-  box-shadow: none;
-}
-
-.whatsapp-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background-color: transparent;
-  border: none;
-  cursor: pointer;
-  color: #8596a0;
-}
-
-.whatsapp-send-button {
+  width: 10px;
+  height: 10px;
   background-color: #00a884;
-  color: white;
+  border-radius: 50%;
+  border: 2px solid #1f2c34;
 }
