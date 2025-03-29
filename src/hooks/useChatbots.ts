@@ -23,6 +23,7 @@ export interface Chatbot {
     communicationTone?: string | null;
     personality?: string | null;
     specialInstructions?: string | null;
+    keyPoints?: string[] | null;
     qaExamples?: Array<{question: string, answer: string}>;
   } | null;
 }
@@ -88,6 +89,26 @@ export function useChatbots() {
         // Transformar el contexto si existe
         const contextoItems = chatbot.contexto || [];
         
+        // Prepare key points array
+        let keyPoints: string[] = [];
+        if (contextoItems.length > 0 && contextoItems[0]?.key_points) {
+          try {
+            const rawKeyPoints = contextoItems[0].key_points;
+            if (Array.isArray(rawKeyPoints)) {
+              keyPoints = rawKeyPoints.map(point => {
+                if (typeof point === 'string') {
+                  return point;
+                } else if (typeof point === 'object' && point !== null) {
+                  return String(Object.values(point)[0] || '');
+                }
+                return '';
+              }).filter(Boolean);
+            }
+          } catch (e) {
+            console.error("Error processing key_points:", e);
+          }
+        }
+        
         // Asegurar que qaExamples sea un array de objetos con question y answer
         let qaExamples: Array<{question: string, answer: string}> = [];
         
@@ -97,7 +118,7 @@ export function useChatbots() {
             if (Array.isArray(rawExamples)) {
               qaExamples = rawExamples.map(example => {
                 if (typeof example === 'object' && example !== null) {
-                  // Accedemos a las propiedades de manera segura usando type assertion
+                  // Use type assertion to safely access properties
                   const exampleObj = example as Record<string, any>;
                   return {
                     question: String(exampleObj.question || ''),
@@ -105,10 +126,10 @@ export function useChatbots() {
                   };
                 }
                 return { question: '', answer: '' };
-              });
+              }).filter(ex => ex.question && ex.answer);
             }
           } catch (e) {
-            console.error("Error procesando qa_examples:", e);
+            console.error("Error processing qa_examples:", e);
           }
         }
         
@@ -119,6 +140,7 @@ export function useChatbots() {
           communicationTone: contextoItems[0]?.communication_tone || null,
           personality: contextoItems[0]?.personality || null,
           specialInstructions: contextoItems[0]?.special_instructions || null,
+          keyPoints,
           qaExamples
         } : null;
         
@@ -171,6 +193,26 @@ export function useChatbot(id: string | undefined) {
       // Procesar contexto
       const contextoItems = data.contexto || [];
       
+      // Prepare key points array
+      let keyPoints: string[] = [];
+      if (contextoItems.length > 0 && contextoItems[0]?.key_points) {
+        try {
+          const rawKeyPoints = contextoItems[0].key_points;
+          if (Array.isArray(rawKeyPoints)) {
+            keyPoints = rawKeyPoints.map(point => {
+              if (typeof point === 'string') {
+                return point;
+              } else if (typeof point === 'object' && point !== null) {
+                return String(Object.values(point)[0] || '');
+              }
+              return '';
+            }).filter(Boolean);
+          }
+        } catch (e) {
+          console.error("Error processing key_points:", e);
+        }
+      }
+      
       // Asegurar que qaExamples sea un array de objetos con question y answer
       let qaExamples: Array<{question: string, answer: string}> = [];
       
@@ -180,7 +222,7 @@ export function useChatbot(id: string | undefined) {
           if (Array.isArray(rawExamples)) {
             qaExamples = rawExamples.map(example => {
               if (typeof example === 'object' && example !== null) {
-                // Accedemos a las propiedades de manera segura usando type assertion
+                // Use type assertion to safely access properties
                 const exampleObj = example as Record<string, any>;
                 return {
                   question: String(exampleObj.question || ''),
@@ -188,10 +230,10 @@ export function useChatbot(id: string | undefined) {
                 };
               }
               return { question: '', answer: '' };
-            });
+            }).filter(ex => ex.question && ex.answer);
           }
         } catch (e) {
-          console.error("Error procesando qa_examples:", e);
+          console.error("Error processing qa_examples:", e);
         }
       }
       
@@ -202,6 +244,7 @@ export function useChatbot(id: string | undefined) {
         communicationTone: contextoItems[0]?.communication_tone || null,
         personality: contextoItems[0]?.personality || null,
         specialInstructions: contextoItems[0]?.special_instructions || null,
+        keyPoints,
         qaExamples
       } : null;
       

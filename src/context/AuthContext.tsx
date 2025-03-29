@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -313,30 +314,45 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             
           if (bucketError) {
             console.error("Error checking avatars bucket:", bucketError.message);
-            console.log("Will continue without avatar upload");
-          } else {
-            console.log("Avatars bucket exists, proceeding with file upload");
             
-            const fileExt = chatbotData.avatarFile.name.split('.').pop();
-            const fileName = `chatbot-${Date.now()}.${fileExt}`;
-            const filePath = `${fileName}`;
-            
-            const { error: uploadError, data } = await supabase.storage
-              .from('avatars')
-              .upload(filePath, chatbotData.avatarFile);
+            // Create the bucket if it doesn't exist
+            if (bucketError.message.includes('The resource was not found')) {
+              const { error: createError } = await supabase.storage.createBucket('avatars', {
+                public: true
+              });
               
-            if (uploadError) {
-              console.error("Error uploading avatar:", uploadError);
+              if (createError) {
+                console.error("Error creating avatars bucket:", createError);
+              } else {
+                console.log("Created avatars bucket");
+              }
             } else {
-              console.log("Avatar uploaded successfully");
-              
-              const { data: { publicUrl } } = supabase.storage
-                .from('avatars')
-                .getPublicUrl(filePath);
-                
-              uploadedAvatarUrl = publicUrl;
-              console.log("Public URL for avatar:", uploadedAvatarUrl);
+              console.log("Will continue without avatar upload");
             }
+          } 
+          
+          // Proceed with file upload
+          console.log("Proceeding with file upload");
+          
+          const fileExt = chatbotData.avatarFile.name.split('.').pop();
+          const fileName = `chatbot-${Date.now()}.${fileExt}`;
+          const filePath = `${fileName}`;
+          
+          const { error: uploadError, data } = await supabase.storage
+            .from('avatars')
+            .upload(filePath, chatbotData.avatarFile);
+            
+          if (uploadError) {
+            console.error("Error uploading avatar:", uploadError);
+          } else {
+            console.log("Avatar uploaded successfully");
+            
+            const { data: { publicUrl } } = supabase.storage
+              .from('avatars')
+              .getPublicUrl(filePath);
+              
+            uploadedAvatarUrl = publicUrl;
+            console.log("Public URL for avatar:", uploadedAvatarUrl);
           }
         } catch (uploadError) {
           console.error("Error during avatar upload process:", uploadError);
@@ -409,6 +425,35 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
       }
       
+      // Create chatbot context with all the new fields
+      console.log("Creating chatbot context with general context, key points, and FAQs");
+      
+      const { error: contextoError } = await supabase
+        .from('chatbot_contextos')
+        .insert([{
+          chatbot_id: chatbotId,
+          tipo: 'general',
+          contenido: chatbotData.contextData?.generalContext || '',
+          welcome_message: chatbotData.welcomeMessage,
+          personality: chatbotData.persona,
+          general_context: chatbotData.contextData?.generalContext || '',
+          communication_tone: chatbotData.communicationTone,
+          main_purpose: chatbotData.mainPurpose,
+          special_instructions: chatbotData.specialInstructions || chatbotData.customInstructions,
+          key_points: chatbotData.keyPoints || [],
+          qa_examples: chatbotData.faqs.map((faq: any) => ({
+            question: faq.question,
+            answer: faq.answer
+          })),
+          orden: 1
+        }]);
+          
+      if (contextoError) {
+        console.error("Error creating chatbot context:", contextoError);
+      } else {
+        console.log("Chatbot context created successfully");
+      }
+      
       const validFaqs = chatbotData.faqs.filter((faq: any) => 
         faq.question.trim() && faq.answer.trim()
       );
@@ -429,25 +474,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           console.error("Error creating FAQs:", faqError);
         } else {
           console.log("FAQs created successfully");
-          
-          const faqsText = validFaqs.map((faq: any) => 
-            `Pregunta: ${faq.question}\nRespuesta: ${faq.answer}`
-          ).join('\n\n');
-          
-          const { error: contextoError } = await supabase
-            .from('chatbot_contextos')
-            .insert([{
-              chatbot_id: chatbotId,
-              tipo: 'faqs',
-              contenido: faqsText,
-              orden: 1
-            }]);
-              
-          if (contextoError) {
-            console.error("Error creating chatbot context:", contextoError);
-          } else {
-            console.log("Chatbot context created successfully");
-          }
         }
       }
       

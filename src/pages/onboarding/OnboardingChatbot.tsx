@@ -37,6 +37,11 @@ interface FAQ {
   answer: string;
 }
 
+interface KeyPoint {
+  id: string;
+  content: string;
+}
+
 interface ContextTag {
   id: string;
   label: string;
@@ -63,6 +68,9 @@ const OnboardingChatbot = () => {
     specialInstructions: "",
   });
   
+  // General context - additional manual information
+  const [generalContext, setGeneralContext] = useState("");
+  
   // Contexto - Etiquetas para mostrar en el editor avanzado
   const [contextTags, setContextTags] = useState<ContextTag[]>([
     {
@@ -77,6 +85,11 @@ const OnboardingChatbot = () => {
       content: "",
       type: "service"
     }
+  ]);
+  
+  // Key points - important points about the company/services
+  const [keyPoints, setKeyPoints] = useState<KeyPoint[]>([
+    { id: crypto.randomUUID(), content: "" }
   ]);
   
   // Cargar información del contexto de la empresa para las etiquetas
@@ -170,6 +183,28 @@ const OnboardingChatbot = () => {
     ));
   };
   
+  // Key points management
+  const addKeyPoint = () => {
+    setKeyPoints([...keyPoints, { id: crypto.randomUUID(), content: "" }]);
+  };
+  
+  const removeKeyPoint = (id: string) => {
+    if (keyPoints.length === 1) {
+      toast({
+        title: "Información",
+        description: "Debe tener al menos un punto clave"
+      });
+      return;
+    }
+    setKeyPoints(keyPoints.filter(point => point.id !== id));
+  };
+  
+  const updateKeyPoint = (id: string, value: string) => {
+    setKeyPoints(keyPoints.map(point => 
+      point.id === id ? { ...point, content: value } : point
+    ));
+  };
+  
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -206,9 +241,10 @@ const OnboardingChatbot = () => {
     setAvatarUrl(null);
   };
 
-  // Obtener contenido general de contexto basado en las etiquetas
+  // Obtener contenido general de contexto basado en las etiquetas y contexto manual
   const getGeneralContext = () => {
-    return contextTags.map(tag => `${tag.label}:\n${tag.content}`).join('\n\n');
+    const tagContent = contextTags.map(tag => `${tag.label}:\n${tag.content}`).join('\n\n');
+    return tagContent + (generalContext ? `\n\nInformación adicional:\n${generalContext}` : '');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -237,6 +273,7 @@ const OnboardingChatbot = () => {
     
     try {
       const validFaqs = faqs.filter(faq => faq.question.trim() && faq.answer.trim());
+      const validKeyPoints = keyPoints.filter(point => point.content.trim());
       
       // Preparar datos del contexto para inserción
       const contextData = {
@@ -246,6 +283,7 @@ const OnboardingChatbot = () => {
         communicationTone: chatbot.communicationTone,
         personality: chatbot.persona,
         specialInstructions: chatbot.specialInstructions || chatbot.customInstructions,
+        keyPoints: validKeyPoints.map(point => point.content),
         qaExamples: validFaqs.map(faq => ({ 
           question: faq.question, 
           answer: faq.answer 
@@ -257,6 +295,7 @@ const OnboardingChatbot = () => {
         ...chatbot,
         avatarFile: avatarFile,
         faqs: validFaqs,
+        keyPoints: validKeyPoints.map(point => point.content),
         contextData: contextData
       });
       
@@ -497,6 +536,70 @@ const OnboardingChatbot = () => {
                 </p>
               </CardContent>
             </Card>
+          </div>
+        </div>
+        
+        {/* General Context section */}
+        <div className="space-y-4 mt-8">
+          <div>
+            <Label htmlFor="generalContext">Contexto general adicional</Label>
+            <p className="text-sm text-muted-foreground mb-2">
+              Añada información adicional que el chatbot debe conocer sobre su empresa, productos o servicios.
+            </p>
+            <Textarea
+              id="generalContext"
+              value={generalContext}
+              onChange={(e) => setGeneralContext(e.target.value)}
+              placeholder="Información adicional importante sobre su empresa, productos o servicios."
+              rows={4}
+            />
+          </div>
+        </div>
+
+        {/* Key Points section */}
+        <div className="space-y-4 mt-8">
+          <div className="flex justify-between items-center">
+            <Label>Puntos clave</Label>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={addKeyPoint}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Agregar punto
+            </Button>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Agregue puntos importantes que el chatbot debe conocer sobre su empresa o servicios.
+          </p>
+          
+          <div className="space-y-4">
+            {keyPoints.map((point, index) => (
+              <div key={point.id} className="border rounded-lg p-4 space-y-4">
+                <div className="flex justify-between items-center">
+                  <h4 className="text-sm font-medium">Punto clave {index + 1}</h4>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeKeyPoint(point.id)}
+                    disabled={keyPoints.length === 1}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+                
+                <div className="space-y-2">
+                  <Textarea
+                    value={point.content}
+                    onChange={(e) => updateKeyPoint(point.id, e.target.value)}
+                    placeholder="Ej: Nuestros productos son fabricados con materiales reciclados y sostenibles."
+                    rows={2}
+                  />
+                </div>
+              </div>
+            ))}
           </div>
         </div>
         
