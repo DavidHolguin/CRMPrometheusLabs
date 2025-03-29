@@ -35,7 +35,6 @@ const ChatInterface = () => {
   const [userFeedback, setUserFeedback] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   
-  // Use our custom hook for messages and real-time updates
   const { messages, addMessage } = useChatMessages(conversationId);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -47,7 +46,6 @@ const ChatInterface = () => {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    // Generate or retrieve session ID
     let storedSessionId = localStorage.getItem(`chatbot_session_${chatbotId}`);
     if (!storedSessionId) {
       storedSessionId = uuidv4();
@@ -55,7 +53,6 @@ const ChatInterface = () => {
     }
     setSessionId(storedSessionId);
     
-    // Retrieve lead information
     const storedLeadId = localStorage.getItem(`chatbot_lead_${chatbotId}`);
     const storedName = localStorage.getItem(`chatbot_name_${chatbotId}`);
     const storedPhone = localStorage.getItem(`chatbot_phone_${chatbotId}`);
@@ -69,10 +66,8 @@ const ChatInterface = () => {
     if (storedPhone) setUserPhone(storedPhone);
     if (storedConversationId) setConversationId(storedConversationId);
     
-    // Get chatbot info
     fetchChatbotInfo();
     
-    // Show user form if needed
     if (!storedLeadId && !storedName && !storedPhone) {
       setShowUserForm(true);
     }
@@ -113,17 +108,14 @@ const ChatInterface = () => {
     }
     
     try {
-      // Store user information locally
       localStorage.setItem(`chatbot_name_${chatbotId}`, userName);
       localStorage.setItem(`chatbot_phone_${chatbotId}`, userPhone);
       
       setUserFormSubmitted(true);
       setShowUserForm(false);
       
-      // Create lead directly in the database
       await createLead();
       
-      // Add welcome message
       const welcomeMessage = {
         id: uuidv4(),
         contenido: `Hola ${userName}, bienvenido/a a nuestro chat. ¿En qué podemos ayudarte hoy?`,
@@ -146,7 +138,6 @@ const ChatInterface = () => {
       
       const empresaId = chatbotInfo.empresa_id;
       
-      // Create a lead record in the database
       const { data: leadData, error: leadError } = await supabase
         .from("leads")
         .insert({
@@ -167,7 +158,6 @@ const ChatInterface = () => {
       
       console.log("Lead created:", leadData);
       
-      // Save the lead ID
       if (leadData?.id) {
         setLeadId(leadData.id);
         localStorage.setItem(`chatbot_lead_${chatbotId}`, leadData.id);
@@ -205,7 +195,6 @@ const ChatInterface = () => {
         throw new Error("No se pudo determinar la empresa del chatbot");
       }
       
-      // Create optimistic message
       const optimisticId = uuidv4();
       const optimisticMsg: ChatMessage = {
         id: optimisticId,
@@ -214,10 +203,8 @@ const ChatInterface = () => {
         created_at: new Date().toISOString()
       };
       
-      // Add optimistic message to UI
       addMessage(optimisticMsg);
       
-      // Clear input
       if (!customContent) {
         setMessage("");
         if (textareaRef.current) {
@@ -225,7 +212,6 @@ const ChatInterface = () => {
         }
       }
       
-      // Prepare the API request with correct lead data
       const apiRequest = {
         empresa_id: empresaId,
         chatbot_id: chatbotId,
@@ -242,7 +228,6 @@ const ChatInterface = () => {
       
       console.log("Sending message to API:", apiRequest);
       
-      // Send message to API
       const apiEndpoint = import.meta.env.VITE_API_BASE_URL || 'https://web-production-01457.up.railway.app';
       const response = await fetch(`${apiEndpoint}/api/v1/channels/web`, {
         method: 'POST',
@@ -259,7 +244,6 @@ const ChatInterface = () => {
       const data = await response.json();
       console.log("API response:", data);
       
-      // Replace optimistic message with actual message
       addMessage({
         id: data.mensaje_id,
         contenido: messageContent,
@@ -267,10 +251,9 @@ const ChatInterface = () => {
         created_at: new Date().toISOString()
       });
       
-      // Add chatbot response if available
       if (data.respuesta) {
         addMessage({
-          id: uuidv4(), // Since response doesn't include ID for the bot message
+          id: uuidv4(),
           contenido: data.respuesta,
           origen: "chatbot",
           created_at: new Date().toISOString(),
@@ -278,13 +261,11 @@ const ChatInterface = () => {
         });
       }
       
-      // Update conversation ID if needed
       if (data.conversacion_id && data.conversacion_id !== conversationId) {
         setConversationId(data.conversacion_id);
         localStorage.setItem(`chatbot_conversation_${chatbotId}`, data.conversacion_id);
       }
       
-      // Update lead ID if needed
       if (data.lead_id && data.lead_id !== leadId) {
         setLeadId(data.lead_id);
         localStorage.setItem(`chatbot_lead_${chatbotId}`, data.lead_id);
@@ -483,6 +464,8 @@ const ChatInterface = () => {
                 const isUser = senderType === "user";
                 const isBot = senderType === "bot";
                 const isAgent = senderType === "agent";
+                
+                console.log("Determining sender type for:", msg.origen, msg.metadata);
                 
                 return (
                   <div key={msg.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-3`}>
