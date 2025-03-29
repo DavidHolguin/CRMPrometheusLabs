@@ -526,6 +526,7 @@ const ChatInterface = () => {
   };
 
   const handleSendButtonClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
     if (message.trim()) {
       sendMessage();
     } else {
@@ -645,7 +646,7 @@ const ChatInterface = () => {
               return (
                 <div 
                   key={msg.id} 
-                  className={`flex ${isUser ? 'justify-start' : 'justify-end'} mb-3`}
+                  className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-3`}
                 >
                   <div 
                     className={`
@@ -661,7 +662,7 @@ const ChatInterface = () => {
                     <p className="whitespace-pre-wrap break-words text-sm font-normal">{msg.contenido}</p>
                     <span className="text-[10px] text-opacity-70 float-right mt-1 ml-2 flex items-center gap-1">
                       {formatTime(msg.created_at)}
-                      {!isUser && <Check className="h-3 w-3" />}
+                      {isUser && <Check className="h-3 w-3" />}
                     </span>
                   </div>
                 </div>
