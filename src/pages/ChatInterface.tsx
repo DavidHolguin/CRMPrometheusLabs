@@ -13,26 +13,16 @@ import { Separator } from "@/components/ui/separator";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Drawer, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { EmojiPicker } from "@/components/conversations/EmojiPicker";
-
-interface Message {
-  id: string;
-  contenido: string;
-  origen: string;
-  created_at: string;
-  metadata?: any;
-}
+import { useChatMessages, ChatMessage } from "@/hooks/useChatMessages";
 
 const ChatInterface = () => {
-  const {
-    chatbotId
-  } = useParams();
+  const { chatbotId } = useParams();
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [message, setMessage] = useState("");
   const [sessionId, setSessionId] = useState("");
   const [leadId, setLeadId] = useState("");
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
   const [chatbotInfo, setChatbotInfo] = useState<any>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
@@ -44,8 +34,11 @@ const ChatInterface = () => {
   const [userRating, setUserRating] = useState(0);
   const [userFeedback, setUserFeedback] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  
+  // Use our custom hook for messages and real-time updates
+  const { messages, addMessage } = useChatMessages(conversationId);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const channelRef = useRef<any>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -54,36 +47,41 @@ const ChatInterface = () => {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    // Generate or retrieve session ID
     let storedSessionId = localStorage.getItem(`chatbot_session_${chatbotId}`);
     if (!storedSessionId) {
       storedSessionId = uuidv4();
       localStorage.setItem(`chatbot_session_${chatbotId}`, storedSessionId);
     }
     setSessionId(storedSessionId);
+    
+    // Retrieve lead information
     const storedLeadId = localStorage.getItem(`chatbot_lead_${chatbotId}`);
     const storedName = localStorage.getItem(`chatbot_name_${chatbotId}`);
     const storedPhone = localStorage.getItem(`chatbot_phone_${chatbotId}`);
+    
     if (storedLeadId) {
       setLeadId(storedLeadId);
       setUserFormSubmitted(true);
     }
     if (storedName) setUserName(storedName);
     if (storedPhone) setUserPhone(storedPhone);
+    
+    // Retrieve or create conversation
     const storedConversationId = localStorage.getItem(`chatbot_conversation_${chatbotId}`);
     if (storedConversationId) {
       setConversationId(storedConversationId);
-      fetchMessages(storedConversationId);
     }
+    
+    // Get chatbot info
     fetchChatbotInfo();
+    
+    // Show user form if needed
     if (!storedLeadId && !storedName && !storedPhone) {
       setShowUserForm(true);
     }
+    
     return () => {
-      if (channelRef.current) {
-        console.log(`Removing realtime subscription for conversation: ${conversationId}`);
-        supabase.removeChannel(channelRef.current);
-        channelRef.current = null;
-      }
       if (mediaRecorderRef.current && isRecording) {
         mediaRecorderRef.current.stop();
       }
@@ -91,22 +89,19 @@ const ChatInterface = () => {
   }, [chatbotId]);
 
   useEffect(() => {
-    if (conversationId) {
-      setupRealtimeSubscription(conversationId);
-    }
-  }, [conversationId]);
-
-  useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
   const fetchChatbotInfo = async () => {
     try {
-      const {
-        data,
-        error
-      } = await supabase.from("chatbots").select("*").eq("id", chatbotId).single();
+      const { data, error } = await supabase
+        .from("chatbots")
+        .select("*")
+        .eq("id", chatbotId)
+        .single();
+        
       if (error) throw error;
+      
       setChatbotInfo(data);
       setLoading(false);
     } catch (error) {
@@ -115,74 +110,31 @@ const ChatInterface = () => {
     }
   };
 
-  const fetchMessages = async (convoId: string) => {
-    try {
-      const {
-        data,
-        error
-      } = await supabase.from("mensajes").select("*").eq("conversacion_id", convoId).order("created_at", {
-        ascending: true
-      });
-      if (error) throw error;
-      console.log("Fetched messages:", data);
-      setMessages(data || []);
-    } catch (error) {
-      console.error("Error fetching messages:", error);
-    }
-  };
-
-  const setupRealtimeSubscription = (convoId: string) => {
-    if (channelRef.current) {
-      console.log("Removing existing channel subscription");
-      supabase.removeChannel(channelRef.current);
-    }
-    const channelName = `public-chat-${convoId}-${Date.now()}`;
-    console.log(`Setting up realtime subscription for conversation: ${convoId} with channel: ${channelName}`);
-    const channel = supabase.channel(channelName).on('postgres_changes', {
-      event: 'INSERT',
-      schema: 'public',
-      table: 'mensajes',
-      filter: `conversacion_id=eq.${convoId} AND origen=eq.agente`
-    }, payload => {
-      if (payload.eventType === 'INSERT') {
-        console.log("New agent message received:", payload.new);
-        const newMsg = payload.new as Message;
-        if (newMsg.metadata && newMsg.metadata.is_system_message === true) {
-          console.log("Skipping system message:", newMsg);
-          return;
-        }
-        setMessages(currentMessages => {
-          const messageExists = currentMessages.some(msg => msg.id === payload.new.id);
-          if (messageExists) {
-            return currentMessages;
-          }
-          return [...currentMessages, newMsg];
-        });
-      }
-    }).subscribe(status => {
-      console.log(`Realtime subscription status: ${status}`);
-    });
-    channelRef.current = channel;
-  };
-
   const submitUserForm = async () => {
     if (!userName.trim() || !userPhone.trim()) {
       toast.error("Por favor, ingresa tu nombre y número de teléfono");
       return;
     }
+    
     try {
+      // Store user information locally
       localStorage.setItem(`chatbot_name_${chatbotId}`, userName);
       localStorage.setItem(`chatbot_phone_${chatbotId}`, userPhone);
+      
       setUserFormSubmitted(true);
       setShowUserForm(false);
-      const welcomeMessage = `Hola ${userName}, bienvenido/a a nuestro chat. ¿En qué podemos ayudarte hoy?`;
-      const welcomeMsgObj = {
+      
+      // Add welcome message
+      const welcomeMessage = {
         id: uuidv4(),
-        contenido: welcomeMessage,
+        contenido: `Hola ${userName}, bienvenido/a a nuestro chat. ¿En qué podemos ayudarte hoy?`,
         origen: "chatbot",
         created_at: new Date().toISOString()
       };
-      setMessages([welcomeMsgObj]);
+      
+      addMessage(welcomeMessage);
+      
+      // Initialize conversation with the API
       await startConversation();
     } catch (error) {
       console.error("Error al iniciar chat:", error);
@@ -196,6 +148,7 @@ const ChatInterface = () => {
       if (!empresaId) {
         throw new Error("No se pudo determinar la empresa del chatbot");
       }
+      
       console.log("Starting conversation with API:", {
         empresa_id: empresaId,
         chatbot_id: chatbotId,
@@ -207,6 +160,7 @@ const ChatInterface = () => {
           phone: userPhone || undefined
         }
       });
+      
       const apiEndpoint = import.meta.env.VITE_API_BASE_URL || 'https://web-production-01457.up.railway.app';
       const response = await fetch(`${apiEndpoint}/api/v1/channels/web/init`, {
         method: 'POST',
@@ -225,16 +179,20 @@ const ChatInterface = () => {
           }
         })
       });
+      
       if (!response.ok) {
         throw new Error(`Error al iniciar conversación: ${response.statusText}`);
       }
+      
       const data = await response.json();
       console.log("API init response:", data);
+      
+      // Store conversation and lead IDs
       if (data.conversacion_id) {
         setConversationId(data.conversacion_id);
         localStorage.setItem(`chatbot_conversation_${chatbotId}`, data.conversacion_id);
-        setupRealtimeSubscription(data.conversacion_id);
       }
+      
       if (data.lead_id) {
         setLeadId(data.lead_id);
         localStorage.setItem(`chatbot_lead_${chatbotId}`, data.lead_id);
@@ -250,6 +208,7 @@ const ChatInterface = () => {
       toast.error("Por favor, seleccione una calificación");
       return;
     }
+    
     try {
       toast.success("¡Gracias por tu opinión!");
       setShowRatingDrawer(false);
@@ -262,33 +221,50 @@ const ChatInterface = () => {
   const sendMessage = async (customContent?: string) => {
     const messageContent = customContent || message.trim();
     if (!messageContent && !isRecording && audioChunksRef.current.length === 0) return;
+    
     setSending(true);
+    
     try {
       const empresaId = chatbotInfo?.empresa_id;
       if (!empresaId) {
         throw new Error("No se pudo determinar la empresa del chatbot");
       }
+      
+      // Create optimistic message
       const optimisticId = uuidv4();
-      const optimisticMsg = {
+      const optimisticMsg: ChatMessage = {
         id: optimisticId,
         contenido: messageContent,
         origen: "usuario",
         created_at: new Date().toISOString()
       };
-      setMessages(prev => [...prev, optimisticMsg]);
+      
+      // Add optimistic message to UI
+      addMessage(optimisticMsg);
+      
+      // Clear input
       if (!customContent) {
         setMessage("");
         if (textareaRef.current) {
           textareaRef.current.style.height = "auto";
         }
       }
+      
       console.log("Sending message to API:", {
         empresa_id: empresaId,
         chatbot_id: chatbotId,
         mensaje: messageContent,
         session_id: sessionId,
-        lead_id: leadId || undefined
+        lead_id: leadId || undefined,
+        metadata: {
+          browser: navigator.userAgent,
+          page: window.location.pathname,
+          name: userName || undefined,
+          phone: userPhone || undefined
+        }
       });
+      
+      // Send message to API
       const apiEndpoint = import.meta.env.VITE_API_BASE_URL || 'https://web-production-01457.up.railway.app';
       const response = await fetch(`${apiEndpoint}/api/v1/channels/web`, {
         method: 'POST',
@@ -309,40 +285,40 @@ const ChatInterface = () => {
           }
         })
       });
+      
       if (!response.ok) {
         throw new Error(`Error al enviar mensaje: ${response.statusText}`);
       }
+      
       const data = await response.json();
       console.log("API response:", data);
-      setMessages(prev => {
-        const filtered = prev.filter(msg => msg.id !== optimisticId);
-        const userMsgExists = filtered.some(msg => msg.id === data.mensaje_id && msg.origen === "usuario");
-        const botResponseExists = filtered.some(msg => msg.contenido === data.respuesta && msg.origen === "chatbot");
-        let newMessages = [...filtered];
-        if (!userMsgExists) {
-          newMessages.push({
-            id: data.mensaje_id,
-            contenido: messageContent,
-            origen: "usuario",
-            created_at: new Date().toISOString()
-          });
-        }
-        if (!botResponseExists && data.respuesta) {
-          newMessages.push({
-            id: uuidv4(),
-            contenido: data.respuesta,
-            origen: "chatbot",
-            created_at: new Date().toISOString(),
-            metadata: data.metadata
-          });
-        }
-        return newMessages;
+      
+      // Replace optimistic message with actual message
+      addMessage({
+        id: data.mensaje_id,
+        contenido: messageContent,
+        origen: "usuario",
+        created_at: new Date().toISOString()
       });
+      
+      // Add chatbot response if available
+      if (data.respuesta) {
+        addMessage({
+          id: uuidv4(), // Since response doesn't include ID for the bot message
+          contenido: data.respuesta,
+          origen: "chatbot",
+          created_at: new Date().toISOString(),
+          metadata: data.metadata
+        });
+      }
+      
+      // Update conversation ID if needed
       if (data.conversacion_id && data.conversacion_id !== conversationId) {
         setConversationId(data.conversacion_id);
         localStorage.setItem(`chatbot_conversation_${chatbotId}`, data.conversacion_id);
-        setupRealtimeSubscription(data.conversacion_id);
       }
+      
+      // Update lead ID if needed
       if (data.lead_id && data.lead_id !== leadId) {
         setLeadId(data.lead_id);
         localStorage.setItem(`chatbot_lead_${chatbotId}`, data.lead_id);
@@ -350,7 +326,6 @@ const ChatInterface = () => {
     } catch (error) {
       console.error("Error sending message:", error);
       toast.error("No se pudo enviar el mensaje. Intente de nuevo.");
-      setMessages(prev => prev.filter(msg => msg.contenido !== messageContent || msg.origen !== "usuario"));
     } finally {
       setSending(false);
     }
