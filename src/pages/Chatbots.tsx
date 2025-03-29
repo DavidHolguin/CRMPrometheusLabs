@@ -1,25 +1,20 @@
 
 import { useState } from "react";
-import { 
-  Tabs, 
-  TabsContent, 
-  TabsList, 
-  TabsTrigger 
-} from "@/components/ui/tabs";
-import { Grid2X2, List } from "lucide-react";
+import { Grid2X2, List, Plus } from "lucide-react";
 import { useChatbots } from "@/hooks/useChatbots";
 import { ChatbotCard } from "@/components/chatbots/ChatbotCard";
 import { ChatbotList } from "@/components/chatbots/ChatbotList";
 import { Button } from "@/components/ui/button";
-import { CreateChatbotDialog } from "@/components/chatbots/CreateChatbotDialog";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
+import { CreateChatbotDrawer } from "@/components/chatbots/CreateChatbotDrawer";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
 const Chatbots = () => {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [createDrawerOpen, setCreateDrawerOpen] = useState(false);
   const { data: chatbots = [], isLoading, isError, refetch } = useChatbots();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -63,8 +58,8 @@ const Chatbots = () => {
               <List size={18} />
             </button>
           </div>
-          <Button onClick={() => setCreateDialogOpen(true)}>
-            Crear Chatbot
+          <Button onClick={() => setCreateDrawerOpen(true)}>
+            <Plus size={16} className="mr-2" /> Crear Chatbot
           </Button>
         </div>
       </div>
@@ -105,8 +100,8 @@ const Chatbots = () => {
                 <p className="text-muted-foreground mb-4">
                   Comienza creando tu primer chatbot para interactuar con tus clientes.
                 </p>
-                <Button onClick={() => setCreateDialogOpen(true)}>
-                  Crear mi primer Chatbot
+                <Button onClick={() => setCreateDrawerOpen(true)}>
+                  <Plus size={16} className="mr-2" /> Crear mi primer Chatbot
                 </Button>
               </div>
             )}
@@ -114,9 +109,9 @@ const Chatbots = () => {
         )}
       </div>
 
-      <CreateChatbotDialog 
-        open={createDialogOpen} 
-        onOpenChange={setCreateDialogOpen}
+      <CreateChatbotDrawer 
+        open={createDrawerOpen} 
+        onOpenChange={setCreateDrawerOpen}
         onSuccess={() => {
           refetch();
           toast.success("Chatbot creado exitosamente");

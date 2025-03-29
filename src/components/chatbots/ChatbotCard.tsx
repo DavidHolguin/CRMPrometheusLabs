@@ -1,37 +1,16 @@
 
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardFooter, 
-  CardHeader, 
-  CardTitle 
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { 
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger
-} from "@/components/ui/dropdown-menu";
-import { 
-  Copy, 
-  Edit2, 
-  ExternalLink, 
-  MessageSquare, 
-  MoreVertical, 
-  Trash2 
-} from "lucide-react";
 import { useState } from "react";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { toast } from "sonner";
-import { EditChatbotDialog } from "./EditChatbotDialog";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { MoreHorizontal, Pencil, Trash2, Eye } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Chatbot } from "@/hooks/useChatbots";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { EditChatbotDrawer } from "./EditChatbotDrawer";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 interface ChatbotCardProps {
   chatbot: Chatbot;
@@ -41,181 +20,150 @@ interface ChatbotCardProps {
 }
 
 export function ChatbotCard({ chatbot, onDelete, onEdit, onLiveView }: ChatbotCardProps) {
-  const [embedDialogOpen, setEmbedDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editDrawerOpen, setEditDrawerOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-
-  const handleCopyEmbed = () => {
-    const embedCode = `<iframe src="${window.location.origin}/chat/${chatbot.id}" width="100%" height="600" frameborder="0"></iframe>`;
-    navigator.clipboard.writeText(embedCode);
-    toast.success("Código de inserción copiado al portapapeles");
-  };
 
   const handleDelete = async () => {
     setIsDeleting(true);
     try {
+      // Primero eliminar los contextos asociados
+      const { error: contextError } = await supabase
+        .from("chatbot_contextos")
+        .delete()
+        .eq("chatbot_id", chatbot.id);
+
+      if (contextError) throw contextError;
+
+      // Luego eliminar el chatbot
       const { error } = await supabase
         .from("chatbots")
         .delete()
         .eq("id", chatbot.id);
-      
+
       if (error) throw error;
-      
+
+      setDeleteDialogOpen(false);
       toast.success("Chatbot eliminado exitosamente");
       onDelete();
     } catch (error) {
       console.error("Error eliminando chatbot:", error);
-      toast.error("Error al eliminar el chatbot");
+      toast.error("Error al eliminar el chatbot. Inténtelo de nuevo.");
     } finally {
       setIsDeleting(false);
-      setDeleteDialogOpen(false);
     }
   };
 
-  const chatbotUrl = `${window.location.origin}/chat/${chatbot.id}`;
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(part => part[0])
+      .join('')
+      .toUpperCase()
+      .substring(0, 2);
+  };
 
   return (
     <>
-      <Card className="overflow-hidden">
+      <Card className="overflow-hidden hover:shadow-md transition-shadow">
         <CardHeader className="pb-2">
           <div className="flex justify-between items-start">
-            <div className="flex items-center gap-2">
-              {chatbot.avatar_url ? (
-                <img 
-                  src={chatbot.avatar_url} 
-                  alt={chatbot.nombre} 
-                  className="w-10 h-10 rounded-full object-cover"
-                />
-              ) : (
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <MessageSquare size={20} className="text-primary" />
-                </div>
-              )}
+            <div className="flex items-center space-x-3">
+              <Avatar className="h-10 w-10 bg-primary/10">
+                <AvatarImage src={chatbot.avatar_url || ""} alt={chatbot.nombre} />
+                <AvatarFallback>{getInitials(chatbot.nombre)}</AvatarFallback>
+              </Avatar>
               <div>
-                <CardTitle className="text-xl">{chatbot.nombre}</CardTitle>
-                <Badge variant={chatbot.is_active ? "default" : "outline"} className="mt-1">
-                  {chatbot.is_active ? "Activo" : "Inactivo"}
-                </Badge>
+                <CardTitle className="text-lg">{chatbot.nombre}</CardTitle>
+                <CardDescription className="line-clamp-1">
+                  {chatbot.descripcion || "Sin descripción"}
+                </CardDescription>
               </div>
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon">
-                  <MoreVertical size={16} />
+                  <MoreHorizontal size={16} />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Opciones</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setEditDialogOpen(true)}>
-                  <Edit2 size={16} className="mr-2" />
+                <DropdownMenuItem onClick={() => setEditDrawerOpen(true)}>
+                  <Pencil size={14} className="mr-2" />
                   Editar
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setEmbedDialogOpen(true)}>
-                  <Copy size={16} className="mr-2" />
-                  Código de inserción
-                </DropdownMenuItem>
                 <DropdownMenuItem onClick={onLiveView}>
-                  <ExternalLink size={16} className="mr-2" />
+                  <Eye size={14} className="mr-2" />
                   Ver en vivo
                 </DropdownMenuItem>
-                <DropdownMenuSeparator />
                 <DropdownMenuItem 
-                  onClick={() => setDeleteDialogOpen(true)} 
+                  onClick={() => setDeleteDialogOpen(true)}
                   className="text-destructive focus:text-destructive"
                 >
-                  <Trash2 size={16} className="mr-2" />
+                  <Trash2 size={14} className="mr-2" />
                   Eliminar
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
         </CardHeader>
-        <CardContent>
-          <CardDescription className="line-clamp-2 h-10">
-            {chatbot.descripcion || "Sin descripción"}
-          </CardDescription>
-        </CardContent>
-        <CardFooter className="flex justify-between pt-2">
-          <div className="text-xs text-muted-foreground">
-            Creado: {new Date(chatbot.created_at).toLocaleDateString()}
+        <CardContent className="pt-2">
+          <div className="flex flex-wrap gap-2 mt-2">
+            <Badge variant={chatbot.is_active ? "default" : "outline"}>
+              {chatbot.is_active ? "Activo" : "Inactivo"}
+            </Badge>
+            {chatbot.tono && (
+              <Badge variant="outline">
+                Tono: {chatbot.tono}
+              </Badge>
+            )}
+            {chatbot.personalidad && (
+              <Badge variant="outline">
+                {chatbot.personalidad}
+              </Badge>
+            )}
           </div>
-          <Button size="sm" variant="outline" onClick={onLiveView}>
-            Ver chatbot
+          <div className="mt-3 text-sm text-muted-foreground">
+            <p className="line-clamp-3">
+              {chatbot.contexto?.generalContext || chatbot.descripcion || "Sin información de contexto adicional."}
+            </p>
+          </div>
+        </CardContent>
+        <CardFooter className="border-t pt-4 flex justify-between">
+          <Button variant="outline" size="sm" onClick={() => setEditDrawerOpen(true)}>
+            <Pencil size={14} className="mr-2" />
+            Editar
+          </Button>
+          <Button size="sm" onClick={onLiveView}>
+            <Eye size={14} className="mr-2" />
+            Ver en vivo
           </Button>
         </CardFooter>
       </Card>
 
-      {/* Embed Dialog */}
-      <Dialog open={embedDialogOpen} onOpenChange={setEmbedDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Código de inserción</DialogTitle>
-            <DialogDescription>
-              Copia este código HTML para insertar el chatbot en tu sitio web
-            </DialogDescription>
-          </DialogHeader>
-          <Textarea 
-            className="font-mono text-sm"
-            readOnly 
-            value={`<iframe src="${chatbotUrl}" width="100%" height="600" frameborder="0"></iframe>`}
-          />
-          <div className="bg-muted p-3 rounded-md text-sm">
-            <div className="font-semibold mb-1">URL directa del chatbot:</div>
-            <div className="flex items-center gap-2">
-              <code className="text-xs bg-background p-1 rounded flex-1 overflow-hidden text-ellipsis">
-                {chatbotUrl}
-              </code>
-              <Button 
-                size="sm" 
-                variant="outline" 
-                onClick={() => {
-                  navigator.clipboard.writeText(chatbotUrl);
-                  toast.success("URL copiada al portapapeles");
-                }}
-              >
-                <Copy size={14} />
-              </Button>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button onClick={handleCopyEmbed}>
-              Copiar código
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>¿Eliminar chatbot?</DialogTitle>
+            <DialogTitle>¿Confirmar eliminación?</DialogTitle>
             <DialogDescription>
-              Esta acción no se puede deshacer. Esto eliminará permanentemente el chatbot <strong>{chatbot.nombre}</strong> y todas sus conversaciones.
+              Estás a punto de eliminar el chatbot "{chatbot.nombre}". Esta acción no se puede deshacer.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} disabled={isDeleting}>
               Cancelar
             </Button>
             <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
-              {isDeleting ? "Eliminando..." : "Eliminar chatbot"}
+              {isDeleting ? "Eliminando..." : "Eliminar"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Edit Dialog */}
-      <EditChatbotDialog 
-        open={editDialogOpen} 
-        onOpenChange={setEditDialogOpen} 
+      <EditChatbotDrawer
         chatbot={chatbot}
-        onSuccess={() => {
-          onEdit();
-          toast.success("Chatbot actualizado exitosamente");
-        }}
+        open={editDrawerOpen}
+        onOpenChange={setEditDrawerOpen}
+        onSuccess={onEdit}
       />
     </>
   );

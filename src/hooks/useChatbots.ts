@@ -118,12 +118,11 @@ export function useChatbots() {
             if (Array.isArray(rawExamples)) {
               qaExamples = rawExamples.map(example => {
                 if (typeof example === 'object' && example !== null) {
-                  // Use type assertion to safely access properties
+                  // Use safer type assertion with proper checks
                   const exampleObj = example as Record<string, any>;
-                  return {
-                    question: String(exampleObj.question || ''),
-                    answer: String(exampleObj.answer || '')
-                  };
+                  const question = typeof exampleObj.question === 'string' ? exampleObj.question : '';
+                  const answer = typeof exampleObj.answer === 'string' ? exampleObj.answer : '';
+                  return { question, answer };
                 }
                 return { question: '', answer: '' };
               }).filter(ex => ex.question && ex.answer);
@@ -222,12 +221,11 @@ export function useChatbot(id: string | undefined) {
           if (Array.isArray(rawExamples)) {
             qaExamples = rawExamples.map(example => {
               if (typeof example === 'object' && example !== null) {
-                // Use type assertion to safely access properties
+                // Use safer type assertion with proper checks
                 const exampleObj = example as Record<string, any>;
-                return {
-                  question: String(exampleObj.question || ''),
-                  answer: String(exampleObj.answer || '')
-                };
+                const question = typeof exampleObj.question === 'string' ? exampleObj.question : '';
+                const answer = typeof exampleObj.answer === 'string' ? exampleObj.answer : '';
+                return { question, answer };
               }
               return { question: '', answer: '' };
             }).filter(ex => ex.question && ex.answer);
