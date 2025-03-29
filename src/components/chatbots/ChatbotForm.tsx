@@ -59,6 +59,7 @@ export function ChatbotForm({ chatbot, onSubmit, isSubmitting }: ChatbotFormProp
   const [newKeyPoint, setNewKeyPoint] = useState("");
   const [newQAPair, setNewQAPair] = useState({ question: "", answer: "" });
   const [previewAvatar, setPreviewAvatar] = useState<string | null>(chatbot?.avatar_url || null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
 
@@ -120,33 +121,48 @@ export function ChatbotForm({ chatbot, onSubmit, isSubmitting }: ChatbotFormProp
     }
 
     try {
+      setUploadingAvatar(true);
+      
+      // Crear una vista previa inmediata
       const fileUrl = URL.createObjectURL(file);
       setPreviewAvatar(fileUrl);
 
       if (user?.companyId) {
-        const fileName = `chatbot-avatar-${Date.now()}-${file.name.replace(/\s+/g, '-')}`;
-        const { data, error } = await supabase.storage
+        // Obtener extensión del archivo
+        const fileExt = file.name.split('.').pop();
+        const fileName = `chatbot-avatar-${Date.now()}.${fileExt}`;
+        const filePath = `chatbots/${user.companyId}/${fileName}`;
+        
+        // Subir archivo a Supabase Storage
+        const { error: uploadError } = await supabase.storage
           .from('avatars')
-          .upload(`chatbots/${user.companyId}/${fileName}`, file);
+          .upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: true
+          });
 
-        if (error) {
-          throw error;
+        if (uploadError) {
+          console.error("Error al subir la imagen:", uploadError);
+          toast.error("Error al subir la imagen. Intente de nuevo.");
+          return;
         }
 
-        if (data) {
-          const { data: urlData } = await supabase.storage
-            .from('avatars')
-            .getPublicUrl(`chatbots/${user.companyId}/${fileName}`);
+        // Obtener URL pública
+        const { data: publicUrlData } = supabase.storage
+          .from('avatars')
+          .getPublicUrl(filePath);
 
-          form.setValue('avatar_url', urlData.publicUrl);
-          toast.success("Imagen subida exitosamente");
-        }
+        form.setValue('avatar_url', publicUrlData.publicUrl);
+        toast.success("Imagen subida exitosamente");
       } else {
         form.setValue('avatar_url', fileUrl);
+        console.warn("No hay ID de empresa. La imagen solo será temporal.");
       }
     } catch (error) {
       console.error("Error al subir la imagen:", error);
       toast.error("Error al subir la imagen. Intente de nuevo.");
+    } finally {
+      setUploadingAvatar(false);
     }
   };
 
@@ -339,24 +355,30 @@ export function ChatbotForm({ chatbot, onSubmit, isSubmitting }: ChatbotFormProp
                                 variant="destructive"
                                 className="absolute -top-2 -right-2 h-8 w-8 rounded-full shadow-lg"
                                 onClick={clearAvatar}
+                                disabled={uploadingAvatar}
                               >
                                 <Trash2 size={16} />
                               </Button>
                             </div>
                           ) : (
                             <div className="flex flex-col items-center cursor-pointer" 
-                                onClick={() => fileInputRef.current?.click()}>
+                                 onClick={() => !uploadingAvatar && fileInputRef.current?.click()}>
                               <div className="w-32 h-32 rounded-full bg-primary/10 flex items-center justify-center mb-4 border-4 border-primary/20">
-                                <Bot size={48} className="text-primary" />
+                                {uploadingAvatar ? (
+                                  <div className="animate-pulse">Subiendo...</div>
+                                ) : (
+                                  <Bot size={48} className="text-primary" />
+                                )}
                               </div>
                               <Button
                                 type="button" 
                                 variant="outline"
                                 className="gap-2"
                                 onClick={() => fileInputRef.current?.click()}
+                                disabled={uploadingAvatar}
                               >
                                 <Upload size={16} />
-                                Subir imagen
+                                {uploadingAvatar ? "Subiendo..." : "Subir imagen"}
                               </Button>
                             </div>
                           )}
@@ -367,6 +389,7 @@ export function ChatbotForm({ chatbot, onSubmit, isSubmitting }: ChatbotFormProp
                             className="hidden"
                             accept="image/*"
                             onChange={handleFileChange}
+                            disabled={uploadingAvatar}
                           />
                           
                           <p className="text-xs text-muted-foreground mt-4 text-center">
@@ -703,7 +726,7 @@ export function ChatbotForm({ chatbot, onSubmit, isSubmitting }: ChatbotFormProp
           </Button>
           
           {activeTab === "examples" ? (
-            <Button type="submit" disabled={isSubmitting} className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground">
+            <Button type="submit" disabled={isSubmitting || uploadingAvatar} className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground">
               <Save size={16} />
               {isSubmitting ? "Guardando..." : chatbot ? "Guardar cambios" : "Crear chatbot"}
             </Button>

@@ -131,10 +131,10 @@ html, body, #root {
   background-color: #020817;
   background-image: url("https://static.whatsapp.net/rsrc.php/v4/yl/r/gi_DckOUM5a.png");
   background-attachment: fixed;
-  background-size: 100%; /* Increased size of pattern to make it larger */
+  background-size: 200%; /* Increased size of pattern to make it larger */
   position: relative;
   background-blend-mode: overlay;
-  background-color: rgba(2, 8, 23, 0.7); /* Reduced opacity to make the pattern more transparent */
+  background-color: rgba(2, 8, 23, 0.85); /* Increased opacity for more transparency */
 }
 
 /* Conversation background - for agent conversations interface, solid dark color */
