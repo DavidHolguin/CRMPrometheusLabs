@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useChatbot } from "@/hooks/useChatbots";
@@ -10,11 +9,10 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { Smile, Send, ArrowLeft, PhoneCheck } from "lucide-react";
+import { Smile, Send, ArrowLeft, MessagesSquare } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-// Type for messages
 interface Message {
   id: string;
   content: string;
@@ -22,7 +20,6 @@ interface Message {
   timestamp: Date;
 }
 
-// Initial registration form schema
 const userFormSchema = z.object({
   nombre: z.string().min(2, "Por favor ingresa tu nombre"),
   telefono: z.string().min(5, "Por favor ingresa un número de teléfono válido"),
@@ -50,7 +47,6 @@ const ChatInterface = () => {
     },
   });
 
-  // Check for local storage session to see if we've already identified the user
   useEffect(() => {
     const checkUserSession = async () => {
       const storedLeadId = localStorage.getItem(`lead_${chatbotId}`);
@@ -67,7 +63,6 @@ const ChatInterface = () => {
     if (chatbot) {
       checkUserSession();
       
-      // Add initial welcome message
       if (messages.length === 0) {
         setMessages([
           {
@@ -81,7 +76,6 @@ const ChatInterface = () => {
     }
   }, [chatbot, chatbotId, messages.length]);
 
-  // Auto-scroll to bottom when messages update
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -89,7 +83,6 @@ const ChatInterface = () => {
   const handleSendMessage = async () => {
     if (!userMessage.trim() || !leadId || !conversationId || !chatbot) return;
     
-    // Add user message to chat
     const userMsg = {
       id: Date.now().toString(),
       content: userMessage,
@@ -102,7 +95,6 @@ const ChatInterface = () => {
     setIsSubmitting(true);
     
     try {
-      // Save message to database
       const { error: msgError } = await supabase
         .from("mensajes")
         .insert({
@@ -114,9 +106,7 @@ const ChatInterface = () => {
       
       if (msgError) throw msgError;
       
-      // Get bot response (in a real app, this would likely call an API)
       setTimeout(() => {
-        // Mock bot response for now
         const botResponses = [
           "Gracias por tu mensaje. ¿En qué más puedo ayudarte?",
           "Entiendo, ¿hay algo más que necesites saber?",
@@ -126,7 +116,6 @@ const ChatInterface = () => {
         
         const botResponse = botResponses[Math.floor(Math.random() * botResponses.length)];
         
-        // Add bot response
         const botMsg = {
           id: Date.now().toString(),
           content: botResponse,
@@ -136,7 +125,6 @@ const ChatInterface = () => {
         
         setMessages((prev) => [...prev, botMsg]);
         
-        // Save bot message to database
         supabase
           .from("mensajes")
           .insert({
@@ -161,7 +149,6 @@ const ChatInterface = () => {
     if (!chatbot) return;
     
     try {
-      // Create lead in database
       const { data: lead, error: leadError } = await supabase
         .from("leads")
         .insert({
@@ -175,7 +162,6 @@ const ChatInterface = () => {
       
       if (leadError) throw leadError;
       
-      // Create conversation
       const { data: conversation, error: convError } = await supabase
         .from("conversaciones")
         .insert({
@@ -188,7 +174,6 @@ const ChatInterface = () => {
       
       if (convError) throw convError;
       
-      // Store in local storage to remember this user
       localStorage.setItem(`lead_${chatbotId}`, lead.id);
       localStorage.setItem(`conversation_${chatbotId}`, conversation.id);
       
@@ -196,7 +181,6 @@ const ChatInterface = () => {
       setConversationId(conversation.id);
       setShowUserForm(false);
       
-      // Add welcome message for new users
       setMessages((prev) => [
         ...prev,
         {
@@ -234,7 +218,6 @@ const ChatInterface = () => {
 
   return (
     <div className="flex flex-col h-screen bg-background">
-      {/* Chat Header */}
       <header className="bg-card border-b px-4 py-3 flex items-center gap-3 z-10 shadow-sm">
         <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
           <ArrowLeft size={18} />
@@ -249,7 +232,7 @@ const ChatInterface = () => {
             />
           ) : (
             <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-              <PhoneCheck size={20} className="text-primary" />
+              <MessagesSquare size={20} className="text-primary" />
             </div>
           )}
           
@@ -263,7 +246,6 @@ const ChatInterface = () => {
         </div>
       </header>
 
-      {/* Chat Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-background">
         {messages.map((message) => (
           <div
@@ -298,7 +280,6 @@ const ChatInterface = () => {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Chat Input */}
       <div className="p-4 border-t bg-card">
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" type="button">
@@ -328,7 +309,6 @@ const ChatInterface = () => {
         </div>
       </div>
 
-      {/* User Registration Form Dialog */}
       <Dialog open={showUserForm} onOpenChange={setShowUserForm}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
