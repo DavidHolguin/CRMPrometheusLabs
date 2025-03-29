@@ -44,12 +44,14 @@ export function useChatMessages(conversationId: string | null) {
     
     // Clean up any existing subscription
     if (channelRef.current) {
+      console.log("Removing existing channel subscription");
       supabase.removeChannel(channelRef.current);
       channelRef.current = null;
     }
     
     // Create a unique channel name with timestamp to avoid conflicts
-    const channelName = `chat-messages-${conversationId}-${Date.now()}`;
+    const timestamp = Date.now();
+    const channelName = `realtime-messages-${conversationId}-${timestamp}`;
     console.log(`Setting up realtime subscription on channel: ${channelName}`);
     
     const channel = supabase
@@ -59,23 +61,28 @@ export function useChatMessages(conversationId: string | null) {
           event: 'INSERT', 
           schema: 'public', 
           table: 'mensajes', 
-          filter: `conversacion_id=eq.${conversationId} AND origen=eq.agente` 
+          filter: `conversacion_id=eq.${conversationId}` 
         },
         (payload) => {
-          console.log("New agent message received:", payload.new);
+          console.log("New message received from realtime:", payload.new);
           
           // Check if message already exists to avoid duplicates
           setMessages(currentMessages => {
             const messageExists = currentMessages.some(msg => msg.id === payload.new.id);
             if (messageExists) {
+              console.log("Message already exists in state, skipping");
               return currentMessages;
             }
+            console.log("Adding new message to state");
             return [...currentMessages, payload.new as ChatMessage];
           });
         }
       )
       .subscribe(status => {
-        console.log(`Realtime subscription status: ${status}`);
+        console.log(`Realtime subscription status on ${channelName}: ${status}`);
+        if (status === 'SUBSCRIBED') {
+          console.log(`Successfully subscribed to messages for conversation: ${conversationId}`);
+        }
       });
     
     channelRef.current = channel;
