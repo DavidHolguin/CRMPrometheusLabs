@@ -99,6 +99,8 @@ const ChatInterface = () => {
       }
       
       if (messageHistory && messageHistory.length > 0) {
+        console.log("Message history loaded:", messageHistory);
+        
         const formattedMessages: Message[] = messageHistory.map(msg => ({
           id: msg.id,
           content: msg.contenido,
@@ -130,8 +132,9 @@ const ChatInterface = () => {
 
   // Helper function to determine the sender type
   const getSenderType = (origen: string, metadata: any): "user" | "bot" | "agent" => {
+    console.log("Determining sender type for:", origen, metadata);
     if (origen === "usuario") return "user";
-    if (origen === "agente" || (metadata && metadata.origin === "agent")) return "agent";
+    if (origen === "agente" || (metadata && (metadata.origin === "agent" || metadata.agent_id))) return "agent";
     return "bot";
   };
 
@@ -142,6 +145,8 @@ const ChatInterface = () => {
   // Set up real-time messaging
   useEffect(() => {
     if (!conversationId) return;
+    
+    console.log("Setting up realtime subscription for conversation:", conversationId);
     
     // Subscribe to new messages in this conversation
     const channel = supabase
@@ -170,13 +175,17 @@ const ChatInterface = () => {
               timestamp: new Date(newMessage.created_at)
             };
             
+            console.log("Adding message to UI:", message);
             setMessages(prev => [...prev, message]);
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log("Supabase realtime subscription status:", status);
+      });
       
     return () => {
+      console.log("Removing realtime subscription");
       supabase.removeChannel(channel);
     };
   }, [conversationId, leadId, messages]);
@@ -197,16 +206,22 @@ const ChatInterface = () => {
     
     try {
       // Guardar mensaje en Supabase
-      const { error: msgError } = await supabase
+      const { data: msgData, error: msgError } = await supabase
         .from("mensajes")
         .insert({
           contenido: userMessage,
           conversacion_id: conversationId,
           origen: "usuario",
           remitente_id: leadId,
-        });
+        })
+        .select();
       
-      if (msgError) throw msgError;
+      if (msgError) {
+        console.error("Error inserting message:", msgError);
+        throw msgError;
+      }
+      
+      console.log("Message saved to Supabase:", msgData);
       
       // Enviar mensaje al endpoint
       const response = await fetch('https://web-production-01457.up.railway.app/api/v1/channels/web', {
