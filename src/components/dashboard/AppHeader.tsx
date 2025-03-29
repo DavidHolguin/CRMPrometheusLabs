@@ -1,10 +1,18 @@
 
 import { useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, Link } from "react-router-dom";
 import { BellIcon, MenuIcon, SearchIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/context/AuthContext";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,16 +31,36 @@ export function AppHeader({ toggleSidebar }: AppHeaderProps) {
   const [showSearch, setShowSearch] = useState(false);
   const location = useLocation();
 
-  // Función para obtener el título basado en la ruta actual
-  const getTitle = () => {
+  // Function to get breadcrumb items based on current route
+  const getBreadcrumbItems = () => {
     const path = location.pathname;
-    if (path === "/dashboard") return "Dashboard";
-    if (path.includes("/leads")) return "Leads";
-    if (path.includes("/conversations")) return "Conversaciones";
-    if (path.includes("/chatbots")) return "Chatbots";
-    if (path.includes("/settings")) return "Configuración";
-    return "Dashboard";
+    const segments = path.split('/').filter(Boolean);
+    
+    // Map of route segments to display names
+    const routeNames: Record<string, string> = {
+      'dashboard': 'Dashboard',
+      'leads': 'Leads',
+      'conversations': 'Conversaciones',
+      'chatbots': 'Chatbots',
+      'settings': 'Configuración',
+      'crm': 'CRM',
+      'canales': 'Canales'
+    };
+
+    return segments.map((segment, index) => {
+      const displayName = routeNames[segment] || segment;
+      const isLast = index === segments.length - 1;
+      const linkPath = `/${segments.slice(0, index + 1).join('/')}`;
+      
+      return {
+        name: displayName,
+        path: linkPath,
+        isLast
+      };
+    });
   };
+
+  const breadcrumbItems = getBreadcrumbItems();
 
   return (
     <header className="sticky top-0 z-20 w-full bg-background border-b">
@@ -47,22 +75,23 @@ export function AppHeader({ toggleSidebar }: AppHeaderProps) {
           <span className="sr-only">Toggle Menu</span>
         </Button>
         
-        <div className="hidden md:flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground mr-2">
-            <svg className="h-6 w-6" viewBox="0 0 687 950" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path fill="currentColor" fillRule="evenodd" d="M334.285 24.772c21.759-7.49 78.815 33.13 97.652 43.307 32.754 17.692 61.04 34.963 92.984 52.201 155.797 84.068 137.902 67.655 137.902 153.164v148.463c0 135.443 18.342 105.008-111.409 179.669-163.09 93.842-148.751 105.057-148.747 10.75l.008-435.716c.072-34.627-3.537-86.725-59.864-85.898-26.093.38-161.118 80.112-192.197 97.254-33.238 18.336-68.952 27.595-69.249 75.633-.248 39.632-3.525 272.184 3.044 290.489 10.033 27.969 54.734 44.744 84.336 60.8 91.63 49.693 114.987 40.876 114.743 103.922l-.015 148.486c.007 86.699 11.493 78.401-189.565-55.063-57.465-38.146-69.805-33.202-69.68-77.109l.076-435.856c.005-86.63-8.964-96.952 29.157-117.796l70.068-39.526c41.23-22.4 184.816-108.24 210.756-117.171v-.003Zm-216.49 212.093c5.12-8.691 14.295-13.057 25.441-16.583.396-.423 1.133-1.619 1.304-1.165L336.428 114.97c56.436-10.201 43.221 70.712 43.221 103.609 0 58.467-2.713 427.771.539 451.962 2.754 20.515 18.935 34.314 42.17 30.728L659.947 564.84c35.625-27.817 25.817-74.661 25.817-126.797l.245-222.942c-.596-22.067-12.436-36.35-30.579-47.851L366.309 4.228c-37.971-16.349-79.11 18.922-107.258 34.087-66.35 35.748-126.992 71.508-191.717 108.605-37.09 21.26-66.33 27.08-66.028 81.256L1.359 680.1c0 58.041-10.841 89.211 28.728 118.475l226.804 148.06c72.065 25.597 49.683-101.013 49.683-172.94 0-137.879 14.424-106.937-171.295-202.879-23.61-12.199-30.747-13.125-30.804-45.458l.14-226.094c-.003-31.201-5.759-55.063 13.18-62.401v.002Z" clipRule="evenodd"/>
-            </svg>
-          </div>
-          <h1 className="text-xl font-semibold">{getTitle()}</h1>
-        </div>
-
-        <div className="md:hidden flex-1 items-center justify-center flex">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground mr-2">
-            <svg className="h-6 w-6" viewBox="0 0 687 950" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path fill="currentColor" fillRule="evenodd" d="M334.285 24.772c21.759-7.49 78.815 33.13 97.652 43.307 32.754 17.692 61.04 34.963 92.984 52.201 155.797 84.068 137.902 67.655 137.902 153.164v148.463c0 135.443 18.342 105.008-111.409 179.669-163.09 93.842-148.751 105.057-148.747 10.75l.008-435.716c.072-34.627-3.537-86.725-59.864-85.898-26.093.38-161.118 80.112-192.197 97.254-33.238 18.336-68.952 27.595-69.249 75.633-.248 39.632-3.525 272.184 3.044 290.489 10.033 27.969 54.734 44.744 84.336 60.8 91.63 49.693 114.987 40.876 114.743 103.922l-.015 148.486c.007 86.699 11.493 78.401-189.565-55.063-57.465-38.146-69.805-33.202-69.68-77.109l.076-435.856c.005-86.63-8.964-96.952 29.157-117.796l70.068-39.526c41.23-22.4 184.816-108.24 210.756-117.171v-.003Zm-216.49 212.093c5.12-8.691 14.295-13.057 25.441-16.583.396-.423 1.133-1.619 1.304-1.165L336.428 114.97c56.436-10.201 43.221 70.712 43.221 103.609 0 58.467-2.713 427.771.539 451.962 2.754 20.515 18.935 34.314 42.17 30.728L659.947 564.84c35.625-27.817 25.817-74.661 25.817-126.797l.245-222.942c-.596-22.067-12.436-36.35-30.579-47.851L366.309 4.228c-37.971-16.349-79.11 18.922-107.258 34.087-66.35 35.748-126.992 71.508-191.717 108.605-37.09 21.26-66.33 27.08-66.028 81.256L1.359 680.1c0 58.041-10.841 89.211 28.728 118.475l226.804 148.06c72.065 25.597 49.683-101.013 49.683-172.94 0-137.879 14.424-106.937-171.295-202.879-23.61-12.199-30.747-13.125-30.804-45.458l.14-226.094c-.003-31.201-5.759-55.063 13.18-62.401v.002Z" clipRule="evenodd"/>
-            </svg>
-          </div>
-          <h1 className="text-xl font-semibold">{getTitle()}</h1>
+        <div className="flex items-center gap-2">
+          <Breadcrumb>
+            <BreadcrumbList>
+              {breadcrumbItems.map((item, index) => (
+                <BreadcrumbItem key={index}>
+                  {item.isLast ? (
+                    <BreadcrumbPage>{item.name}</BreadcrumbPage>
+                  ) : (
+                    <BreadcrumbLink asChild>
+                      <Link to={item.path}>{item.name}</Link>
+                    </BreadcrumbLink>
+                  )}
+                  {!item.isLast && <BreadcrumbSeparator />}
+                </BreadcrumbItem>
+              ))}
+            </BreadcrumbList>
+          </Breadcrumb>
         </div>
         
         <div className="flex items-center space-x-2 ml-auto">

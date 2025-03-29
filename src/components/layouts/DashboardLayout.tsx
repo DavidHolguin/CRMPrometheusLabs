@@ -41,7 +41,7 @@ const DashboardLayout = () => {
       <div className="min-h-screen flex w-full">
         <AppSidebar isMobileOpen={isMobileSidebarOpen} setIsMobileOpen={setIsMobileSidebarOpen} />
         
-        <div className="flex flex-col flex-1 transition-all duration-300 ease-in-out ml-[70px] md:ml-[70px]">
+        <div className="flex flex-col flex-1 transition-all duration-300 ease-in-out ml-[70px] md:ml-[70px] max-w-[calc(100%-70px)]">
           <AppHeader toggleSidebar={toggleMobileSidebar} />
           
           <main className="flex-1 overflow-auto p-4 md:p-6">
@@ -51,6 +51,6 @@ const DashboardLayout = () => {
       </div>
     </SidebarProvider>
   );
-};
+}
 
 export default DashboardLayout;
