@@ -59,6 +59,7 @@ const ChatInterface = () => {
     const storedLeadId = localStorage.getItem(`chatbot_lead_${chatbotId}`);
     const storedName = localStorage.getItem(`chatbot_name_${chatbotId}`);
     const storedPhone = localStorage.getItem(`chatbot_phone_${chatbotId}`);
+    const storedConversationId = localStorage.getItem(`chatbot_conversation_${chatbotId}`);
     
     if (storedLeadId) {
       setLeadId(storedLeadId);
@@ -66,12 +67,7 @@ const ChatInterface = () => {
     }
     if (storedName) setUserName(storedName);
     if (storedPhone) setUserPhone(storedPhone);
-    
-    // Retrieve or create conversation
-    const storedConversationId = localStorage.getItem(`chatbot_conversation_${chatbotId}`);
-    if (storedConversationId) {
-      setConversationId(storedConversationId);
-    }
+    if (storedConversationId) setConversationId(storedConversationId);
     
     // Get chatbot info
     fetchChatbotInfo();
@@ -124,6 +120,9 @@ const ChatInterface = () => {
       setUserFormSubmitted(true);
       setShowUserForm(false);
       
+      // Create lead directly in the database
+      await createLead();
+      
       // Add welcome message
       const welcomeMessage = {
         id: uuidv4(),
@@ -133,73 +132,49 @@ const ChatInterface = () => {
       };
       
       addMessage(welcomeMessage);
-      
-      // Initialize conversation with the API
-      await startConversation();
     } catch (error) {
       console.error("Error al iniciar chat:", error);
       toast.error("Hubo un problema al iniciar el chat. Intente de nuevo.");
     }
   };
 
-  const startConversation = async () => {
+  const createLead = async () => {
     try {
-      const empresaId = chatbotInfo?.empresa_id;
-      if (!empresaId) {
-        throw new Error("No se pudo determinar la empresa del chatbot");
+      if (!chatbotInfo) {
+        throw new Error("No se pudo determinar la información del chatbot");
       }
       
-      console.log("Starting conversation with API:", {
-        empresa_id: empresaId,
-        chatbot_id: chatbotId,
-        session_id: sessionId,
-        metadata: {
-          browser: navigator.userAgent,
-          page: window.location.pathname,
-          name: userName || undefined,
-          phone: userPhone || undefined
-        }
-      });
+      const empresaId = chatbotInfo.empresa_id;
       
-      const apiEndpoint = import.meta.env.VITE_API_BASE_URL || 'https://web-production-01457.up.railway.app';
-      const response = await fetch(`${apiEndpoint}/api/v1/channels/web/init`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
+      // Create a lead record in the database
+      const { data: leadData, error: leadError } = await supabase
+        .from("leads")
+        .insert({
           empresa_id: empresaId,
-          chatbot_id: chatbotId,
-          session_id: sessionId,
-          metadata: {
-            browser: navigator.userAgent,
-            page: window.location.pathname,
-            name: userName || undefined,
-            phone: userPhone || undefined
+          nombre: userName,
+          telefono: userPhone,
+          canal_origen: "web",
+          datos_adicionales: {
+            session_id: sessionId,
+            user_agent: navigator.userAgent,
+            page: window.location.pathname
           }
         })
-      });
+        .select()
+        .single();
       
-      if (!response.ok) {
-        throw new Error(`Error al iniciar conversación: ${response.statusText}`);
-      }
+      if (leadError) throw leadError;
       
-      const data = await response.json();
-      console.log("API init response:", data);
+      console.log("Lead created:", leadData);
       
-      // Store conversation and lead IDs
-      if (data.conversacion_id) {
-        setConversationId(data.conversacion_id);
-        localStorage.setItem(`chatbot_conversation_${chatbotId}`, data.conversacion_id);
-      }
-      
-      if (data.lead_id) {
-        setLeadId(data.lead_id);
-        localStorage.setItem(`chatbot_lead_${chatbotId}`, data.lead_id);
+      // Save the lead ID
+      if (leadData?.id) {
+        setLeadId(leadData.id);
+        localStorage.setItem(`chatbot_lead_${chatbotId}`, leadData.id);
       }
     } catch (error) {
-      console.error("Error starting conversation:", error);
-      toast.error("No se pudo iniciar la conversación. Intente de nuevo.");
+      console.error("Error creating lead:", error);
+      throw error;
     }
   };
 
