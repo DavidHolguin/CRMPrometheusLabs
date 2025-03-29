@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { 
@@ -10,9 +9,9 @@ import {
   Settings, 
   User, 
   Users,
-  Mail,
+  Building,
   LogOut,
-  Building
+  MessagesSquare
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { 
@@ -48,7 +47,6 @@ export function AppSidebar({ isMobileOpen, setIsMobileOpen }: AppSidebarProps) {
   const { isCollapsed, setCollapsed } = useSidebar();
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
 
-  // Fetch company information
   useEffect(() => {
     const fetchCompanyInfo = async () => {
       if (user?.companyId) {
@@ -69,7 +67,7 @@ export function AppSidebar({ isMobileOpen, setIsMobileOpen }: AppSidebarProps) {
               id: data.id,
               nombre: data.nombre,
               logo_url: data.logo_url,
-              plan: "Plan Básico" // This could be fetched from a subscription table in the future
+              plan: "Plan Básico"
             });
           }
         } catch (error) {
@@ -81,7 +79,6 @@ export function AppSidebar({ isMobileOpen, setIsMobileOpen }: AppSidebarProps) {
     fetchCompanyInfo();
   }, [user?.companyId]);
 
-  // Cambiar ancho del sidebar
   const toggleCollapse = () => {
     setCollapsed(!isCollapsed);
   };
@@ -96,7 +93,6 @@ export function AppSidebar({ isMobileOpen, setIsMobileOpen }: AppSidebarProps) {
       .substring(0, 2);
   };
 
-  // Cerrar sidebar en móvil cuando se hace clic en un enlace
   const handleLinkClick = () => {
     if (isMobile) {
       setIsMobileOpen(false);
@@ -105,7 +101,6 @@ export function AppSidebar({ isMobileOpen, setIsMobileOpen }: AppSidebarProps) {
 
   return (
     <>
-      {/* Overlay para móviles */}
       {isMobile && isMobileOpen && (
         <div
           className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm"
@@ -113,7 +108,6 @@ export function AppSidebar({ isMobileOpen, setIsMobileOpen }: AppSidebarProps) {
         />
       )}
 
-      {/* Sidebar */}
       <Sidebar
         className={cn(
           "fixed inset-y-0 left-0 z-50 flex h-full flex-col border-r bg-card transition-all duration-300 ease-in-out",
@@ -153,7 +147,6 @@ export function AppSidebar({ isMobileOpen, setIsMobileOpen }: AppSidebarProps) {
             </Button>
           </div>
 
-          {/* Perfil del usuario */}
           <div className="mt-6 flex items-center gap-3">
             <Avatar className="h-9 w-9">
               <AvatarImage src={user?.avatarUrl} />
@@ -201,7 +194,7 @@ export function AppSidebar({ isMobileOpen, setIsMobileOpen }: AppSidebarProps) {
             />
             <NavLink
               to="/dashboard/chatbots"
-              icon={<Mail size={20} />}
+              icon={<MessagesSquare size={20} />}
               label="Chatbots"
               isActive={location.pathname.includes("chatbots")}
               isCollapsed={isCollapsed}
@@ -219,7 +212,6 @@ export function AppSidebar({ isMobileOpen, setIsMobileOpen }: AppSidebarProps) {
         </SidebarContent>
 
         <SidebarFooter className="p-3">
-          {/* Información de la empresa */}
           <div className="mb-3 flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary/10 text-primary">
               {companyInfo?.logo_url ? (

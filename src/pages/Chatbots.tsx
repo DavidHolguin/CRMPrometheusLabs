@@ -19,7 +19,7 @@ import { useNavigate } from "react-router-dom";
 const Chatbots = () => {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const { data: chatbots, isLoading, isError, refetch } = useChatbots();
+  const { data: chatbots = [], isLoading, isError, refetch } = useChatbots();
   const navigate = useNavigate();
 
   if (isError) {
