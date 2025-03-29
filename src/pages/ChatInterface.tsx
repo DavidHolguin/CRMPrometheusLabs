@@ -102,11 +102,7 @@ const ChatInterface = () => {
         const formattedMessages: Message[] = messageHistory.map(msg => ({
           id: msg.id,
           content: msg.contenido,
-          sender: msg.origen === "usuario" 
-            ? "user" 
-            : msg.origen === "agente" 
-              ? "agent"
-              : "bot",
+          sender: getSenderType(msg.origen, msg.metadata),
           timestamp: new Date(msg.created_at)
         }));
         
@@ -132,6 +128,13 @@ const ChatInterface = () => {
     }
   };
 
+  // Helper function to determine the sender type
+  const getSenderType = (origen: string, metadata: any): "user" | "bot" | "agent" => {
+    if (origen === "usuario") return "user";
+    if (origen === "agente" || (metadata && metadata.origin === "agent")) return "agent";
+    return "bot";
+  };
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -154,24 +157,20 @@ const ChatInterface = () => {
         (payload) => {
           const newMessage = payload.new;
           
-          // Check if message is not from the current user to avoid duplicates
-          if (newMessage.origen !== "usuario" || newMessage.remitente_id !== leadId) {
-            const messageExists = messages.some(msg => msg.id === newMessage.id);
+          // We should display all messages that arrive in this conversation
+          const messageExists = messages.some(msg => msg.id === newMessage.id);
             
-            if (!messageExists) {
-              const message: Message = {
-                id: newMessage.id,
-                content: newMessage.contenido,
-                sender: newMessage.origen === "usuario" 
-                  ? "user" 
-                  : newMessage.origen === "agente" 
-                    ? "agent" 
-                    : "bot",
-                timestamp: new Date(newMessage.created_at)
-              };
-              
-              setMessages(prev => [...prev, message]);
-            }
+          if (!messageExists) {
+            console.log("New real-time message received:", newMessage);
+            
+            const message: Message = {
+              id: newMessage.id,
+              content: newMessage.contenido,
+              sender: getSenderType(newMessage.origen, newMessage.metadata),
+              timestamp: new Date(newMessage.created_at)
+            };
+            
+            setMessages(prev => [...prev, message]);
           }
         }
       )
@@ -232,10 +231,7 @@ const ChatInterface = () => {
         throw new Error('Error al enviar mensaje al API');
       }
       
-      const data = await response.json();
-      
       // The bot response should be handled by the real-time subscription now
-      // so we don't need to manually add it to messages
       
     } catch (error) {
       console.error("Error sending message:", error);
@@ -278,6 +274,10 @@ const ChatInterface = () => {
           lead_id: lead.id,
           chatbot_id: chatbot.id,
           estado: "activa",
+          metadata: {
+            source: 'web_chat',
+            user_agent: navigator.userAgent
+          }
         })
         .select()
         .single();
