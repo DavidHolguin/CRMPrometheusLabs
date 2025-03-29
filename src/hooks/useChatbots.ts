@@ -57,8 +57,6 @@ export function useChatbots() {
         return [];
       }
       
-      console.log("Consultando chatbots para empresa:", user.companyId);
-      
       const { data, error } = await supabase
         .from("chatbots")
         .select(`
@@ -83,8 +81,6 @@ export function useChatbots() {
         console.error("Error obteniendo chatbots:", error);
         throw error;
       }
-      
-      console.log("Chatbots obtenidos:", data?.length || 0);
       
       // Procesar y transformar los datos
       const processedData = data?.map(chatbot => {
@@ -120,7 +116,6 @@ export function useChatbots() {
             if (Array.isArray(rawExamples)) {
               qaExamples = rawExamples.map(example => {
                 if (typeof example === 'object' && example !== null) {
-                  // Use safer type assertion with proper checks
                   const exampleObj = example as Record<string, any>;
                   const question = typeof exampleObj.question === 'string' ? exampleObj.question : '';
                   const answer = typeof exampleObj.answer === 'string' ? exampleObj.answer : '';
@@ -225,7 +220,6 @@ export function useChatbot(id: string | undefined) {
           if (Array.isArray(rawExamples)) {
             qaExamples = rawExamples.map(example => {
               if (typeof example === 'object' && example !== null) {
-                // Use safer type assertion with proper checks
                 const exampleObj = example as Record<string, any>;
                 const question = typeof exampleObj.question === 'string' ? exampleObj.question : '';
                 const answer = typeof exampleObj.answer === 'string' ? exampleObj.answer : '';

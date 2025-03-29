@@ -9,11 +9,11 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { CreateChatbotDrawer } from "@/components/chatbots/CreateChatbotDrawer";
+import { CreateChatbotModal } from "@/components/chatbots/CreateChatbotModal";
 
 const Chatbots = () => {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [createDrawerOpen, setCreateDrawerOpen] = useState(false);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
   const { data: chatbots = [], isLoading, isError, refetch } = useChatbots();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -57,7 +57,7 @@ const Chatbots = () => {
               <List size={18} />
             </button>
           </div>
-          <Button onClick={() => setCreateDrawerOpen(true)}>
+          <Button onClick={() => setCreateModalOpen(true)}>
             <Plus size={16} className="mr-2" /> Crear Chatbot
           </Button>
         </div>
@@ -99,7 +99,7 @@ const Chatbots = () => {
                 <p className="text-muted-foreground mb-4">
                   Comienza creando tu primer chatbot para interactuar con tus clientes.
                 </p>
-                <Button onClick={() => setCreateDrawerOpen(true)}>
+                <Button onClick={() => setCreateModalOpen(true)}>
                   <Plus size={16} className="mr-2" /> Crear mi primer Chatbot
                 </Button>
               </div>
@@ -108,9 +108,9 @@ const Chatbots = () => {
         )}
       </div>
 
-      <CreateChatbotDrawer 
-        open={createDrawerOpen} 
-        onOpenChange={setCreateDrawerOpen}
+      <CreateChatbotModal 
+        open={createModalOpen} 
+        onOpenChange={setCreateModalOpen}
         onSuccess={() => {
           refetch();
           toast.success("Chatbot creado exitosamente");

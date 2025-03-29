@@ -1,16 +1,18 @@
 
 import { useState } from "react";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { MoreHorizontal, Pencil, Trash2, Eye } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Chatbot } from "@/hooks/useChatbots";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { MoreHorizontal, Edit, Trash2, ExternalLink, Bot } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { EditChatbotDrawer } from "./EditChatbotDrawer";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { EditChatbotModal } from "./EditChatbotModal";
 
 interface ChatbotCardProps {
   chatbot: Chatbot;
@@ -20,149 +22,144 @@ interface ChatbotCardProps {
 }
 
 export function ChatbotCard({ chatbot, onDelete, onEdit, onLiveView }: ChatbotCardProps) {
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [editDrawerOpen, setEditDrawerOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const handleDelete = async () => {
     setIsDeleting(true);
     try {
-      // Primero eliminar los contextos asociados
-      const { error: contextError } = await supabase
+      // Primero eliminar los contextos del chatbot
+      await supabase
         .from("chatbot_contextos")
         .delete()
         .eq("chatbot_id", chatbot.id);
-
-      if (contextError) throw contextError;
-
+        
       // Luego eliminar el chatbot
       const { error } = await supabase
         .from("chatbots")
         .delete()
         .eq("id", chatbot.id);
-
+      
       if (error) throw error;
-
-      setDeleteDialogOpen(false);
+      
       toast.success("Chatbot eliminado exitosamente");
       onDelete();
     } catch (error) {
       console.error("Error eliminando chatbot:", error);
-      toast.error("Error al eliminar el chatbot. Inténtelo de nuevo.");
+      toast.error("Error al eliminar el chatbot");
     } finally {
       setIsDeleting(false);
+      setIsDeleteDialogOpen(false);
     }
   };
 
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(part => part[0])
-      .join('')
-      .toUpperCase()
-      .substring(0, 2);
-  };
+  const creationDate = chatbot.created_at ? 
+    format(new Date(chatbot.created_at), "dd MMM yyyy", { locale: es }) : "Fecha desconocida";
 
   return (
     <>
-      <Card className="overflow-hidden hover:shadow-md transition-shadow">
+      <Card className="hover:shadow-md transition-shadow">
         <CardHeader className="pb-2">
           <div className="flex justify-between items-start">
-            <div className="flex items-center space-x-3">
-              <Avatar className="h-10 w-10 bg-primary/10">
-                <AvatarImage src={chatbot.avatar_url || ""} alt={chatbot.nombre} />
-                <AvatarFallback>{getInitials(chatbot.nombre)}</AvatarFallback>
+            <div className="flex items-center gap-3">
+              <Avatar className="h-12 w-12 border">
+                {chatbot.avatar_url ? (
+                  <AvatarImage src={chatbot.avatar_url} alt={chatbot.nombre} />
+                ) : (
+                  <AvatarFallback className="bg-primary-foreground">
+                    <Bot size={24} className="text-primary" />
+                  </AvatarFallback>
+                )}
               </Avatar>
               <div>
                 <CardTitle className="text-lg">{chatbot.nombre}</CardTitle>
-                <CardDescription className="line-clamp-1">
-                  {chatbot.descripcion || "Sin descripción"}
+                <CardDescription className="text-xs">
+                  Creado el {creationDate}
                 </CardDescription>
               </div>
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon">
-                  <MoreHorizontal size={16} />
+                  <MoreHorizontal size={18} />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setEditDrawerOpen(true)}>
-                  <Pencil size={14} className="mr-2" />
-                  Editar
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={onLiveView}>
-                  <Eye size={14} className="mr-2" />
+                <DropdownMenuItem onClick={onLiveView} className="gap-2">
+                  <ExternalLink size={16} />
                   Ver en vivo
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setIsEditModalOpen(true)} className="gap-2">
+                  <Edit size={16} />
+                  Editar
+                </DropdownMenuItem>
                 <DropdownMenuItem 
-                  onClick={() => setDeleteDialogOpen(true)}
-                  className="text-destructive focus:text-destructive"
+                  onClick={() => setIsDeleteDialogOpen(true)}
+                  className="text-destructive gap-2"
                 >
-                  <Trash2 size={14} className="mr-2" />
+                  <Trash2 size={16} />
                   Eliminar
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
         </CardHeader>
-        <CardContent className="pt-2">
-          <div className="flex flex-wrap gap-2 mt-2">
+        <CardContent>
+          <div className="h-20 overflow-hidden">
+            <p className="text-sm text-muted-foreground line-clamp-3">
+              {chatbot.descripcion || "Sin descripción"}
+            </p>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
             <Badge variant={chatbot.is_active ? "default" : "outline"}>
               {chatbot.is_active ? "Activo" : "Inactivo"}
             </Badge>
             {chatbot.tono && (
-              <Badge variant="outline">
-                Tono: {chatbot.tono}
-              </Badge>
+              <Badge variant="secondary">{chatbot.tono}</Badge>
             )}
-            {chatbot.personalidad && (
-              <Badge variant="outline">
-                {chatbot.personalidad}
-              </Badge>
-            )}
-          </div>
-          <div className="mt-3 text-sm text-muted-foreground">
-            <p className="line-clamp-3">
-              {chatbot.contexto?.generalContext || chatbot.descripcion || "Sin información de contexto adicional."}
-            </p>
           </div>
         </CardContent>
-        <CardFooter className="border-t pt-4 flex justify-between">
-          <Button variant="outline" size="sm" onClick={() => setEditDrawerOpen(true)}>
-            <Pencil size={14} className="mr-2" />
+        <CardFooter className="flex justify-between">
+          <Button variant="outline" size="sm" onClick={() => setIsEditModalOpen(true)}>
+            <Edit size={14} className="mr-2" />
             Editar
           </Button>
           <Button size="sm" onClick={onLiveView}>
-            <Eye size={14} className="mr-2" />
+            <ExternalLink size={14} className="mr-2" />
             Ver en vivo
           </Button>
         </CardFooter>
       </Card>
 
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>¿Confirmar eliminación?</DialogTitle>
-            <DialogDescription>
-              Estás a punto de eliminar el chatbot "{chatbot.nombre}". Esta acción no se puede deshacer.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} disabled={isDeleting}>
-              Cancelar
-            </Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar chatbot?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará permanentemente el chatbot "{chatbot.nombre}" y todos sus datos asociados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleDelete();
+              }}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               {isDeleting ? "Eliminando..." : "Eliminar"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-      <EditChatbotDrawer
+      <EditChatbotModal
         chatbot={chatbot}
-        open={editDrawerOpen}
-        onOpenChange={setEditDrawerOpen}
+        open={isEditModalOpen}
+        onOpenChange={setIsEditModalOpen}
         onSuccess={onEdit}
       />
     </>
