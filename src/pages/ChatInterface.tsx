@@ -102,6 +102,8 @@ const ChatInterface = () => {
   const loadMessageHistory = async (convId: string) => {
     setIsLoadingHistory(true);
     try {
+      console.log("Loading message history for conversation:", convId);
+      
       const { data: messageHistory, error } = await supabase
         .from("mensajes")
         .select("*")
@@ -148,8 +150,16 @@ const ChatInterface = () => {
   // Helper function to determine the sender type
   const getSenderType = (origen: string, metadata: any): "user" | "bot" | "agent" => {
     console.log("Determining sender type for:", origen, metadata);
+    
     if (origen === "usuario") return "user";
-    if (origen === "agente" || (metadata && (metadata.origin === "agent" || metadata.agent_id))) return "agent";
+    
+    // Check for agent first with more detailed logic
+    if (origen === "agente") return "agent";
+    if (metadata && metadata.agent_id) return "agent";
+    if (metadata && metadata.origin === "agent") return "agent";
+    if (metadata && metadata.agent_name) return "agent";
+    
+    // Default to bot
     return "bot";
   };
 
@@ -177,16 +187,19 @@ const ChatInterface = () => {
         (payload) => {
           const newMessage = payload.new;
           
-          // We should display all messages that arrive in this conversation
+          // Check if message already exists in our state
           const messageExists = messages.some(msg => msg.id === newMessage.id);
             
           if (!messageExists) {
             console.log("New real-time message received:", newMessage);
             
+            const sender = getSenderType(newMessage.origen, newMessage.metadata);
+            console.log("Determined sender type:", sender);
+            
             const message: Message = {
               id: newMessage.id,
               content: newMessage.contenido,
-              sender: getSenderType(newMessage.origen, newMessage.metadata),
+              sender: sender,
               timestamp: new Date(newMessage.created_at)
             };
             
@@ -203,7 +216,7 @@ const ChatInterface = () => {
       console.log("Removing realtime subscription");
       supabase.removeChannel(channel);
     };
-  }, [conversationId, leadId, messages]);
+  }, [conversationId, messages]);
 
   const handleSendMessage = async () => {
     if (!userMessage.trim() || !leadId || !conversationId || !chatbot) return;
@@ -220,6 +233,13 @@ const ChatInterface = () => {
     setIsSubmitting(true);
     
     try {
+      console.log("Saving message to Supabase:", {
+        contenido: userMessage,
+        conversacion_id: conversationId,
+        origen: "usuario",
+        remitente_id: leadId,
+      });
+      
       // Guardar mensaje en Supabase
       const { data: msgData, error: msgError } = await supabase
         .from("mensajes")
@@ -285,6 +305,8 @@ const ChatInterface = () => {
     if (!chatbot) return;
     
     try {
+      console.log("User form submitted with values:", values);
+      
       // First check if a lead with this phone number already exists for this company
       const { data: existingLeads, error: checkError } = await supabase
         .from("leads")
@@ -318,7 +340,13 @@ const ChatInterface = () => {
         lead = newLead;
       }
       
-      // Check if an active conversation already exists for this lead with this chatbot
+      // Now check if a conversation already exists for this lead with this chatbot
+      console.log("Checking for existing conversation", {
+        lead_id: lead.id,
+        chatbot_id: chatbot.id,
+        estado: "activa"
+      });
+      
       const { data: existingConvs, error: convCheckError } = await supabase
         .from("conversaciones")
         .select("id")
@@ -343,10 +371,12 @@ const ChatInterface = () => {
             lead_id: lead.id,
             chatbot_id: chatbot.id,
             estado: "activa",
-            canal_id: null, // This is a direct web chat
+            canal_identificador: values.telefono, // Usa el teléfono como identificador
             metadata: {
               source: 'web_chat',
-              user_agent: navigator.userAgent
+              user_agent: navigator.userAgent,
+              nombre: values.nombre,
+              telefono: values.telefono
             }
           })
           .select()
@@ -356,8 +386,14 @@ const ChatInterface = () => {
         conversation = newConv;
       }
       
+      // Store in localStorage
       localStorage.setItem(`lead_${chatbotId}`, lead.id);
       localStorage.setItem(`conversation_${chatbotId}`, conversation.id);
+      
+      console.log("Session data saved", {
+        leadId: lead.id, 
+        conversationId: conversation.id
+      });
       
       setLeadId(lead.id);
       setConversationId(conversation.id);
