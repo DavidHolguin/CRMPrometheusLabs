@@ -289,6 +289,7 @@ export type Database = {
         Row: {
           canal_id: string | null
           canal_identificador: string | null
+          chatbot_activo: boolean | null
           chatbot_id: string | null
           created_at: string | null
           estado: string | null
@@ -301,6 +302,7 @@ export type Database = {
         Insert: {
           canal_id?: string | null
           canal_identificador?: string | null
+          chatbot_activo?: boolean | null
           chatbot_id?: string | null
           created_at?: string | null
           estado?: string | null
@@ -313,6 +315,7 @@ export type Database = {
         Update: {
           canal_id?: string | null
           canal_identificador?: string | null
+          chatbot_activo?: boolean | null
           chatbot_id?: string | null
           created_at?: string | null
           estado?: string | null
@@ -908,6 +911,7 @@ export type Database = {
           conversacion_id: string | null
           created_at: string | null
           id: string
+          leido: boolean | null
           metadata: Json | null
           origen: string
           remitente_id: string | null
@@ -919,6 +923,7 @@ export type Database = {
           conversacion_id?: string | null
           created_at?: string | null
           id?: string
+          leido?: boolean | null
           metadata?: Json | null
           origen: string
           remitente_id?: string | null
@@ -930,6 +935,7 @@ export type Database = {
           conversacion_id?: string | null
           created_at?: string | null
           id?: string
+          leido?: boolean | null
           metadata?: Json | null
           origen?: string
           remitente_id?: string | null
