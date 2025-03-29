@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -203,7 +202,6 @@ const ChatInterface = () => {
       setUserFormSubmitted(true);
       setShowUserForm(false);
       
-      // Add a welcome message directly to the messages state
       const welcomeMessage = `Hola ${userName}, bienvenido/a a nuestro chat. ¿En qué podemos ayudarte hoy?`;
       
       const welcomeMsgObj = {
@@ -215,8 +213,6 @@ const ChatInterface = () => {
       
       setMessages([welcomeMsgObj]);
       
-      // Important: When user submits form, we don't want to send the data as a message
-      // Instead, we'll start a conversation but we'll handle this data differently
       await startConversation();
     } catch (error) {
       console.error("Error al iniciar chat:", error);
@@ -224,7 +220,6 @@ const ChatInterface = () => {
     }
   };
 
-  // New function to start a conversation without sending the user data as a message
   const startConversation = async () => {
     try {
       const empresaId = chatbotInfo?.empresa_id;
@@ -562,7 +557,7 @@ const ChatInterface = () => {
       <header className="p-3 bg-card shadow-sm flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-3">
           <div className="avatar-border">
-            <Avatar className="h-10 w-10 border-2 border-primary/10">
+            <Avatar className="h-10 w-10 border-2 border-primary/20">
               <AvatarImage src={chatbotInfo.avatar_url} />
               <AvatarFallback>
                 <Bot className="h-6 w-6" />
@@ -650,16 +645,8 @@ const ChatInterface = () => {
               return (
                 <div 
                   key={msg.id} 
-                  className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-2`}
+                  className={`flex ${isUser ? 'justify-start' : 'justify-end'} mb-3`}
                 >
-                  {!isUser && (
-                    <div className="flex flex-col items-start mr-1">
-                      <span className="text-xs font-medium mb-1 text-primary">
-                        {isBot ? chatbotInfo.nombre : msg.metadata?.agent_name || 'Agente'}
-                      </span>
-                    </div>
-                  )}
-                  
                   <div 
                     className={`
                       relative px-3 py-2 shadow-sm max-w-[80%]
@@ -674,7 +661,7 @@ const ChatInterface = () => {
                     <p className="whitespace-pre-wrap break-words text-sm font-normal">{msg.contenido}</p>
                     <span className="text-[10px] text-opacity-70 float-right mt-1 ml-2 flex items-center gap-1">
                       {formatTime(msg.created_at)}
-                      {isUser && <Check className="h-3 w-3" />}
+                      {!isUser && <Check className="h-3 w-3" />}
                     </span>
                   </div>
                 </div>
@@ -685,13 +672,13 @@ const ChatInterface = () => {
         </div>
       </ScrollArea>
 
-      <div className="p-2 border-t bg-gray-900">
-        <div className="flex items-center gap-1 chat-input relative rounded-full bg-gray-800 px-2" ref={inputContainerRef}>
+      <div className="p-2 border-t bg-background">
+        <div className="flex items-center gap-1 chat-input relative rounded-full px-2" ref={inputContainerRef}>
           <Button 
             onClick={() => setShowEmojiPicker(!showEmojiPicker)} 
             variant="ghost" 
             size="icon" 
-            className="h-9 w-9 text-gray-400 hover:text-gray-200"
+            className="h-9 w-9 text-muted-foreground hover:text-foreground"
           >
             <Smile className="h-5 w-5" />
           </Button>
@@ -702,7 +689,7 @@ const ChatInterface = () => {
             onChange={handleTextareaChange}
             onKeyDown={handleKeyDown}
             placeholder="Escribe un mensaje..."
-            className="min-h-[40px] max-h-[120px] resize-none border-none bg-transparent py-2 focus-visible:ring-0 focus-visible:ring-offset-0 text-gray-200"
+            className="min-h-[40px] max-h-[120px] resize-none border-none bg-transparent py-2 focus-visible:ring-0 focus-visible:ring-offset-0"
             disabled={sending || isRecording || showUserForm}
           />
           

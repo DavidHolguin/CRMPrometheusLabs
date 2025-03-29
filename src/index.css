@@ -41,9 +41,9 @@
     --sidebar-ring: 217.2 91.2% 59.8%;
     
     /* Chat bubble colors */
-    --user-bubble: 142, 71%, 45%;
-    --bot-bubble: 0, 0%, 100%;
-    --agent-bubble: 199, 89%, 48%;
+    --user-bubble: 0, 0%, 98%;
+    --bot-bubble: 221, 83%, 53%;
+    --agent-bubble: 222, 47%, 30%;
   }
 
   .dark {
@@ -82,9 +82,9 @@
     --sidebar-ring: 224.3 76.3% 48%;
     
     /* Chat bubble colors for dark mode */
-    --user-bubble: 142, 40%, 40%;
-    --bot-bubble: 0, 0%, 20%;
-    --agent-bubble: 199, 60%, 40%;
+    --user-bubble: 0, 0%, 20%;
+    --bot-bubble: 217, 91%, 60%;
+    --agent-bubble: 222, 47%, 30%;
   }
 }
 
@@ -141,7 +141,7 @@ html, body, #root {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.05);
+  background-color: rgba(255, 255, 255, 0.92);
   z-index: 0;
 }
 
@@ -152,7 +152,7 @@ html, body, #root {
 
 .user-bubble {
   background-color: hsl(var(--user-bubble));
-  color: #ffffff;
+  color: hsl(var(--foreground));
   border-radius: 0.75rem 0 0.75rem 0.75rem;
   box-shadow: 0 1px 0.5px rgba(0,0,0,0.13);
 }
@@ -170,7 +170,7 @@ html, body, #root {
 
 .bot-bubble {
   background-color: hsl(var(--bot-bubble));
-  color: hsl(var(--foreground));
+  color: #ffffff;
   border-radius: 0 0.75rem 0.75rem 0.75rem;
   box-shadow: 0 1px 0.5px rgba(0,0,0,0.13);
 }
