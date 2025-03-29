@@ -30,10 +30,10 @@ export interface ChatbotContext {
   general_context: string;
   communication_tone: string;
   main_purpose: string;
-  key_points: string[];
+  key_points: string[] | any; // Updated to handle both string[] and JSON
   special_instructions: string;
   prompt_template: string;
-  qa_examples?: QA[];
+  qa_examples?: QA[] | any; // Updated to handle both QA[] and JSON
   orden: number;
   created_at: string;
   updated_at: string;

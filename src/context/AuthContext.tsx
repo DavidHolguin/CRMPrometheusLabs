@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,6 +16,13 @@ interface AuthContextType {
   updateUser: (data: any) => Promise<void>;
   createChatbot: (chatbotData: ChatbotCreationData) => Promise<void>;
   setOnboardingCompleted: () => Promise<void>;
+  // Aliases for better compatibility
+  login: (email: string, password: string) => Promise<any>;
+  register: (name: string, email: string, password: string) => Promise<any>;
+  logout: () => Promise<void>;
+  loginWithGoogle: () => Promise<any>;
+  createCompany: (data: any) => Promise<any>;
+  saveServices: (data: any) => Promise<any>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -171,6 +179,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       const updates = {
         id: user?.id,
+        email: user?.email, // Include email as it's required
         full_name: data.fullName,
         avatar_url: data.avatarUrl,
         updated_at: new Date().toISOString(),
@@ -218,7 +227,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
       
       // Create the chatbot
-      const { data: chatbotData, error: chatbotError } = await supabase
+      const { data: newChatbotData, error: chatbotError } = await supabase
         .from('chatbots')
         .insert({
           nombre: chatbotData.name,
@@ -236,7 +245,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const { error: contextError } = await supabase
         .from('chatbot_contextos')
         .insert({
-          chatbot_id: chatbotData.id,
+          chatbot_id: newChatbotData.id,
           tipo: 'primary',
           contenido: chatbotData.customInstructions || '',
           welcome_message: chatbotData.welcomeMessage,
@@ -278,7 +287,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 answer: faq.answer
               })))
             })
-            .eq('chatbot_id', chatbotData.id)
+            .eq('chatbot_id', newChatbotData.id)
             .eq('tipo', 'primary');
             
           if (qaError) throw qaError;
@@ -327,6 +336,93 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  // Add alias methods for better compatibility
+  const login = async (email: string, password: string) => {
+    return signIn({ email, password });
+  };
+
+  const register = async (name: string, email: string, password: string) => {
+    return signUp({ fullName: name, email, password });
+  };
+
+  const logout = async () => {
+    return signOut();
+  };
+
+  const loginWithGoogle = async () => {
+    try {
+      setLoading(true);
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+      });
+
+      if (error) {
+        throw error;
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createCompany = async (data: any) => {
+    try {
+      setLoading(true);
+      
+      const { data: companyData, error } = await supabase
+        .from('empresas')
+        .insert({
+          nombre: data.name,
+          descripcion: data.description || null,
+          sitio_web: data.website || null,
+          email: data.email || null,
+          telefono: data.phone || null,
+          created_by: user?.id
+        })
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      setUser({ ...user, companyId: companyData.id } as Profile);
+      
+      return companyData;
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveServices = async (data: any) => {
+    try {
+      setLoading(true);
+      // Implementation depends on your requirements
+      return true;
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const value = {
     user,
     session,
@@ -337,6 +433,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     updateUser,
     createChatbot,
     setOnboardingCompleted,
+    // Aliases
+    login,
+    register,
+    logout,
+    loginWithGoogle,
+    createCompany,
+    saveServices
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

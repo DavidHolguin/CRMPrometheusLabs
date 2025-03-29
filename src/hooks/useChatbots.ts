@@ -60,9 +60,26 @@ export function useChatbots() {
           // Map contexts to their respective chatbots
           return data.map(chatbot => {
             const context = contexts.find(ctx => ctx.chatbot_id === chatbot.id);
+            if (context) {
+              // Parse JSON fields if they are strings
+              const parsedContext = {
+                ...context,
+                key_points: typeof context.key_points === 'string' 
+                  ? JSON.parse(context.key_points) 
+                  : context.key_points,
+                qa_examples: context.qa_examples && typeof context.qa_examples === 'string'
+                  ? JSON.parse(context.qa_examples)
+                  : context.qa_examples || []
+              };
+              return {
+                ...chatbot,
+                context: parsedContext as ChatbotContext
+              };
+            }
+            
             return {
               ...chatbot,
-              context: context || undefined
+              context: undefined
             };
           });
         }
@@ -106,9 +123,20 @@ export function useChatbot(id: string | undefined) {
       if (contextError) {
         console.error("Error obteniendo contexto del chatbot:", contextError);
       } else if (contextData) {
+        // Parse JSON fields if they are strings
+        const parsedContext = {
+          ...contextData,
+          key_points: typeof contextData.key_points === 'string' 
+            ? JSON.parse(contextData.key_points) 
+            : contextData.key_points || [],
+          qa_examples: contextData.qa_examples && typeof contextData.qa_examples === 'string'
+            ? JSON.parse(contextData.qa_examples)
+            : contextData.qa_examples || []
+        };
+        
         return {
           ...data,
-          context: contextData
+          context: parsedContext as ChatbotContext
         };
       }
       
@@ -138,7 +166,20 @@ export function useChatbotContext(chatbotId: string | undefined) {
         throw error;
       }
       
-      return data;
+      if (!data) {
+        return null;
+      }
+      
+      // Parse JSON fields if they are strings
+      return {
+        ...data,
+        key_points: typeof data.key_points === 'string' 
+          ? JSON.parse(data.key_points) 
+          : data.key_points || [],
+        qa_examples: data.qa_examples && typeof data.qa_examples === 'string'
+          ? JSON.parse(data.qa_examples)
+          : data.qa_examples || []
+      } as ChatbotContext;
     },
     enabled: !!chatbotId,
   });
