@@ -50,6 +50,7 @@ const ChatInterface = () => {
   const audioChunksRef = useRef<Blob[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputContainerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let storedSessionId = localStorage.getItem(`chatbot_session_${chatbotId}`);
@@ -420,26 +421,21 @@ const ChatInterface = () => {
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
     }
   };
 
-  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setMessage(e.target.value);
-    
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height = `${Math.min(120, textareaRef.current.scrollHeight)}px`;
-    }
   };
 
   const handleEmojiSelect = (emoji: string) => {
     setMessage(prev => prev + emoji);
-    if (textareaRef.current) {
-      textareaRef.current.focus();
+    if (inputRef.current) {
+      inputRef.current.focus();
     }
     setShowEmojiPicker(false);
   };
@@ -552,13 +548,13 @@ const ChatInterface = () => {
 
   return (
     <div 
-      className="flex flex-col h-screen bg-background"
+      className="flex flex-col h-screen bg-[#0e1621]"
       ref={containerRef}
     >
-      <header className="p-3 bg-card shadow-sm flex items-center justify-between sticky top-0 z-10">
+      <header className="p-3 bg-[#1f2c34] shadow-sm flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-3">
           <div className="avatar-border">
-            <Avatar className="h-10 w-10 border-2 border-primary/20">
+            <Avatar className="h-10 w-10 border-2 border-transparent">
               <AvatarImage src={chatbotInfo.avatar_url} />
               <AvatarFallback>
                 <Bot className="h-6 w-6" />
@@ -566,22 +562,22 @@ const ChatInterface = () => {
             </Avatar>
           </div>
           <div>
-            <h1 className="text-base font-medium">{chatbotInfo.nombre}</h1>
-            <p className="text-xs text-muted-foreground">{getLastActiveTime()}</p>
+            <h1 className="text-base font-medium text-white">{chatbotInfo.nombre}</h1>
+            <p className="text-xs text-gray-400">en línea</p>
           </div>
         </div>
         
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-9 w-9">
+            <Button variant="ghost" size="icon" className="h-9 w-9 text-gray-400">
               <MoreVertical className="h-5 w-5" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-56" align="end">
+          <PopoverContent className="w-56 bg-[#1f2c34] border-0 text-white" align="end">
             <div className="space-y-1">
               <Button 
                 variant="ghost" 
-                className="w-full justify-start" 
+                className="w-full justify-start text-gray-200 hover:bg-[#2a3942]" 
                 size="sm"
                 onClick={() => setShowProfile(true)}
               >
@@ -590,17 +586,17 @@ const ChatInterface = () => {
               </Button>
               <Button 
                 variant="ghost" 
-                className="w-full justify-start" 
+                className="w-full justify-start text-gray-200 hover:bg-[#2a3942]" 
                 size="sm"
                 onClick={() => setShowRatingDrawer(true)}
               >
                 <Star className="mr-2 h-4 w-4" />
                 <span>Calificar chatbot</span>
               </Button>
-              <Separator className="my-2" />
+              <Separator className="my-2 bg-gray-700" />
               <Button 
                 variant="ghost" 
-                className="w-full justify-start text-xs" 
+                className="w-full justify-start text-xs text-gray-400 hover:bg-[#2a3942]" 
                 size="sm"
                 asChild
               >
@@ -611,7 +607,7 @@ const ChatInterface = () => {
               </Button>
               <Button 
                 variant="ghost" 
-                className="w-full justify-start text-xs" 
+                className="w-full justify-start text-xs text-gray-400 hover:bg-[#2a3942]" 
                 size="sm"
                 asChild
               >
@@ -625,23 +621,20 @@ const ChatInterface = () => {
         </Popover>
       </header>
 
-      <ScrollArea 
-        className="flex-1 chat-background"
-      >
+      <ScrollArea className="flex-1 chat-background">
         <div className="space-y-2 max-w-3xl mx-auto pb-2 p-4 chat-message-container">
           {messages.length === 0 ? (
             <div className="text-center py-8">
-              <Bot className="h-12 w-12 mx-auto text-muted-foreground mb-4 opacity-50" />
-              <p className="text-muted-foreground text-sm bg-white/80 p-3 rounded-lg backdrop-blur-sm inline-block">
+              <Bot className="h-12 w-12 mx-auto text-gray-500 mb-4 opacity-50" />
+              <p className="text-gray-400 text-sm bg-[#1f2c34]/50 p-3 rounded-lg backdrop-blur-sm inline-block">
                 Inicia una conversación con el chatbot.
               </p>
             </div>
           ) : (
             messages.filter(msg => !(msg.metadata && msg.metadata.is_system_message === true)).map((msg) => {
-              const senderType = getSenderType(msg.origen, msg.metadata);
-              const isUser = senderType === "user";
-              const isBot = senderType === "bot";
-              const isAgent = senderType === "agent";
+              const isUser = msg.origen === 'usuario' || msg.origen === 'lead' || msg.origen === 'user';
+              const isBot = msg.origen === 'chatbot' || msg.origen === 'bot';
+              const isAgent = msg.origen === 'agente' || msg.origen === 'agent';
               
               return (
                 <div 
@@ -660,9 +653,9 @@ const ChatInterface = () => {
                     `}
                   >
                     <p className="whitespace-pre-wrap break-words text-sm font-normal">{msg.contenido}</p>
-                    <span className="text-[10px] text-opacity-70 float-right mt-1 ml-2 flex items-center gap-1">
+                    <span className="chat-timestamp">
                       {formatTime(msg.created_at)}
-                      {isUser && <Check className="h-3 w-3" />}
+                      {isUser && <Check className="ml-1 h-3 w-3" />}
                     </span>
                   </div>
                 </div>
@@ -673,38 +666,37 @@ const ChatInterface = () => {
         </div>
       </ScrollArea>
 
-      <div className="p-2 border-t bg-background">
-        <div className="flex items-center gap-1 chat-input relative rounded-full px-2" ref={inputContainerRef}>
-          <Button 
+      <div className="p-2 bg-[#0e1621] border-t border-[#1f2c34]">
+        <div className="whatsapp-input-container" ref={inputContainerRef}>
+          <button 
             onClick={() => setShowEmojiPicker(!showEmojiPicker)} 
-            variant="ghost" 
-            size="icon" 
-            className="h-9 w-9 text-muted-foreground hover:text-foreground"
+            className="whatsapp-button"
           >
-            <Smile className="h-5 w-5" />
-          </Button>
+            <Smile className="h-6 w-6" />
+          </button>
           
-          <Textarea
-            ref={textareaRef}
+          <input
+            ref={inputRef}
+            type="text"
             value={message}
-            onChange={handleTextareaChange}
+            onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder="Escribe un mensaje..."
-            className="min-h-[40px] max-h-[120px] resize-none border-none bg-transparent py-2 focus-visible:ring-0 focus-visible:ring-offset-0"
+            placeholder="Mensaje"
+            className="whatsapp-input"
             disabled={sending || isRecording || showUserForm}
           />
           
-          <Button 
+          <button 
             onClick={handleSendButtonClick}
-            className="h-9 w-9 rounded-full bg-primary hover:bg-primary/90 flex items-center justify-center"
+            className={`whatsapp-button ${message.trim() ? 'whatsapp-send-button' : ''}`}
             disabled={sending || showUserForm}
           >
             {message.trim() ? (
-              <Send className="h-4 w-4" />
+              <Send className="h-5 w-5" />
             ) : (
-              <Mic className={`h-4 w-4 ${isRecording ? 'animate-pulse' : ''}`} />
+              <Mic className={`h-6 w-6 ${isRecording ? 'animate-pulse' : ''}`} />
             )}
-          </Button>
+          </button>
         </div>
       </div>
       
