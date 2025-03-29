@@ -41,8 +41,8 @@
     
     /* Updated WhatsApp style chat bubble colors - with requested colors */
     --user-bubble: 214, 60%, 40%; /* #3b82f6 for lead messages */
-    --bot-bubble: 220, 19%, 19%; /* #1f2637 for bot messages - updated to new color */
-    --agent-bubble: 215, 32%, 7%; /* #08142e for agent messages - updated */
+    --bot-bubble: 215, 32%, 7%; /* #08142e for bot messages - updated */
+    --agent-bubble: 222, 28%, 17%; /* #1d283a for agent messages - updated */
   }
 
   .dark {
@@ -82,8 +82,8 @@
     
     /* WhatsApp style chat bubble colors for dark mode - updated with requested colors */
     --user-bubble: 214, 60%, 40%; /* #3b82f6 for lead messages */
-    --bot-bubble: 220, 19%, 19%; /* #1f2637 for bot messages - updated to new color */
-    --agent-bubble: 215, 32%, 7%; /* #08142e for agent messages - updated */
+    --bot-bubble: 215, 32%, 7%; /* #08142e for bot messages - updated */
+    --agent-bubble: 222, 28%, 17%; /* #1d283a for agent messages - updated */
   }
 }
 

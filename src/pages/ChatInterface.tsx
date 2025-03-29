@@ -1,374 +1,661 @@
-import React, { useState, useEffect, useRef } from "react";
+
+import { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
-import { Send, Smile } from "lucide-react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { ChatMessage, useChatMessages } from "@/hooks/useChatMessages";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
+import ReactMarkdown from 'react-markdown';
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Send, Bot, User, Mic, MicOff, Smile, ChevronLeft, MoreVertical, Check, Star, Phone, Users, Info, Shield, ExternalLink } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
-import ReactMarkdown from "react-markdown";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { toast } from "sonner";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Separator } from "@/components/ui/separator";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Drawer, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
+import { EmojiPicker } from "@/components/conversations/EmojiPicker";
+import { useChatMessages, ChatMessage } from "@/hooks/useChatMessages";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const ChatInterface = () => {
-  const { chatbotId } = useParams<{ chatbotId: string }>();
+  const { chatbotId } = useParams();
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
   const [message, setMessage] = useState("");
-  const [sessionId, setSessionId] = useState<string>("");
-  const [leadId, setLeadId] = useState<string | null>(null);
-  const [name, setName] = useState<string>("");
-  const [phone, setPhone] = useState<string>("");
-  const [showNamePhoneForm, setShowNamePhoneForm] = useState(true);
-  const [isLoadingResponse, setIsLoadingResponse] = useState(false);
+  const [sessionId, setSessionId] = useState("");
+  const [leadId, setLeadId] = useState("");
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [chatbotInfo, setChatbotInfo] = useState<any>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+  const [userName, setUserName] = useState("");
+  const [userPhone, setUserPhone] = useState("");
+  const [showUserForm, setShowUserForm] = useState(false);
+  const [userFormSubmitted, setUserFormSubmitted] = useState(false);
+  const [showRatingDrawer, setShowRatingDrawer] = useState(false);
+  const [userRating, setUserRating] = useState(0);
+  const [userFeedback, setUserFeedback] = useState("");
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  
+  const { messages, addMessage } = useChatMessages(conversationId);
+  const isMobile = useIsMobile();
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  
-  const { messages } = useChatMessages(conversationId);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputContainerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  // Initialize session ID
   useEffect(() => {
-    // Check if we have a session ID in localStorage
-    const storedSessionId = localStorage.getItem(`chat_session_${chatbotId}`);
-    if (storedSessionId) {
-      setSessionId(storedSessionId);
-      
-      // Check if this session already has a conversation
-      const checkExistingConversation = async () => {
-        const { data, error } = await supabase
-          .from("conversaciones")
-          .select("id, lead_id")
-          .eq("session_id", storedSessionId)
-          .eq("chatbot_id", chatbotId)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .single();
-          
-        if (data && !error) {
-          console.log("Found existing conversation:", data);
-          setConversationId(data.id);
-          setLeadId(data.lead_id);
-          setShowNamePhoneForm(false);
-        }
-      };
-      
-      checkExistingConversation();
-    } else {
-      // Generate a new session ID
-      const newSessionId = uuidv4();
-      localStorage.setItem(`chat_session_${chatbotId}`, newSessionId);
-      setSessionId(newSessionId);
+    let storedSessionId = localStorage.getItem(`chatbot_session_${chatbotId}`);
+    if (!storedSessionId) {
+      storedSessionId = uuidv4();
+      localStorage.setItem(`chatbot_session_${chatbotId}`, storedSessionId);
     }
+    setSessionId(storedSessionId);
+    
+    const storedLeadId = localStorage.getItem(`chatbot_lead_${chatbotId}`);
+    const storedName = localStorage.getItem(`chatbot_name_${chatbotId}`);
+    const storedPhone = localStorage.getItem(`chatbot_phone_${chatbotId}`);
+    const storedConversationId = localStorage.getItem(`chatbot_conversation_${chatbotId}`);
+    
+    if (storedLeadId) {
+      setLeadId(storedLeadId);
+      setUserFormSubmitted(true);
+    }
+    if (storedName) setUserName(storedName);
+    if (storedPhone) setUserPhone(storedPhone);
+    if (storedConversationId) setConversationId(storedConversationId);
+    
+    fetchChatbotInfo();
+    
+    if (!storedLeadId && !storedName && !storedPhone) {
+      setShowUserForm(true);
+    }
+    
+    return () => {
+      if (mediaRecorderRef.current && isRecording) {
+        mediaRecorderRef.current.stop();
+      }
+    };
   }, [chatbotId]);
 
-  // Scroll to bottom when messages change
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  const fetchChatbotInfo = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("chatbots")
+        .select("*")
+        .eq("id", chatbotId)
+        .single();
+        
+      if (error) throw error;
+      
+      setChatbotInfo(data);
+      setLoading(false);
+    } catch (error) {
+      console.error("Error fetching chatbot info:", error);
+      setLoading(false);
+    }
   };
 
-  // Process name and phone to create lead
-  const handleNamePhoneSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!name.trim() || !phone.trim()) {
-      toast.error("Por favor ingresa tu nombre y teléfono");
+  const submitUserForm = async () => {
+    if (!userName.trim() || !userPhone.trim()) {
+      toast.error("Por favor, ingresa tu nombre y número de teléfono");
       return;
     }
     
     try {
-      // Create lead with provided name and phone
-      const { data: lead, error: leadError } = await supabase
-        .from("leads")
-        .insert({
-          nombre: name,
-          telefono: phone,
-          empresa_id: chatbotId ? chatbotId.split("-")[0] : null,
-          canal_origen: "web",
-          datos_adicionales: {
-            page: window.location.pathname,
-            session_id: sessionId,
-            user_agent: navigator.userAgent
-          }
-        })
-        .select("id")
-        .single();
-        
-      if (leadError) throw leadError;
+      localStorage.setItem(`chatbot_name_${chatbotId}`, userName);
+      localStorage.setItem(`chatbot_phone_${chatbotId}`, userPhone);
       
-      console.log("Lead created:", lead);
-      setLeadId(lead.id);
-      setShowNamePhoneForm(false);
+      setUserFormSubmitted(true);
+      setShowUserForm(false);
       
-      // Send welcome message automatically
-      sendMessage("Hola, quiero más información");
+      await createLead();
       
+      const welcomeMessage = {
+        id: uuidv4(),
+        contenido: `Hola ${userName}, bienvenido/a a nuestro chat. ¿En qué podemos ayudarte hoy?`,
+        origen: "chatbot",
+        created_at: new Date().toISOString()
+      };
+      
+      addMessage(welcomeMessage);
     } catch (error) {
-      console.error("Error creating lead:", error);
-      toast.error("Error al crear el usuario. Inténtalo de nuevo.");
+      console.error("Error al iniciar chat:", error);
+      toast.error("Hubo un problema al iniciar el chat. Intente de nuevo.");
     }
   };
 
-  // Send message to chatbot
-  const sendMessage = async (messageContent: string = message) => {
-    if (!messageContent.trim() || !chatbotId) return;
+  const createLead = async () => {
+    try {
+      if (!chatbotInfo) {
+        throw new Error("No se pudo determinar la información del chatbot");
+      }
+      
+      const empresaId = chatbotInfo.empresa_id;
+      
+      const { data: leadData, error: leadError } = await supabase
+        .from("leads")
+        .insert({
+          empresa_id: empresaId,
+          nombre: userName,
+          telefono: userPhone,
+          canal_origen: "web",
+          datos_adicionales: {
+            session_id: sessionId,
+            user_agent: navigator.userAgent,
+            page: window.location.pathname
+          }
+        })
+        .select()
+        .single();
+      
+      if (leadError) throw leadError;
+      
+      console.log("Lead created:", leadData);
+      
+      if (leadData?.id) {
+        setLeadId(leadData.id);
+        localStorage.setItem(`chatbot_lead_${chatbotId}`, leadData.id);
+      }
+    } catch (error) {
+      console.error("Error creating lead:", error);
+      throw error;
+    }
+  };
+
+  const submitRating = async () => {
+    if (userRating === 0) {
+      toast.error("Por favor, seleccione una calificación");
+      return;
+    }
     
     try {
-      setIsLoadingResponse(true);
-      
-      // If we don't have a conversation yet, create one
-      if (!conversationId) {
-        if (!leadId) {
-          toast.error("Primero debes ingresar tu nombre y teléfono");
-          setIsLoadingResponse(false);
-          return;
-        }
-        
-        const { data: conversation, error: convError } = await supabase
-          .from("conversaciones")
-          .insert({
-            chatbot_id: chatbotId,
-            lead_id: leadId,
-            session_id: sessionId,
-            canal_id: null, // Web chat doesn't have a channel ID
-            estado: "activa"
-          })
-          .select("id")
-          .single();
-          
-        if (convError) throw convError;
-        
-        console.log("Conversation created:", conversation);
-        setConversationId(conversation.id);
+      toast.success("¡Gracias por tu opinión!");
+      setShowRatingDrawer(false);
+    } catch (error) {
+      console.error("Error submitting rating:", error);
+      toast.error("No se pudo enviar la calificación. Intente de nuevo.");
+    }
+  };
+
+  const sendMessage = async (customContent?: string) => {
+    const messageContent = customContent || message.trim();
+    if (!messageContent && !isRecording && audioChunksRef.current.length === 0) return;
+    
+    setSending(true);
+    
+    try {
+      const empresaId = chatbotInfo?.empresa_id;
+      if (!empresaId) {
+        throw new Error("No se pudo determinar la empresa del chatbot");
       }
       
-      // Generate a temporary ID for optimistic UI update
-      const tempId = uuidv4();
-      const timestamp = new Date().toISOString();
-      
-      // Add user message to UI immediately
-      const userMessage: ChatMessage = {
-        id: tempId,
+      const optimisticId = uuidv4();
+      const optimisticMsg: ChatMessage = {
+        id: optimisticId,
         contenido: messageContent,
-        origen: "user",
-        created_at: timestamp,
+        origen: "usuario",
+        created_at: new Date().toISOString()
       };
       
-      // Clear input field
-      setMessage("");
-      if (textareaRef.current) {
-        textareaRef.current.style.height = "auto";
+      addMessage(optimisticMsg);
+      
+      if (!customContent) {
+        setMessage("");
+        if (textareaRef.current) {
+          textareaRef.current.style.height = "auto";
+        }
       }
       
-      // Send message to API
-      const response = await fetch(`/api/v1/chat/${chatbotId}`, {
-        method: "POST",
+      const apiRequest = {
+        empresa_id: empresaId,
+        chatbot_id: chatbotId,
+        mensaje: messageContent,
+        session_id: sessionId,
+        lead_id: leadId || undefined,
+        metadata: {
+          browser: navigator.userAgent,
+          page: window.location.pathname,
+          name: userName || undefined,
+          phone: userPhone || undefined
+        }
+      };
+      
+      console.log("Sending message to API:", apiRequest);
+      
+      const apiEndpoint = import.meta.env.VITE_API_BASE_URL || 'https://web-production-01457.up.railway.app';
+      const response = await fetch(`${apiEndpoint}/api/v1/channels/web`, {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          message: messageContent,
-          conversation_id: conversationId,
-          lead_id: leadId,
-          session_id: sessionId
-        }),
+        body: JSON.stringify(apiRequest)
       });
       
       if (!response.ok) {
-        throw new Error("Error sending message");
+        throw new Error(`Error al enviar mensaje: ${response.statusText}`);
       }
       
       const data = await response.json();
-      console.log("Chat response:", data);
+      console.log("API response:", data);
       
-      setIsLoadingResponse(false);
+      // We don't add the user message here again since we already added it optimistically
+      
+      if (data.respuesta) {
+        addMessage({
+          id: uuidv4(),
+          contenido: data.respuesta,
+          origen: "chatbot",
+          created_at: new Date().toISOString(),
+          metadata: data.metadata
+        });
+      }
+      
+      if (data.conversacion_id && data.conversacion_id !== conversationId) {
+        setConversationId(data.conversacion_id);
+        localStorage.setItem(`chatbot_conversation_${chatbotId}`, data.conversacion_id);
+      }
+      
+      if (data.lead_id && data.lead_id !== leadId) {
+        setLeadId(data.lead_id);
+        localStorage.setItem(`chatbot_lead_${chatbotId}`, data.lead_id);
+      }
     } catch (error) {
-      console.error("Error in chat:", error);
-      setIsLoadingResponse(false);
-      toast.error("Error al enviar el mensaje. Inténtalo de nuevo.");
+      console.error("Error sending message:", error);
+      toast.error("No se pudo enviar el mensaje. Intente de nuevo.");
+    } finally {
+      setSending(false);
     }
   };
 
-  const renderMessageContent = (content: string) => {
-    return (
-      <ReactMarkdown className="message-content whitespace-pre-wrap break-words">
-        {content}
-      </ReactMarkdown>
-    );
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
     }
   };
 
-  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setMessage(e.target.value);
-    
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+  };
+
+  const handleEmojiSelect = (emoji: string) => {
+    setMessage(prev => prev + emoji);
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+    setShowEmojiPicker(false);
+  };
+
+  const toggleRecording = async () => {
+    try {
+      if (!isRecording) {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true
+        });
+        const mediaRecorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = mediaRecorder;
+        audioChunksRef.current = [];
+        mediaRecorder.ondataavailable = event => {
+          if (event.data.size > 0) {
+            audioChunksRef.current.push(event.data);
+          }
+        };
+        mediaRecorder.onstop = () => {
+          const audioBlob = new Blob(audioChunksRef.current, {
+            type: 'audio/webm'
+          });
+          const reader = new FileReader();
+          reader.readAsDataURL(audioBlob);
+          reader.onloadend = () => {
+            const base64Audio = reader.result?.toString().split(',')[1];
+            toast.info("Audio recording feature coming soon!");
+            setIsRecording(false);
+            audioChunksRef.current = [];
+          };
+          const tracks = stream.getTracks();
+          tracks.forEach(track => track.stop());
+        };
+        mediaRecorder.start();
+        setIsRecording(true);
+        toast.info("Grabando... Toca de nuevo para detener.");
+      } else {
+        if (mediaRecorderRef.current) {
+          mediaRecorderRef.current.stop();
+        }
+      }
+    } catch (error) {
+      console.error("Error accessing microphone:", error);
+      toast.error("No se pudo acceder al micrófono. Verifique los permisos.");
     }
   };
-  
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({
+      behavior: "smooth"
+    });
+  };
+
+  const getSenderType = (origen: string, metadata: any): "user" | "bot" | "agent" => {
+    if (origen === 'usuario' || origen === 'lead' || origen === 'user') return "user";
+    if (origen === 'chatbot' || origen === 'bot') return "bot";
+    if (origen === 'agente' || origen === 'agent') return "agent";
+    return origen === "agente" ? "agent" : origen === "chatbot" ? "bot" : "user";
+  };
+
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const getLastActiveTime = () => {
+    if (messages.length === 0) return "Ahora";
+    const lastMessage = messages[messages.length - 1];
+    return formatTime(lastMessage.created_at);
+  };
+
+  const renderStars = () => {
+    return Array.from({
+      length: 5
+    }).map((_, i) => <button key={i} className={`p-2 ${i < userRating ? 'text-yellow-400' : 'text-gray-300'}`} onClick={() => setUserRating(i + 1)}>
+      <Star className="h-8 w-8" fill={i < userRating ? "currentColor" : "none"} />
+    </button>);
+  };
+
+  const handleSendButtonClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    if (message.trim()) {
+      sendMessage();
+    } else {
+      toggleRecording();
+    }
+  };
+
+  if (loading) {
+    return <div className="flex items-center justify-center h-screen">
+        <p>Cargando chatbot...</p>
+      </div>;
+  }
+
+  if (!chatbotInfo) {
+    return <div className="flex items-center justify-center h-screen">
+        <p>Chatbot no encontrado.</p>
+      </div>;
+  }
+
   return (
-    <div className="flex flex-col h-screen bg-background">
-      <div className="flex-1 overflow-hidden flex flex-col">
-        <div className="p-4 bg-primary text-primary-foreground flex items-center">
-          <Avatar className="h-10 w-10 mr-3">
-            <AvatarFallback>AI</AvatarFallback>
-          </Avatar>
+    <div className="flex flex-col h-screen bg-[#0e1621] overflow-hidden" ref={containerRef}>
+      <header className="p-3 bg-[#020817] shadow-sm flex items-center justify-between fixed top-0 left-0 right-0 z-30 border-b border-[#3b82f6]">
+        <div className="flex items-center gap-3">
+          <div className="avatar-border">
+            <Avatar className="h-10 w-10 border-2 border-transparent text-green-500">
+              <AvatarImage src={chatbotInfo.avatar_url} />
+              <AvatarFallback>
+                <Bot className="h-6 w-6" />
+              </AvatarFallback>
+            </Avatar>
+          </div>
           <div>
-            <h3 className="font-medium">Asistente Virtual</h3>
-            <p className="text-xs opacity-80">Respuestas en tiempo real</p>
+            <h1 className="text-base font-medium text-white">{chatbotInfo.nombre}</h1>
+            <p className="text-xs text-gray-400">en línea</p>
           </div>
         </div>
         
-        <div className="flex-1 overflow-y-auto p-4 chat-background">
-          {showNamePhoneForm ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="bg-card p-6 rounded-lg shadow-lg w-full max-w-md">
-                <h3 className="text-xl font-semibold mb-4 text-center">Bienvenido al Chat</h3>
-                <p className="text-muted-foreground mb-6 text-center">
-                  Para comenzar, por favor ingresa tu nombre y teléfono.
-                </p>
-                
-                <form onSubmit={handleNamePhoneSubmit}>
-                  <div className="space-y-4">
-                    <div>
-                      <label htmlFor="name" className="block text-sm font-medium mb-1">
-                        Nombre
-                      </label>
-                      <input
-                        id="name"
-                        type="text"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        className="w-full p-2 border rounded-md bg-background"
-                        placeholder="Tu nombre"
-                        required
-                      />
-                    </div>
-                    
-                    <div>
-                      <label htmlFor="phone" className="block text-sm font-medium mb-1">
-                        Teléfono
-                      </label>
-                      <input
-                        id="phone"
-                        type="tel"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        className="w-full p-2 border rounded-md bg-background"
-                        placeholder="Tu número de teléfono"
-                        required
-                      />
-                    </div>
-                    
-                    <Button type="submit" className="w-full">
-                      Comenzar Chat
-                    </Button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {messages.length === 0 ? (
-                <div className="flex justify-center items-center h-64">
-                  <p className="text-muted-foreground">
-                    {isLoadingResponse ? "Cargando..." : "Envía un mensaje para comenzar"}
-                  </p>
-                </div>
-              ) : (
-                messages.map((msg) => {
-                  const isUser = msg.origen === "user" || msg.origen === "lead" || msg.origen === "usuario";
-                  const isChatbot = msg.origen === "chatbot" || msg.origen === "bot";
-                  const isAgent = msg.origen === "agente" || msg.origen === "agent";
-                  
-                  return (
-                    <div 
-                      key={msg.id} 
-                      className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}
-                    >
-                      <div 
-                        className={`
-                          px-4 py-3 rounded-lg max-w-[80%]
-                          ${isUser 
-                            ? 'user-bubble' 
-                            : isChatbot 
-                              ? 'bot-bubble' 
-                              : 'agent-bubble'
-                          }
-                        `}
-                      >
-                        {renderMessageContent(msg.contenido)}
-                        <div className="text-xs opacity-70 text-right mt-1">
-                          {new Date(msg.created_at).toLocaleTimeString([], { 
-                            hour: '2-digit', 
-                            minute: '2-digit' 
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-              
-              {isLoadingResponse && (
-                <div className="flex justify-start">
-                  <div className="bot-bubble px-4 py-3 rounded-lg">
-                    <div className="flex space-x-2">
-                      <div className="h-2 w-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                      <div className="h-2 w-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                      <div className="h-2 w-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '600ms' }}></div>
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              <div ref={messagesEndRef} />
-            </div>
-          )}
-        </div>
-        
-        {!showNamePhoneForm && (
-          <div className="p-4 border-t bg-card/50">
-            <div className="flex items-end gap-2">
-              <div className="relative flex-1">
-                <textarea
-                  ref={textareaRef}
-                  value={message}
-                  onChange={handleTextareaChange}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Escribe un mensaje..."
-                  className="w-full p-3 pr-12 rounded-md resize-none min-h-[60px] max-h-[150px] bg-background"
-                  disabled={isLoadingResponse}
-                />
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="absolute right-2 bottom-2 h-8 w-8 text-muted-foreground"
-                  disabled={isLoadingResponse}
-                >
-                  <Smile className="h-5 w-5" />
-                </Button>
-              </div>
-              <Button
-                size="icon"
-                className="h-10 w-10 rounded-full"
-                onClick={() => sendMessage()}
-                disabled={!message.trim() || isLoadingResponse}
-              >
-                <Send className="h-5 w-5" />
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-9 w-9 text-gray-400">
+              <MoreVertical className="h-5 w-5" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-56 bg-[#1f2c34] border-0 text-white" align="end">
+            <div className="space-y-1">
+              <Button variant="ghost" className="w-full justify-start text-gray-200 hover:bg-[#2a3942]" size="sm" onClick={() => setShowProfile(true)}>
+                <User className="mr-2 h-4 w-4" />
+                <span>Mi perfil</span>
+              </Button>
+              <Button variant="ghost" className="w-full justify-start text-gray-200 hover:bg-[#2a3942]" size="sm" onClick={() => setShowRatingDrawer(true)}>
+                <Star className="mr-2 h-4 w-4" />
+                <span>Calificar chatbot</span>
+              </Button>
+              <Separator className="my-2 bg-gray-700" />
+              <Button variant="ghost" className="w-full justify-start text-xs text-gray-400 hover:bg-[#2a3942]" size="sm" asChild>
+                <a href="#" target="_blank" rel="noopener noreferrer">
+                  <Shield className="mr-2 h-4 w-4" />
+                  <span>Políticas de privacidad</span>
+                </a>
+              </Button>
+              <Button variant="ghost" className="w-full justify-start text-xs text-gray-400 hover:bg-[#2a3942]" size="sm" asChild>
+                <a href="#" target="_blank" rel="noopener noreferrer">
+                  <Info className="mr-2 h-4 w-4" />
+                  <span>Términos de uso</span>
+                </a>
               </Button>
             </div>
-          </div>
-        )}
+          </PopoverContent>
+        </Popover>
+      </header>
+
+      <div 
+        className="flex-1 chat-background overflow-y-auto pt-16 pb-16" 
+        style={{ height: 'calc(100vh - 122px)' }}
+        ref={scrollAreaRef}
+      >
+        <div className="space-y-2 max-w-3xl mx-auto pb-2 p-4 chat-message-container">
+          {messages.length === 0 ? (
+            <div className="text-center py-8">
+              <Bot className="h-12 w-12 mx-auto text-gray-500 mb-4 opacity-50" />
+              <p className="text-gray-400 text-sm bg-[#1f2c34]/50 p-3 rounded-lg backdrop-blur-sm inline-block">
+                Inicia una conversación con el chatbot.
+              </p>
+            </div>
+          ) : (
+            messages
+              .filter(msg => !(msg.metadata && msg.metadata.is_system_message === true))
+              .map(msg => {
+                const senderType = getSenderType(msg.origen, msg.metadata);
+                const isUser = senderType === "user";
+                const isBot = senderType === "bot";
+                const isAgent = senderType === "agent";
+                
+                return (
+                  <div key={msg.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-3`}>
+                    <div className={`
+                      relative px-3 py-2 shadow-sm
+                      ${isUser ? 'user-bubble' : isBot ? 'bot-bubble' : 'agent-bubble'}
+                    `}>
+                      <ReactMarkdown className="whitespace-pre-wrap break-words text-sm font-normal">
+                        {msg.contenido}
+                      </ReactMarkdown>
+                      <span className="chat-timestamp">
+                        {formatTime(msg.created_at)}
+                        {isUser && <Check className="ml-1 h-3 w-3" />}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })
+          )}
+          <div ref={messagesEndRef} />
+        </div>
       </div>
+
+      <div className="p-2 bg-[#020817] border-t border-[#3b82f6] fixed bottom-0 left-0 right-0 z-30">
+        <div className="whatsapp-input-container" ref={inputContainerRef}>
+          <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="whatsapp-button">
+            <Smile className="h-6 w-6" />
+          </button>
+          
+          <input 
+            ref={inputRef} 
+            type="text" 
+            value={message} 
+            onChange={handleInputChange} 
+            onKeyDown={handleKeyDown} 
+            placeholder="Mensaje" 
+            className="whatsapp-input" 
+            disabled={sending || isRecording || showUserForm} 
+          />
+          
+          <button 
+            onClick={handleSendButtonClick} 
+            className={`whatsapp-button ${message.trim() ? 'whatsapp-send-button' : ''}`} 
+            disabled={sending || showUserForm}
+          >
+            {message.trim() ? <Send className="h-5 w-5" /> : <Mic className={`h-6 w-6 ${isRecording ? 'animate-pulse' : ''}`} />}
+          </button>
+        </div>
+      </div>
+      
+      {showEmojiPicker && (
+        <div className="absolute bottom-16 left-2 z-50">
+          <EmojiPicker onEmojiSelect={handleEmojiSelect} />
+        </div>
+      )}
+
+      {/* User Form Modal */}
+      {showUserForm && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card rounded-lg shadow-lg max-w-md w-full p-6 space-y-4 relative">
+            <div className="text-center mb-4">
+              <Avatar className="h-16 w-16 mx-auto mb-2 avatar-border">
+                <AvatarImage src={chatbotInfo.avatar_url} />
+                <AvatarFallback>
+                  <Bot className="h-8 w-8" />
+                </AvatarFallback>
+              </Avatar>
+              <h2 className="text-xl font-semibold">{chatbotInfo.nombre}</h2>
+              <p className="text-muted-foreground text-sm mt-1">
+                Para iniciar la conversación, por favor comparte tus datos:
+              </p>
+            </div>
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <label htmlFor="userName" className="text-sm font-medium">
+                  Nombre completo
+                </label>
+                <input id="userName" type="text" value={userName} onChange={e => setUserName(e.target.value)} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" placeholder="Ingresa tu nombre" />
+              </div>
+              <div className="space-y-1">
+                <label htmlFor="userPhone" className="text-sm font-medium">
+                  Número de teléfono
+                </label>
+                <input id="userPhone" type="tel" value={userPhone} onChange={e => setUserPhone(e.target.value)} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" placeholder="Ingresa tu número de teléfono" />
+              </div>
+            </div>
+            <Button className="w-full mt-4" onClick={submitUserForm} disabled={!userName.trim() || !userPhone.trim()}>
+              Iniciar chat
+            </Button>
+            <p className="text-xs text-center text-muted-foreground mt-4">
+              Al continuar, aceptas nuestras políticas de privacidad y términos de uso.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Profile Sheet */}
+      <Sheet open={showProfile} onOpenChange={setShowProfile}>
+        <SheetContent side="right" className="sm:max-w-md">
+          <SheetHeader className="mb-4">
+            <SheetTitle>Mi Perfil</SheetTitle>
+          </SheetHeader>
+          <div className="flex flex-col items-center py-6">
+            <Avatar className="h-24 w-24 mb-4 avatar-border">
+              <AvatarFallback className="text-2xl">
+                {userName ? userName.charAt(0).toUpperCase() : "U"}
+              </AvatarFallback>
+            </Avatar>
+            <h3 className="text-xl font-semibold">{userName || "Usuario"}</h3>
+            <div className="flex items-center text-muted-foreground mt-1">
+              <Phone className="h-4 w-4 mr-2" />
+              <span>{userPhone || "No disponible"}</span>
+            </div>
+          </div>
+          <Separator className="my-4" />
+          <div className="space-y-4">
+            <div>
+              <h4 className="text-sm font-medium mb-2">Datos de contacto</h4>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Nombre:</span>
+                  <span>{userName || "No disponible"}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Teléfono:</span>
+                  <span>{userPhone || "No disponible"}</span>
+                </div>
+              </div>
+            </div>
+            <Separator />
+            <div>
+              <h4 className="text-sm font-medium mb-2">Acciones</h4>
+              <div className="space-y-2">
+                <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => setShowRatingDrawer(true)}>
+                  <Star className="mr-2 h-4 w-4" />
+                  <span>Calificar chatbot</span>
+                </Button>
+              </div>
+            </div>
+            <Separator />
+            <div>
+              <h4 className="text-sm font-medium mb-2">Legal</h4>
+              <div className="space-y-2">
+                <Button variant="link" size="sm" className="w-full justify-start p-0 h-auto" asChild>
+                  <a href="#" target="_blank" rel="noopener noreferrer">
+                    <Shield className="mr-2 h-4 w-4" />
+                    <span>Políticas de privacidad</span>
+                    <ExternalLink className="ml-auto h-3 w-3" />
+                  </a>
+                </Button>
+                <Button variant="link" size="sm" className="w-full justify-start p-0 h-auto" asChild>
+                  <a href="#" target="_blank" rel="noopener noreferrer">
+                    <Info className="mr-2 h-4 w-4" />
+                    <span>Términos de uso</span>
+                    <ExternalLink className="ml-auto h-3 w-3" />
+                  </a>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Rating Drawer */}
+      <Drawer open={showRatingDrawer} onOpenChange={setShowRatingDrawer}>
+        <DrawerContent className="max-w-md mx-auto">
+          <DrawerHeader>
+            <DrawerTitle className="text-center">Calificar chatbot</DrawerTitle>
+            <DrawerDescription className="text-center">
+              ¿Cómo calificarías tu experiencia con {chatbotInfo.nombre}?
+            </DrawerDescription>
+          </DrawerHeader>
+          <div className="flex justify-center p-4">
+            <div className="flex items-center">
+              {renderStars()}
+            </div>
+          </div>
+          <div className="p-4 pt-0">
+            <Textarea placeholder="Comentarios (opcional)" value={userFeedback} onChange={e => setUserFeedback(e.target.value)} className="min-h-[80px]" />
+          </div>
+          <DrawerFooter>
+            <Button onClick={submitRating} disabled={userRating === 0}>
+              Enviar calificación
+            </Button>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
     </div>
   );
 };
