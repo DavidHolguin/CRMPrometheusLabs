@@ -80,8 +80,8 @@ export function CreateChatbotModal({ open, onOpenChange, onSuccess }: CreateChat
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col bg-background dark:border-slate-700">
+        <DialogHeader className="dark:border-b dark:border-slate-700 pb-4">
           <DialogTitle className="text-xl">Crear Chatbot</DialogTitle>
         </DialogHeader>
         
