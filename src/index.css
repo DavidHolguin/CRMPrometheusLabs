@@ -40,9 +40,9 @@
     --sidebar-ring: 217.2 91.2% 59.8%;
     
     /* WhatsApp style chat bubble colors - updated with requested colors */
-    --user-bubble: 214, 100%, 41%; /* #3570d1 for user/lead messages */
-    --bot-bubble: 220, 74%, 11%; /* #08142e for bot messages */
-    --agent-bubble: 217, 33%, 17%; /* #1e293b for agent messages */
+    --user-bubble: 214, 60%, 40%; /* Más sobrio azul para lead messages */
+    --bot-bubble: 215, 32%, 7%; /* #0b141a para bot messages */
+    --agent-bubble: 217, 33%, 17%; /* #1e293b para agent messages */
   }
 
   .dark {
@@ -81,9 +81,9 @@
     --sidebar-ring: 224.3 76.3% 48%;
     
     /* WhatsApp style chat bubble colors for dark mode - updated with requested colors */
-    --user-bubble: 214, 100%, 41%; /* #3570d1 for user/lead messages */
-    --bot-bubble: 220, 74%, 11%; /* #08142e for bot messages */
-    --agent-bubble: 217, 33%, 17%; /* #1e293b for agent messages */
+    --user-bubble: 214, 60%, 40%; /* Más sobrio azul para lead messages */
+    --bot-bubble: 215, 32%, 7%; /* #0b141a para bot messages */
+    --agent-bubble: 217, 33%, 17%; /* #1e293b para agent messages */
   }
 }
 
@@ -131,7 +131,7 @@ html, body, #root {
   background-repeat: repeat;
   background-size: 210px;
   position: relative;
-  background-color: #0e1621; /* Dark background color like WhatsApp */
+  background-color: #0b141a; /* Actualizado a #0b141a como solicitado */
 }
 
 .chat-background::before {
@@ -141,7 +141,7 @@ html, body, #root {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(14, 22, 33, 0.8); /* Slightly more visible background pattern */
+  background-color: rgba(11, 20, 26, 0.8); /* Actualizado a #0b141a con transparencia */
   z-index: 0;
 }
 
@@ -186,17 +186,14 @@ html, body, #root {
   word-wrap: break-word;
 }
 
-/* WhatsApp style agent message bubble (left side) */
-
 /* Improved timestamp that doesn't interfere with message content */
 .chat-timestamp {
   font-size: 11px;
   opacity: 0.7;
-  display: inline-block;
-  float: right;
+  display: flex;
+  align-items: center;
+  gap: 2px;
   margin-left: 4px;
-  margin-top: 2px;
-  line-height: 1;
   white-space: nowrap;
 }
 

@@ -386,7 +386,7 @@ const ConversationsPage = () => {
               </Button>
             </div>
 
-            <ScrollArea className="flex-1 p-4 overflow-y-auto">
+            <ScrollArea className="flex-1 p-4 overflow-y-auto chat-background">
               {messagesLoading ? (
                 <div className="h-full flex items-center justify-center">
                   <p className="text-muted-foreground animate-pulse">Cargando mensajes...</p>
@@ -399,7 +399,7 @@ const ConversationsPage = () => {
                   </div>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-4 chat-message-container">
                   {messages.map((msg) => {
                     const senderType = getSenderType(msg.origen, msg.metadata);
                     const isLead = senderType === "user";
@@ -414,18 +414,17 @@ const ConversationsPage = () => {
                     return (
                       <div 
                         key={msg.id} 
-                        className={`flex ${isLead ? 'justify-start' : 'justify-end'}`}
+                        className={`flex ${isLead ? 'justify-end' : 'justify-start'}`}
                       >
                         <div 
                           className={`
                             px-4 py-3 rounded-lg
                             ${isLead 
-                              ? 'bg-muted text-foreground' 
+                              ? 'user-bubble' 
                               : isChatbot 
-                                ? 'bg-primary/10 text-foreground' 
-                                : 'bg-primary text-primary-foreground'
+                                ? 'bot-bubble' 
+                                : 'agent-bubble'
                             }
-                            ${isLead ? 'bot-bubble' : (isChatbot ? 'bot-bubble' : 'user-bubble')}
                           `}
                         >
                           <div className="text-xs mb-1 font-medium flex items-center">
@@ -451,9 +450,14 @@ const ConversationsPage = () => {
                             <div className="message-content whitespace-pre-wrap break-words">
                               {msg.contenido}
                             </div>
-                            <div className="chat-timestamp flex items-center gap-1">
+                            <div className="chat-timestamp">
                               {messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              {!isLead && <CheckCheck className="h-3 w-3" />}
+                              {isLead && (
+                                <>
+                                  <CheckCheck className="h-3 w-3" />
+                                  <CheckCheck className="h-3 w-3" />
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>
