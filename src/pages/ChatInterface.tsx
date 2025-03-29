@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -248,12 +249,7 @@ const ChatInterface = () => {
       const data = await response.json();
       console.log("API response:", data);
       
-      addMessage({
-        id: data.mensaje_id,
-        contenido: messageContent,
-        origen: "usuario",
-        created_at: new Date().toISOString()
-      });
+      // We don't add the user message here again since we already added it optimistically
       
       if (data.respuesta) {
         addMessage({
@@ -529,6 +525,7 @@ const ChatInterface = () => {
         </div>
       )}
 
+      {/* User Form Modal */}
       {showUserForm && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-card rounded-lg shadow-lg max-w-md w-full p-6 space-y-4 relative">
@@ -568,6 +565,7 @@ const ChatInterface = () => {
         </div>
       )}
 
+      {/* Profile Sheet */}
       <Sheet open={showProfile} onOpenChange={setShowProfile}>
         <SheetContent side="right" className="sm:max-w-md">
           <SheetHeader className="mb-4">
@@ -634,6 +632,7 @@ const ChatInterface = () => {
         </SheetContent>
       </Sheet>
 
+      {/* Rating Drawer */}
       <Drawer open={showRatingDrawer} onOpenChange={setShowRatingDrawer}>
         <DrawerContent className="max-w-md mx-auto">
           <DrawerHeader>

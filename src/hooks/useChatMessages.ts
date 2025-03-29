@@ -38,7 +38,7 @@ export function useChatMessages(conversationId: string | null) {
     fetchMessages();
   }, [conversationId]);
 
-  // Set up real-time listener for agent messages only
+  // Set up real-time listener for agent messages only using the new table
   useEffect(() => {
     if (!conversationId) return;
     
@@ -51,7 +51,7 @@ export function useChatMessages(conversationId: string | null) {
     
     // Create a unique channel name with timestamp to avoid conflicts
     const timestamp = Date.now();
-    const channelName = `realtime-messages-${conversationId}-${timestamp}`;
+    const channelName = `realtime-agent-messages-${conversationId}-${timestamp}`;
     console.log(`Setting up realtime subscription on channel: ${channelName}`);
     
     const channel = supabase

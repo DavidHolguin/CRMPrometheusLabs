@@ -979,6 +979,44 @@ export type Database = {
           },
         ]
       }
+      mensajes_agentes: {
+        Row: {
+          contenido: string
+          conversacion_id: string | null
+          created_at: string | null
+          id: string
+          metadata: Json | null
+          origen: string | null
+          remitente_id: string | null
+        }
+        Insert: {
+          contenido: string
+          conversacion_id?: string | null
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          origen?: string | null
+          remitente_id?: string | null
+        }
+        Update: {
+          contenido?: string
+          conversacion_id?: string | null
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          origen?: string | null
+          remitente_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mensajes_agentes_conversacion_id_fkey"
+            columns: ["conversacion_id"]
+            isOneToOne: false
+            referencedRelation: "conversaciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pipeline_stages: {
         Row: {
           color: string | null

@@ -39,10 +39,10 @@
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
     
-    /* WhatsApp style chat bubble colors - updated with requested colors */
-    --user-bubble: 214, 60%, 40%; /* Más sobrio azul para lead messages */
-    --bot-bubble: 215, 32%, 7%; /* #0b141a para bot messages */
-    --agent-bubble: 217, 33%, 17%; /* #1e293b para agent messages */
+    /* Updated WhatsApp style chat bubble colors - with requested colors */
+    --user-bubble: 214, 60%, 40%; /* #3b82f6 for lead messages */
+    --bot-bubble: 215, 32%, 7%; /* #08142e for bot messages - updated */
+    --agent-bubble: 222, 28%, 17%; /* #1d283a for agent messages - updated */
   }
 
   .dark {
@@ -81,9 +81,9 @@
     --sidebar-ring: 224.3 76.3% 48%;
     
     /* WhatsApp style chat bubble colors for dark mode - updated with requested colors */
-    --user-bubble: 214, 60%, 40%; /* Más sobrio azul para lead messages */
-    --bot-bubble: 215, 32%, 7%; /* #0b141a para bot messages */
-    --agent-bubble: 217, 33%, 17%; /* #1e293b para agent messages */
+    --user-bubble: 214, 60%, 40%; /* #3b82f6 for lead messages */
+    --bot-bubble: 215, 32%, 7%; /* #08142e for bot messages - updated */
+    --agent-bubble: 222, 28%, 17%; /* #1d283a for agent messages - updated */
   }
 }
 
@@ -130,10 +130,10 @@ html, body, #root {
   background-color: #020817;
   background-image: url("https://static.whatsapp.net/rsrc.php/v4/yl/r/gi_DckOUM5a.png");
   background-attachment: fixed;
-  background-size: 120%; /* Reduced size of pattern to make it smaller (was 150%) */
+  background-size: 120%; /* Reduced size of pattern to make it smaller */
   position: relative;
   background-blend-mode: overlay;
-  background-color: rgba(2, 8, 23, 0.95); /* Updated opacity to 0.95 (was 0.75) */
+  background-color: rgba(2, 8, 23, 0.95); /* Updated opacity to 0.95 */
 }
 
 /* Conversation background - for agent conversations interface, solid dark color */
