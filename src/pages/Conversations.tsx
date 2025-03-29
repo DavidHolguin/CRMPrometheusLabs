@@ -11,7 +11,11 @@ import {
   Smile, 
   CheckCheck, 
   Bot, 
-  BotOff 
+  BotOff,
+  User,
+  Calendar,
+  Hash,
+  Mail
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +23,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
 import { useConversations } from "@/hooks/useConversations";
 import { useMessages } from "@/hooks/useMessages";
 import { EmojiPicker } from "@/components/conversations/EmojiPicker";
@@ -161,10 +167,10 @@ const ConversationsPage = () => {
   }
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] overflow-hidden">
+    <div className="flex h-[calc(100vh-4rem)] overflow-hidden bg-background">
       {/* Conversations Sidebar */}
       <div className="w-80 border-r flex flex-col">
-        <div className="p-4 border-b">
+        <div className="p-4 border-b bg-card/50">
           <h2 className="font-semibold text-lg mb-4">Conversaciones</h2>
           
           <div className="flex gap-2 mb-4">
@@ -202,38 +208,65 @@ const ConversationsPage = () => {
               {sortedConversations.map((conversation) => {
                 const leadName = `${conversation.lead?.nombre || ''} ${conversation.lead?.apellido || ''}`.trim();
                 const hasUnread = conversation.unread_count > 0;
+                const messageCount = messages.length;
+                const channelIdentifier = conversation.canal_identificador || "N/A";
                 
                 return (
                   <div 
                     key={conversation.id}
                     className={`
-                      flex items-center p-3 cursor-pointer hover:bg-muted transition-colors
+                      p-3 cursor-pointer hover:bg-muted transition-colors
                       ${conversationId === conversation.id ? 'bg-muted' : ''}
-                      ${hasUnread ? 'font-medium' : ''}
+                      ${hasUnread ? 'border-l-4 border-primary' : ''}
                     `}
                     onClick={() => navigate(`/dashboard/conversations/${conversation.id}`)}
                   >
-                    <div className="relative">
-                      <Avatar className="h-10 w-10">
-                        <AvatarFallback>{getInitials(leadName || 'Usuario')}</AvatarFallback>
+                    <div className="flex items-start space-x-3">
+                      <Avatar className="h-10 w-10 flex-shrink-0">
+                        <AvatarFallback className="bg-primary/10 text-primary">
+                          {getInitials(leadName || 'Usuario')}
+                        </AvatarFallback>
                       </Avatar>
-                      {hasUnread && (
-                        <span className="absolute -top-1 -right-1 bg-primary text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
-                          {conversation.unread_count}
-                        </span>
-                      )}
-                    </div>
-                    
-                    <div className="ml-3 flex-1 overflow-hidden">
-                      <div className="flex justify-between items-baseline">
-                        <p className="truncate">{leadName || 'Usuario'}</p>
-                        <span className="text-xs text-muted-foreground whitespace-nowrap ml-2">
-                          {conversation.ultimo_mensaje ? formatDate(conversation.ultimo_mensaje) : ''}
-                        </span>
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between">
+                          <h3 className="font-medium text-sm truncate">
+                            {leadName || 'Usuario'}
+                            {hasUnread && (
+                              <Badge variant="default" className="ml-2 text-xs">
+                                {conversation.unread_count}
+                              </Badge>
+                            )}
+                          </h3>
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">
+                            {conversation.ultimo_mensaje ? formatDate(conversation.ultimo_mensaje) : ''}
+                          </span>
+                        </div>
+                        
+                        <div className="mt-1 flex flex-wrap gap-2">
+                          <div className="flex items-center text-xs text-muted-foreground">
+                            <Hash className="h-3 w-3 mr-1" />
+                            <span className="truncate max-w-[90px]">{channelIdentifier}</span>
+                          </div>
+                          
+                          <div className="flex items-center text-xs text-muted-foreground">
+                            <MessageSquare className="h-3 w-3 mr-1" />
+                            <span>{messages.length || 0}</span>
+                          </div>
+                          
+                          {conversation.lead?.score !== undefined && (
+                            <div className="flex items-center text-xs">
+                              <Badge 
+                                variant={conversation.lead.score > 70 ? "default" : 
+                                       (conversation.lead.score > 40 ? "secondary" : "outline")}
+                                className="px-1.5 py-0 h-4"
+                              >
+                                {conversation.lead.score || 0}
+                              </Badge>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <p className="text-sm text-muted-foreground truncate">
-                        {conversation.last_message?.contenido || 'No hay mensajes'}
-                      </p>
                     </div>
                   </div>
                 );
@@ -244,14 +277,14 @@ const ConversationsPage = () => {
       </div>
 
       {/* Conversation Area */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col h-full overflow-hidden">
         {conversationId ? (
           <>
-            {/* Conversation Header */}
-            <div className="p-4 border-b flex items-center justify-between">
+            {/* Conversation Header - Fixed */}
+            <div className="p-4 border-b bg-card/50 shadow-sm flex items-center justify-between sticky top-0 z-10">
               <div className="flex items-center">
                 <Avatar className="h-10 w-10 mr-3">
-                  <AvatarFallback>
+                  <AvatarFallback className="bg-primary/10 text-primary">
                     {selectedConversation?.lead?.nombre 
                       ? getInitials(`${selectedConversation.lead.nombre} ${selectedConversation.lead.apellido || ''}`)
                       : 'U'}
@@ -263,11 +296,20 @@ const ConversationsPage = () => {
                       ? `${selectedConversation.lead.nombre} ${selectedConversation.lead.apellido || ''}`
                       : 'Usuario'}
                   </h3>
-                  <p className="text-xs text-muted-foreground">
-                    {selectedConversation?.ultimo_mensaje 
-                      ? `Último mensaje: ${formatDate(selectedConversation.ultimo_mensaje)}`
-                      : 'Sin mensajes'}
-                  </p>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    {selectedConversation?.lead?.email && (
+                      <div className="flex items-center">
+                        <Mail className="h-3 w-3 mr-1" />
+                        <span>{selectedConversation.lead.email}</span>
+                      </div>
+                    )}
+                    {selectedConversation?.ultimo_mensaje && (
+                      <div className="flex items-center">
+                        <Calendar className="h-3 w-3 mr-1" />
+                        <span>{formatDate(selectedConversation.ultimo_mensaje)}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
               
@@ -292,8 +334,8 @@ const ConversationsPage = () => {
               </Button>
             </div>
 
-            {/* Messages Area */}
-            <ScrollArea className="flex-1 p-4">
+            {/* Messages Area - Scrollable */}
+            <ScrollArea className="flex-1 p-4 overflow-y-auto">
               {messagesLoading ? (
                 <div className="h-full flex items-center justify-center">
                   <p className="text-muted-foreground animate-pulse">Cargando mensajes...</p>
@@ -320,22 +362,32 @@ const ConversationsPage = () => {
                       >
                         <div 
                           className={`
-                            max-w-[80%] px-4 py-2 rounded-lg
+                            max-w-[80%] px-4 py-3 rounded-lg
                             ${isLead 
                               ? 'bg-muted text-foreground' 
                               : isChatbot 
-                                ? 'bg-primary/20 text-foreground' 
+                                ? 'bg-primary/10 text-foreground' 
                                 : 'bg-primary text-primary-foreground'
                             }
                           `}
                         >
-                          <div className="text-xs mb-1 font-medium">
-                            {isLead 
-                              ? selectedConversation?.lead?.nombre || 'Usuario'
-                              : isChatbot 
-                                ? 'Chatbot' 
-                                : 'Tú'
-                            }
+                          <div className="text-xs mb-1 font-medium flex items-center">
+                            {isLead ? (
+                              <>
+                                <User className="h-3 w-3 mr-1" />
+                                <span>{selectedConversation?.lead?.nombre || 'Usuario'}</span>
+                              </>
+                            ) : isChatbot ? (
+                              <>
+                                <Bot className="h-3 w-3 mr-1" />
+                                <span>Chatbot</span>
+                              </>
+                            ) : (
+                              <>
+                                <User className="h-3 w-3 mr-1" />
+                                <span>Tú</span>
+                              </>
+                            )}
                           </div>
                           <p className="whitespace-pre-wrap break-words">{msg.contenido}</p>
                           <div className="text-xs mt-1 opacity-70 flex justify-end items-center gap-1">
@@ -351,8 +403,8 @@ const ConversationsPage = () => {
               )}
             </ScrollArea>
 
-            {/* Message Input */}
-            <div className="p-4 border-t">
+            {/* Message Input - Fixed at bottom */}
+            <div className="p-4 border-t bg-card/50 shadow-md mt-auto sticky bottom-0">
               <div className="relative">
                 <div className="flex">
                   <div className="relative flex-1">
@@ -395,7 +447,7 @@ const ConversationsPage = () => {
           </>
         ) : (
           // No conversation selected state
-          <div className="h-full flex items-center justify-center">
+          <div className="h-full flex items-center justify-center bg-card/5">
             <div className="text-center max-w-md mx-auto p-8">
               <MessageSquare className="h-16 w-16 text-muted-foreground mx-auto mb-6 opacity-20" />
               <h3 className="text-xl font-medium mb-2">Mensajes</h3>
