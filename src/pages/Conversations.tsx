@@ -29,6 +29,8 @@ import { useMessages } from "@/hooks/useMessages";
 import { EmojiPicker } from "@/components/conversations/EmojiPicker";
 import { toast } from "sonner";
 import { useChat } from "@/hooks/useChat";
+import { useCanales } from "@/hooks/useCanales";
+import { CanalIcon } from "@/components/canales/CanalIcon";
 
 const ConversationsPage = () => {
   const { user } = useAuth();
@@ -40,6 +42,10 @@ const ConversationsPage = () => {
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const navigate = useNavigate();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Get available channels
+  const { useCanalesQuery } = useCanales();
+  const { data: canales = [] } = useCanalesQuery();
 
   // Get conversations
   const { 
@@ -142,6 +148,20 @@ const ConversationsPage = () => {
     return new Date(b.ultimo_mensaje || 0).getTime() - new Date(a.ultimo_mensaje || 0).getTime();
   });
 
+  // Get channel name by id
+  const getChannelName = (canalId: string | null) => {
+    if (!canalId) return "N/A";
+    const canal = canales.find(c => c.id === canalId);
+    return canal ? canal.nombre : "N/A";
+  };
+
+  // Get channel type by id
+  const getChannelType = (canalId: string | null) => {
+    if (!canalId) return "default";
+    const canal = canales.find(c => c.id === canalId);
+    return canal ? canal.tipo.toLowerCase() : "default";
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const today = new Date();
@@ -208,8 +228,8 @@ const ConversationsPage = () => {
                 const leadName = `${conversation.lead?.nombre || ''} ${conversation.lead?.apellido || ''}`.trim();
                 const hasUnread = conversation.unread_count > 0;
                 const messageCount = messages.length;
-                // Here we're using canal_identificador instead of canal_id
-                const channelIdentifier = conversation.canal_identificador || "N/A";
+                const canalName = getChannelName(conversation.canal_id);
+                const canalType = getChannelType(conversation.canal_id);
                 
                 return (
                   <div 
@@ -245,8 +265,8 @@ const ConversationsPage = () => {
                         
                         <div className="mt-1 flex flex-wrap gap-2">
                           <div className="flex items-center text-xs text-muted-foreground">
-                            <Hash className="h-3 w-3 mr-1" />
-                            <span className="truncate max-w-[90px]">{channelIdentifier}</span>
+                            <CanalIcon tipo={canalType} size={12} className="mr-1" />
+                            <span className="truncate max-w-[90px]">{canalName}</span>
                           </div>
                           
                           <div className="flex items-center text-xs text-muted-foreground">
