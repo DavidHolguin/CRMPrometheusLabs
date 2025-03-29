@@ -2,7 +2,6 @@
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-import { Json } from "@/integrations/supabase/types";
 
 export interface Chatbot {
   id: string;
@@ -87,7 +86,7 @@ export function useChatbots() {
       
       console.log("Chatbots obtenidos:", data?.length || 0);
       
-      // Procesar y transformar los datos si es necesario
+      // Procesar y transformar los datos
       const processedData = data?.map(chatbot => {
         // Transformar el contexto si existe
         const contextoItems = chatbot.contexto || [];
