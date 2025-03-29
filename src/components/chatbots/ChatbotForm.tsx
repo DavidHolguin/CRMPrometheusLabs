@@ -1,4 +1,3 @@
-
 import { useState, useRef } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -24,6 +23,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { Bot, MessageSquare, Settings, Trash2, Upload, User, PlusCircle, X } from "lucide-react";
 import { Chatbot } from "@/hooks/useChatbots";
+import { Label } from "@/components/ui/label";
 
 const formSchema = z.object({
   nombre: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
@@ -61,7 +61,6 @@ export function ChatbotForm({ chatbot, onSubmit, isSubmitting }: ChatbotFormProp
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
 
-  // Prepare default values
   const defaultValues: ChatbotFormValues = {
     nombre: chatbot?.nombre || "",
     descripcion: chatbot?.descripcion || "",
@@ -120,11 +119,9 @@ export function ChatbotForm({ chatbot, onSubmit, isSubmitting }: ChatbotFormProp
     }
 
     try {
-      // Mostrar vista previa
       const fileUrl = URL.createObjectURL(file);
       setPreviewAvatar(fileUrl);
 
-      // Si hay una empresa ID, intentamos subir el archivo a Supabase
       if (user?.companyId) {
         const fileName = `chatbot-avatar-${Date.now()}-${file.name.replace(/\s+/g, '-')}`;
         const { data, error } = await supabase.storage
@@ -144,7 +141,6 @@ export function ChatbotForm({ chatbot, onSubmit, isSubmitting }: ChatbotFormProp
           toast.success("Imagen subida exitosamente");
         }
       } else {
-        // Si no hay ID de empresa, solo usamos la URL para el formulario
         form.setValue('avatar_url', fileUrl);
       }
     } catch (error) {
