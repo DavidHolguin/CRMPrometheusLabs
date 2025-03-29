@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useCanales, ChatbotCanal } from "@/hooks/useCanales";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -155,7 +156,7 @@ export default function Canales() {
                 <SelectValue placeholder="Todos los chatbots" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos los chatbots</SelectItem>
+                <SelectItem value="all">Todos los chatbots</SelectItem>
                 {chatbots.map((chatbot) => (
                   <SelectItem key={chatbot.id} value={chatbot.id}>
                     {chatbot.nombre}
