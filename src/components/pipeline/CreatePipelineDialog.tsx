@@ -16,7 +16,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { usePipelines } from "@/hooks/usePipelines";
 import { Plus } from "lucide-react";
 
-export function CreatePipelineDialog() {
+interface CreatePipelineDialogProps {
+  children?: React.ReactNode;
+}
+
+export function CreatePipelineDialog({ children }: CreatePipelineDialogProps) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -47,10 +51,12 @@ export function CreatePipelineDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="gap-2">
-          <Plus size={16} />
-          Nuevo Pipeline
-        </Button>
+        {children || (
+          <Button className="gap-2">
+            <Plus size={16} />
+            Nuevo Pipeline
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <form onSubmit={handleSubmit}>

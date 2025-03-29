@@ -18,14 +18,16 @@ import { Plus } from "lucide-react";
 
 interface CreateStageDialogProps {
   pipeline: Pipeline;
+  onComplete?: () => void;
+  children?: React.ReactNode;
 }
 
-export function CreateStageDialog({ pipeline }: CreateStageDialogProps) {
+export function CreateStageDialog({ pipeline, onComplete, children }: CreateStageDialogProps) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [color, setColor] = useState("#3498db");
-  const [probability, setProbability] = useState("0");
+  const [score, setScore] = useState("0");
   const { createStage } = usePipelines();
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -47,14 +49,15 @@ export function CreateStageDialog({ pipeline }: CreateStageDialogProps) {
         descripcion: description,
         color: color,
         posicion: maxPosition + 1,
-        probabilidad: parseInt(probability, 10) || 0,
+        probabilidad: parseInt(score, 10) || 0,
       },
       {
         onSuccess: () => {
           setOpen(false);
           setName("");
           setDescription("");
-          setProbability("0");
+          setScore("0");
+          if (onComplete) onComplete();
         }
       }
     );
@@ -63,10 +66,12 @@ export function CreateStageDialog({ pipeline }: CreateStageDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-1">
-          <Plus size={14} />
-          Etapa
-        </Button>
+        {children || (
+          <Button variant="outline" className="gap-1 w-full flex justify-center" size="lg">
+            <Plus size={16} />
+            Nueva Etapa
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <form onSubmit={handleSubmit}>
@@ -122,16 +127,16 @@ export function CreateStageDialog({ pipeline }: CreateStageDialogProps) {
               </div>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="probability" className="text-right">
-                Probabilidad (%)
+              <Label htmlFor="score" className="text-right">
+                Score
               </Label>
               <Input
-                id="probability"
+                id="score"
                 type="number"
                 min="0"
                 max="100"
-                value={probability}
-                onChange={(e) => setProbability(e.target.value)}
+                value={score}
+                onChange={(e) => setScore(e.target.value)}
                 className="col-span-3"
               />
             </div>

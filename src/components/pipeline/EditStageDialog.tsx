@@ -25,7 +25,7 @@ export function EditStageDialog({ stage }: EditStageDialogProps) {
   const [name, setName] = useState(stage.nombre);
   const [description, setDescription] = useState(stage.descripcion || "");
   const [color, setColor] = useState(stage.color);
-  const [probability, setProbability] = useState(stage.probabilidad.toString());
+  const [score, setScore] = useState(stage.probabilidad.toString());
   const { updateStage } = usePipelines();
 
   useEffect(() => {
@@ -33,7 +33,7 @@ export function EditStageDialog({ stage }: EditStageDialogProps) {
       setName(stage.nombre);
       setDescription(stage.descripcion || "");
       setColor(stage.color);
-      setProbability(stage.probabilidad.toString());
+      setScore(stage.probabilidad.toString());
     }
   }, [open, stage]);
 
@@ -50,7 +50,7 @@ export function EditStageDialog({ stage }: EditStageDialogProps) {
         nombre: name,
         descripcion: description,
         color: color,
-        probabilidad: parseInt(probability, 10) || 0,
+        probabilidad: parseInt(score, 10) || 0,
       },
       {
         onSuccess: () => {
@@ -121,16 +121,16 @@ export function EditStageDialog({ stage }: EditStageDialogProps) {
               </div>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="probability" className="text-right">
-                Probabilidad (%)
+              <Label htmlFor="score" className="text-right">
+                Score
               </Label>
               <Input
-                id="probability"
+                id="score"
                 type="number"
                 min="0"
                 max="100"
-                value={probability}
-                onChange={(e) => setProbability(e.target.value)}
+                value={score}
+                onChange={(e) => setScore(e.target.value)}
                 className="col-span-3"
               />
             </div>
