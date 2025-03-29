@@ -10,7 +10,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { Smile, Send, ArrowLeft, MessagesSquare } from "lucide-react";
+import { Smile, Send, ArrowLeft, MessagesSquare, Bot, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useMessages } from "@/hooks/useMessages";
@@ -19,7 +19,7 @@ import { v4 as uuidv4 } from 'uuid';
 interface Message {
   id: string;
   content: string;
-  sender: "user" | "bot";
+  sender: "user" | "bot" | "agent";
   timestamp: Date;
 }
 
@@ -40,6 +40,7 @@ const ChatInterface = () => {
   const [leadId, setLeadId] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string>("");
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   
@@ -69,6 +70,9 @@ const ChatInterface = () => {
       if (storedLeadId && storedConversationId) {
         setLeadId(storedLeadId);
         setConversationId(storedConversationId);
+        
+        // Load message history
+        await loadMessageHistory(storedConversationId);
       } else if (chatbot) {
         setShowUserForm(true);
       }
@@ -76,23 +80,107 @@ const ChatInterface = () => {
 
     if (chatbot) {
       checkUserSession();
+    }
+  }, [chatbot, chatbotId]);
+
+  // Load message history from Supabase
+  const loadMessageHistory = async (convId: string) => {
+    setIsLoadingHistory(true);
+    try {
+      const { data: messageHistory, error } = await supabase
+        .from("mensajes")
+        .select("*")
+        .eq("conversacion_id", convId)
+        .order("created_at", { ascending: true });
       
-      if (messages.length === 0) {
+      if (error) {
+        console.error("Error loading message history:", error);
+        throw error;
+      }
+      
+      if (messageHistory && messageHistory.length > 0) {
+        const formattedMessages: Message[] = messageHistory.map(msg => ({
+          id: msg.id,
+          content: msg.contenido,
+          sender: msg.origen === "usuario" 
+            ? "user" 
+            : msg.origen === "agente" 
+              ? "agent"
+              : "bot",
+          timestamp: new Date(msg.created_at)
+        }));
+        
+        setMessages(formattedMessages);
+      } else {
+        // If no messages, add welcome message
         setMessages([
           {
             id: "welcome",
-            content: `¡Hola! Soy ${chatbot.nombre}. ¿En qué puedo ayudarte hoy?`,
+            content: chatbot 
+              ? `¡Hola! Soy ${chatbot.nombre}. ¿En qué puedo ayudarte hoy?`
+              : "¡Hola! ¿En qué puedo ayudarte hoy?",
             sender: "bot",
             timestamp: new Date(),
           },
         ]);
       }
+    } catch (error) {
+      console.error("Error fetching message history:", error);
+      toast.error("No se pudieron cargar los mensajes anteriores.");
+    } finally {
+      setIsLoadingHistory(false);
     }
-  }, [chatbot, chatbotId, messages.length]);
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Set up real-time messaging
+  useEffect(() => {
+    if (!conversationId) return;
+    
+    // Subscribe to new messages in this conversation
+    const channel = supabase
+      .channel(`conversation-${conversationId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'mensajes',
+          filter: `conversacion_id=eq.${conversationId}`
+        },
+        (payload) => {
+          const newMessage = payload.new;
+          
+          // Check if message is not from the current user to avoid duplicates
+          if (newMessage.origen !== "usuario" || newMessage.remitente_id !== leadId) {
+            const messageExists = messages.some(msg => msg.id === newMessage.id);
+            
+            if (!messageExists) {
+              const message: Message = {
+                id: newMessage.id,
+                content: newMessage.contenido,
+                sender: newMessage.origen === "usuario" 
+                  ? "user" 
+                  : newMessage.origen === "agente" 
+                    ? "agent" 
+                    : "bot",
+                timestamp: new Date(newMessage.created_at)
+              };
+              
+              setMessages(prev => [...prev, message]);
+            }
+          }
+        }
+      )
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [conversationId, leadId, messages]);
 
   const handleSendMessage = async () => {
     if (!userMessage.trim() || !leadId || !conversationId || !chatbot) return;
@@ -146,25 +234,8 @@ const ChatInterface = () => {
       
       const data = await response.json();
       
-      // Mostrar respuesta del chatbot
-      const botMsg = {
-        id: Date.now().toString(),
-        content: data.respuesta || "Lo siento, no pude procesar tu mensaje en este momento.",
-        sender: "bot" as const,
-        timestamp: new Date(),
-      };
-      
-      setMessages((prev) => [...prev, botMsg]);
-      
-      // Guardar respuesta del chatbot en Supabase
-      await supabase
-        .from("mensajes")
-        .insert({
-          contenido: botMsg.content,
-          conversacion_id: conversationId,
-          origen: "chatbot",
-          remitente_id: chatbotId,
-        });
+      // The bot response should be handled by the real-time subscription now
+      // so we don't need to manually add it to messages
       
     } catch (error) {
       console.error("Error sending message:", error);
@@ -235,7 +306,7 @@ const ChatInterface = () => {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || isLoadingHistory) {
     return (
       <div className="h-screen flex items-center justify-center bg-background">
         <div className="animate-pulse text-muted-foreground">Cargando chatbot...</div>
@@ -297,10 +368,27 @@ const ChatInterface = () => {
               className={`max-w-[80%] rounded-lg px-4 py-2 ${
                 message.sender === "user"
                   ? "bg-primary text-primary-foreground rounded-br-none"
+                  : message.sender === "agent"
+                  ? "bg-secondary text-secondary-foreground rounded-bl-none"
                   : "bg-muted rounded-bl-none"
               }`}
             >
-              <p>{message.content}</p>
+              <div className="text-xs mb-1 font-medium flex items-center">
+                {message.sender === "user" ? (
+                  <span>Tú</span>
+                ) : message.sender === "agent" ? (
+                  <>
+                    <User className="h-3 w-3 mr-1" />
+                    <span>Agente</span>
+                  </>
+                ) : (
+                  <>
+                    <Bot className="h-3 w-3 mr-1" />
+                    <span>{chatbot.nombre}</span>
+                  </>
+                )}
+              </div>
+              <p className="whitespace-pre-wrap break-words">{message.content}</p>
               <div
                 className={`text-xs mt-1 ${
                   message.sender === "user"
