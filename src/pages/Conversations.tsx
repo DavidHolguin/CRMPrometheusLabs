@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -209,6 +208,7 @@ const ConversationsPage = () => {
                 const leadName = `${conversation.lead?.nombre || ''} ${conversation.lead?.apellido || ''}`.trim();
                 const hasUnread = conversation.unread_count > 0;
                 const messageCount = messages.length;
+                // Here we're using canal_identificador instead of canal_id
                 const channelIdentifier = conversation.canal_identificador || "N/A";
                 
                 return (
