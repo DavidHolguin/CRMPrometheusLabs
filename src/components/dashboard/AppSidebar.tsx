@@ -12,7 +12,9 @@ import {
   Users,
   Building,
   LogOut,
-  MessagesSquare
+  MessagesSquare,
+  Database,
+  Link2
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { 
@@ -198,6 +200,22 @@ export function AppSidebar({ isMobileOpen, setIsMobileOpen }: AppSidebarProps) {
               icon={<MessagesSquare size={20} />}
               label="Chatbots"
               isActive={location.pathname.includes("chatbots")}
+              isCollapsed={isCollapsed}
+              onClick={handleLinkClick}
+            />
+            <NavLink
+              to="/dashboard/crm"
+              icon={<Database size={20} />}
+              label="CRM"
+              isActive={location.pathname.includes("crm")}
+              isCollapsed={isCollapsed}
+              onClick={handleLinkClick}
+            />
+            <NavLink
+              to="/dashboard/canales"
+              icon={<Link2 size={20} />}
+              label="Integraciones"
+              isActive={location.pathname.includes("canales")}
               isCollapsed={isCollapsed}
               onClick={handleLinkClick}
             />
