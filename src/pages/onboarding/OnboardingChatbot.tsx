@@ -37,9 +37,16 @@ interface FAQ {
   answer: string;
 }
 
+interface ContextTag {
+  id: string;
+  label: string;
+  content: string;
+  type: "company" | "service" | "custom";
+}
+
 const OnboardingChatbot = () => {
   const navigate = useNavigate();
-  const { createChatbot, setOnboardingCompleted } = useAuth();
+  const { createChatbot, setOnboardingCompleted, user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -50,8 +57,84 @@ const OnboardingChatbot = () => {
     welcomeMessage: "¡Hola! Soy el asistente virtual. ¿En qué puedo ayudarte hoy?",
     persona: "helpful",
     channels: ["website"],
-    customInstructions: ""
+    customInstructions: "",
+    mainPurpose: "Asistir a los clientes con información y soporte",
+    communicationTone: "profesional",
+    specialInstructions: "",
   });
+  
+  // Contexto - Etiquetas para mostrar en el editor avanzado
+  const [contextTags, setContextTags] = useState<ContextTag[]>([
+    {
+      id: "company-info",
+      label: "Información de empresa",
+      content: "",
+      type: "company"
+    },
+    {
+      id: "services-info",
+      label: "Productos y servicios",
+      content: "",
+      type: "service"
+    }
+  ]);
+  
+  // Cargar información del contexto de la empresa para las etiquetas
+  useState(() => {
+    const loadCompanyInfo = async () => {
+      if (user?.companyId) {
+        try {
+          // Cargar información de la empresa
+          const { data: empresaData, error: empresaError } = await supabase
+            .from("empresas")
+            .select("*")
+            .eq("id", user.companyId)
+            .single();
+          
+          if (empresaError) throw empresaError;
+          
+          // Cargar productos y servicios
+          const { data: productosData, error: productosError } = await supabase
+            .from("empresa_productos")
+            .select("*")
+            .eq("empresa_id", user.companyId);
+            
+          if (productosError) throw productosError;
+          
+          // Actualizar las etiquetas con la información obtenida
+          setContextTags(prev => prev.map(tag => {
+            if (tag.type === "company" && empresaData) {
+              const companyInfo = `
+                Información sobre ${empresaData.nombre}:
+                ${empresaData.descripcion || ""}
+                ${empresaData.sitio_web ? `Sitio web: ${empresaData.sitio_web}` : ""}
+                ${empresaData.email ? `Email: ${empresaData.email}` : ""}
+                ${empresaData.telefono ? `Teléfono: ${empresaData.telefono}` : ""}
+                ${empresaData.direccion ? `Dirección: ${empresaData.direccion}` : ""}
+              `;
+              return {...tag, content: companyInfo.trim()};
+            }
+            if (tag.type === "service" && productosData && productosData.length > 0) {
+              const servicesInfo = `
+                Productos y servicios:
+                ${productosData.map(producto => `
+                  - ${producto.nombre}: ${producto.descripcion}
+                  ${producto.precio ? `  Precio: ${producto.precio}` : ""}
+                `).join("\n")}
+              `;
+              return {...tag, content: servicesInfo.trim()};
+            }
+            return tag;
+          }));
+          
+        } catch (error) {
+          console.error("Error cargando información contextual:", error);
+        }
+      }
+    };
+    
+    loadCompanyInfo();
+  }, [user?.companyId]);
   
   const [faqs, setFaqs] = useState<FAQ[]>([
     { id: crypto.randomUUID(), question: "", answer: "" }
@@ -123,6 +206,11 @@ const OnboardingChatbot = () => {
     setAvatarUrl(null);
   };
 
+  // Obtener contenido general de contexto basado en las etiquetas
+  const getGeneralContext = () => {
+    return contextTags.map(tag => `${tag.label}:\n${tag.content}`).join('\n\n');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -150,11 +238,26 @@ const OnboardingChatbot = () => {
     try {
       const validFaqs = faqs.filter(faq => faq.question.trim() && faq.answer.trim());
       
-      // Create the chatbot
+      // Preparar datos del contexto para inserción
+      const contextData = {
+        generalContext: getGeneralContext(),
+        welcomeMessage: chatbot.welcomeMessage,
+        mainPurpose: chatbot.mainPurpose,
+        communicationTone: chatbot.communicationTone,
+        personality: chatbot.persona,
+        specialInstructions: chatbot.specialInstructions || chatbot.customInstructions,
+        qaExamples: validFaqs.map(faq => ({ 
+          question: faq.question, 
+          answer: faq.answer 
+        })),
+      };
+      
+      // Create the chatbot with expanded context
       await createChatbot({
         ...chatbot,
         avatarFile: avatarFile,
-        faqs: validFaqs
+        faqs: validFaqs,
+        contextData: contextData
       });
       
       // Mark onboarding as completed
@@ -260,6 +363,43 @@ const OnboardingChatbot = () => {
             </div>
             
             <div className="space-y-2">
+              <Label htmlFor="mainPurpose">Propósito principal</Label>
+              <Textarea
+                id="mainPurpose"
+                name="mainPurpose"
+                value={chatbot.mainPurpose}
+                onChange={handleChange}
+                placeholder="Describir el propósito principal de este chatbot, como asistir a clientes, proporcionar información, etc."
+                rows={2}
+              />
+              <p className="text-xs text-muted-foreground">
+                Describa la función principal que el chatbot debe cumplir.
+              </p>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="communicationTone">Tono de comunicación</Label>
+              <Select
+                value={chatbot.communicationTone}
+                onValueChange={(value) => handleSelectChange("communicationTone", value)}
+              >
+                <SelectTrigger id="communicationTone">
+                  <SelectValue placeholder="Seleccione un tono de comunicación" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="profesional">Profesional</SelectItem>
+                  <SelectItem value="casual">Casual</SelectItem>
+                  <SelectItem value="formal">Formal</SelectItem>
+                  <SelectItem value="amistoso">Amistoso</SelectItem>
+                  <SelectItem value="técnico">Técnico</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                El tono con el que el chatbot se comunicará con los usuarios.
+              </p>
+            </div>
+            
+            <div className="space-y-2">
               <Label>Canales de integración</Label>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mt-2">
                 <div className="border rounded-md p-3 bg-primary/5 border-primary/20 flex items-center space-x-2">
@@ -335,6 +475,28 @@ const OnboardingChatbot = () => {
                 Este avatar se mostrará en el widget del chatbot.
               </p>
             </div>
+            
+            {/* Contexto del chatbot - Etiquetas */}
+            <Card className="mt-4">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Contexto del chatbot</CardTitle>
+                <CardDescription className="text-xs">
+                  Información que el chatbot usará para responder
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-2">
+                  {contextTags.map(tag => (
+                    <div key={tag.id} className="bg-primary/10 text-primary rounded-full px-3 py-1 text-xs">
+                      {tag.label}
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Esta información se añadirá automáticamente al contexto del chatbot.
+                </p>
+              </CardContent>
+            </Card>
           </div>
         </div>
         
@@ -402,11 +564,11 @@ const OnboardingChatbot = () => {
             <AccordionContent>
               <div className="space-y-4 pt-2">
                 <div className="space-y-2">
-                  <Label htmlFor="customInstructions">Instrucciones personalizadas</Label>
+                  <Label htmlFor="specialInstructions">Instrucciones especiales</Label>
                   <Textarea
-                    id="customInstructions"
-                    name="customInstructions"
-                    value={chatbot.customInstructions}
+                    id="specialInstructions"
+                    name="specialInstructions"
+                    value={chatbot.specialInstructions}
                     onChange={handleChange}
                     placeholder="Indique instrucciones específicas para su chatbot, como respuestas a preguntas frecuentes o cómo manejar situaciones específicas."
                     rows={4}
@@ -438,3 +600,4 @@ const OnboardingChatbot = () => {
 };
 
 export default OnboardingChatbot;
+

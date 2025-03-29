@@ -15,6 +15,32 @@ export interface Chatbot {
   instrucciones: string | null;
   created_at: string;
   updated_at: string;
+  contexto?: {
+    generalContext?: string;
+    welcomeMessage?: string;
+    mainPurpose?: string;
+    communicationTone?: string;
+    personality?: string;
+    specialInstructions?: string;
+    qaExamples?: Array<{question: string, answer: string}>;
+  } | null;
+}
+
+export interface ChatbotContext {
+  id: string;
+  chatbot_id: string;
+  tipo: string;
+  contenido: string;
+  welcome_message: string | null;
+  personality: string | null;
+  general_context: string | null;
+  communication_tone: string | null;
+  main_purpose: string | null;
+  special_instructions: string | null;
+  key_points: any[] | null;
+  qa_examples: any[] | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export function useChatbots() {
@@ -32,7 +58,20 @@ export function useChatbots() {
       
       const { data, error } = await supabase
         .from("chatbots")
-        .select("*")
+        .select(`
+          *,
+          contexto:chatbot_contextos(
+            id,
+            general_context,
+            welcome_message,
+            personality,
+            communication_tone,
+            main_purpose,
+            special_instructions,
+            key_points,
+            qa_examples
+          )
+        `)
         .eq("empresa_id", user.companyId)
         .order("created_at", { ascending: false });
       
@@ -42,7 +81,28 @@ export function useChatbots() {
       }
       
       console.log("Chatbots obtenidos:", data?.length || 0);
-      return data || [];
+      
+      // Procesar y transformar los datos si es necesario
+      const processedData = data?.map(chatbot => {
+        // Transformar el contexto si existe
+        const contextoItems = chatbot.contexto || [];
+        const contexto = contextoItems.length > 0 ? {
+          generalContext: contextoItems[0]?.general_context || null,
+          welcomeMessage: contextoItems[0]?.welcome_message || null,
+          mainPurpose: contextoItems[0]?.main_purpose || null,
+          communicationTone: contextoItems[0]?.communication_tone || null,
+          personality: contextoItems[0]?.personality || null,
+          specialInstructions: contextoItems[0]?.special_instructions || null,
+          qaExamples: contextoItems[0]?.qa_examples || [],
+        } : null;
+        
+        return {
+          ...chatbot,
+          contexto
+        };
+      });
+      
+      return processedData || [];
     },
     enabled: !!user?.companyId,
   });
@@ -60,7 +120,20 @@ export function useChatbot(id: string | undefined) {
       
       const { data, error } = await supabase
         .from("chatbots")
-        .select("*")
+        .select(`
+          *,
+          contexto:chatbot_contextos(
+            id,
+            general_context,
+            welcome_message,
+            personality,
+            communication_tone,
+            main_purpose,
+            special_instructions,
+            key_points,
+            qa_examples
+          )
+        `)
         .eq("id", id)
         .single();
       
@@ -69,7 +142,22 @@ export function useChatbot(id: string | undefined) {
         throw error;
       }
       
-      return data;
+      // Procesar contexto
+      const contextoItems = data.contexto || [];
+      const contexto = contextoItems.length > 0 ? {
+        generalContext: contextoItems[0]?.general_context || null,
+        welcomeMessage: contextoItems[0]?.welcome_message || null,
+        mainPurpose: contextoItems[0]?.main_purpose || null,
+        communicationTone: contextoItems[0]?.communication_tone || null,
+        personality: contextoItems[0]?.personality || null,
+        specialInstructions: contextoItems[0]?.special_instructions || null,
+        qaExamples: contextoItems[0]?.qa_examples || [],
+      } : null;
+      
+      return {
+        ...data,
+        contexto
+      };
     },
     enabled: !!id,
   });

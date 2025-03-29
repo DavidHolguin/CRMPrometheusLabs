@@ -191,30 +191,57 @@ export type Database = {
       chatbot_contextos: {
         Row: {
           chatbot_id: string | null
+          communication_tone: string | null
           contenido: string
           created_at: string | null
+          general_context: string | null
           id: string
+          key_points: Json | null
+          main_purpose: string | null
           orden: number | null
+          personality: string | null
+          prompt_template: string | null
+          qa_examples: Json | null
+          special_instructions: string | null
           tipo: string
           updated_at: string | null
+          welcome_message: string | null
         }
         Insert: {
           chatbot_id?: string | null
+          communication_tone?: string | null
           contenido: string
           created_at?: string | null
+          general_context?: string | null
           id?: string
+          key_points?: Json | null
+          main_purpose?: string | null
           orden?: number | null
+          personality?: string | null
+          prompt_template?: string | null
+          qa_examples?: Json | null
+          special_instructions?: string | null
           tipo: string
           updated_at?: string | null
+          welcome_message?: string | null
         }
         Update: {
           chatbot_id?: string | null
+          communication_tone?: string | null
           contenido?: string
           created_at?: string | null
+          general_context?: string | null
           id?: string
+          key_points?: Json | null
+          main_purpose?: string | null
           orden?: number | null
+          personality?: string | null
+          prompt_template?: string | null
+          qa_examples?: Json | null
+          special_instructions?: string | null
           tipo?: string
           updated_at?: string | null
+          welcome_message?: string | null
         }
         Relationships: [
           {
