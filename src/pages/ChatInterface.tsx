@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Drawer, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { EmojiPicker } from "@/components/conversations/EmojiPicker";
+
 interface Message {
   id: string;
   contenido: string;
@@ -20,6 +21,7 @@ interface Message {
   created_at: string;
   metadata?: any;
 }
+
 const ChatInterface = () => {
   const {
     chatbotId
@@ -50,6 +52,7 @@ const ChatInterface = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const inputContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     let storedSessionId = localStorage.getItem(`chatbot_session_${chatbotId}`);
     if (!storedSessionId) {
@@ -86,14 +89,17 @@ const ChatInterface = () => {
       }
     };
   }, [chatbotId]);
+
   useEffect(() => {
     if (conversationId) {
       setupRealtimeSubscription(conversationId);
     }
   }, [conversationId]);
+
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
   const fetchChatbotInfo = async () => {
     try {
       const {
@@ -108,6 +114,7 @@ const ChatInterface = () => {
       setLoading(false);
     }
   };
+
   const fetchMessages = async (convoId: string) => {
     try {
       const {
@@ -123,6 +130,7 @@ const ChatInterface = () => {
       console.error("Error fetching messages:", error);
     }
   };
+
   const setupRealtimeSubscription = (convoId: string) => {
     if (channelRef.current) {
       console.log("Removing existing channel subscription");
@@ -156,6 +164,7 @@ const ChatInterface = () => {
     });
     channelRef.current = channel;
   };
+
   const submitUserForm = async () => {
     if (!userName.trim() || !userPhone.trim()) {
       toast.error("Por favor, ingresa tu nombre y número de teléfono");
@@ -180,6 +189,7 @@ const ChatInterface = () => {
       toast.error("Hubo un problema al iniciar el chat. Intente de nuevo.");
     }
   };
+
   const startConversation = async () => {
     try {
       const empresaId = chatbotInfo?.empresa_id;
@@ -234,6 +244,7 @@ const ChatInterface = () => {
       toast.error("No se pudo iniciar la conversación. Intente de nuevo.");
     }
   };
+
   const submitRating = async () => {
     if (userRating === 0) {
       toast.error("Por favor, seleccione una calificación");
@@ -247,6 +258,7 @@ const ChatInterface = () => {
       toast.error("No se pudo enviar la calificación. Intente de nuevo.");
     }
   };
+
   const sendMessage = async (customContent?: string) => {
     const messageContent = customContent || message.trim();
     if (!messageContent && !isRecording && audioChunksRef.current.length === 0) return;
@@ -343,15 +355,18 @@ const ChatInterface = () => {
       setSending(false);
     }
   };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
     }
   };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setMessage(e.target.value);
   };
+
   const handleEmojiSelect = (emoji: string) => {
     setMessage(prev => prev + emoji);
     if (inputRef.current) {
@@ -359,6 +374,7 @@ const ChatInterface = () => {
     }
     setShowEmojiPicker(false);
   };
+
   const toggleRecording = async () => {
     try {
       if (!isRecording) {
@@ -401,17 +417,20 @@ const ChatInterface = () => {
       toast.error("No se pudo acceder al micrófono. Verifique los permisos.");
     }
   };
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({
       behavior: "smooth"
     });
   };
+
   const getSenderType = (origen: string, metadata: any): "user" | "bot" | "agent" => {
     if (origen === 'usuario' || origen === 'lead' || origen === 'user') return "user";
     if (origen === 'chatbot' || origen === 'bot') return "bot";
     if (origen === 'agente' || origen === 'agent') return "agent";
     return origen === "agente" ? "agent" : origen === "chatbot" ? "bot" : "user";
   };
+
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleTimeString([], {
@@ -419,18 +438,21 @@ const ChatInterface = () => {
       minute: '2-digit'
     });
   };
+
   const getLastActiveTime = () => {
     if (messages.length === 0) return "Ahora";
     const lastMessage = messages[messages.length - 1];
     return formatTime(lastMessage.created_at);
   };
+
   const renderStars = () => {
     return Array.from({
       length: 5
     }).map((_, i) => <button key={i} className={`p-2 ${i < userRating ? 'text-yellow-400' : 'text-gray-300'}`} onClick={() => setUserRating(i + 1)}>
-        <Star className="h-8 w-8" fill={i < userRating ? "currentColor" : "none"} />
-      </button>);
+      <Star className="h-8 w-8" fill={i < userRating ? "currentColor" : "none"} />
+    </button>);
   };
+
   const handleSendButtonClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     if (message.trim()) {
@@ -439,16 +461,19 @@ const ChatInterface = () => {
       toggleRecording();
     }
   };
+
   if (loading) {
     return <div className="flex items-center justify-center h-screen">
         <p>Cargando chatbot...</p>
       </div>;
   }
+
   if (!chatbotInfo) {
     return <div className="flex items-center justify-center h-screen">
         <p>Chatbot no encontrado.</p>
       </div>;
   }
+
   return <div className="flex flex-col h-screen bg-[#0e1621]" ref={containerRef}>
       <header className="p-3 bg-[#1f2c34] shadow-sm flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-3">
@@ -502,28 +527,38 @@ const ChatInterface = () => {
 
       <ScrollArea className="flex-1 chat-background">
         <div className="space-y-2 max-w-3xl mx-auto pb-2 p-4 chat-message-container">
-          {messages.length === 0 ? <div className="text-center py-8">
+          {messages.length === 0 ? (
+            <div className="text-center py-8">
               <Bot className="h-12 w-12 mx-auto text-gray-500 mb-4 opacity-50" />
               <p className="text-gray-400 text-sm bg-[#1f2c34]/50 p-3 rounded-lg backdrop-blur-sm inline-block">
                 Inicia una conversación con el chatbot.
               </p>
-            </div> : messages.filter(msg => !(msg.metadata && msg.metadata.is_system_message === true)).map(msg => {
-          const isUser = msg.origen === 'usuario' || msg.origen === 'lead' || msg.origen === 'user';
-          const isBot = msg.origen === 'chatbot' || msg.origen === 'bot';
-          const isAgent = msg.origen === 'agente' || msg.origen === 'agent';
-          return <div key={msg.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-3`}>
-                  <div className={`
-                      relative px-3 py-2 shadow-sm max-w-[80%]
+            </div>
+          ) : (
+            messages
+              .filter(msg => !(msg.metadata && msg.metadata.is_system_message === true))
+              .map(msg => {
+                const senderType = getSenderType(msg.origen, msg.metadata);
+                const isUser = senderType === "user";
+                const isBot = senderType === "bot";
+                const isAgent = senderType === "agent";
+                
+                return (
+                  <div key={msg.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-3`}>
+                    <div className={`
+                      relative px-3 py-2 shadow-sm
                       ${isUser ? 'user-bubble' : isBot ? 'bot-bubble' : 'agent-bubble'}
                     `}>
-                    <p className="whitespace-pre-wrap break-words text-sm font-normal">{msg.contenido}</p>
-                    <span className="chat-timestamp">
-                      {formatTime(msg.created_at)}
-                      {isUser && <Check className="ml-1 h-3 w-3" />}
-                    </span>
+                      <p className="whitespace-pre-wrap break-words text-sm font-normal">{msg.contenido}</p>
+                      <span className="chat-timestamp">
+                        {formatTime(msg.created_at)}
+                        {isUser && <Check className="ml-1 h-3 w-3" />}
+                      </span>
+                    </div>
                   </div>
-                </div>;
-        })}
+                );
+              })
+          )}
           <div ref={messagesEndRef} />
         </div>
       </ScrollArea>
@@ -534,19 +569,35 @@ const ChatInterface = () => {
             <Smile className="h-6 w-6" />
           </button>
           
-          <input ref={inputRef} type="text" value={message} onChange={handleInputChange} onKeyDown={handleKeyDown} placeholder="Mensaje" className="whatsapp-input" disabled={sending || isRecording || showUserForm} />
+          <input 
+            ref={inputRef} 
+            type="text" 
+            value={message} 
+            onChange={handleInputChange} 
+            onKeyDown={handleKeyDown} 
+            placeholder="Mensaje" 
+            className="whatsapp-input" 
+            disabled={sending || isRecording || showUserForm} 
+          />
           
-          <button onClick={handleSendButtonClick} className={`whatsapp-button ${message.trim() ? 'whatsapp-send-button' : ''}`} disabled={sending || showUserForm}>
+          <button 
+            onClick={handleSendButtonClick} 
+            className={`whatsapp-button ${message.trim() ? 'whatsapp-send-button' : ''}`} 
+            disabled={sending || showUserForm}
+          >
             {message.trim() ? <Send className="h-5 w-5" /> : <Mic className={`h-6 w-6 ${isRecording ? 'animate-pulse' : ''}`} />}
           </button>
         </div>
       </div>
       
-      {showEmojiPicker && <div className="absolute bottom-14 left-2 z-50">
+      {showEmojiPicker && (
+        <div className="absolute bottom-14 left-2 z-50">
           <EmojiPicker onEmojiSelect={handleEmojiSelect} />
-        </div>}
+        </div>
+      )}
 
-      {showUserForm && <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      {showUserForm && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-card rounded-lg shadow-lg max-w-md w-full p-6 space-y-4 relative">
             <div className="text-center mb-4">
               <Avatar className="h-16 w-16 mx-auto mb-2 avatar-border">
@@ -581,7 +632,8 @@ const ChatInterface = () => {
               Al continuar, aceptas nuestras políticas de privacidad y términos de uso.
             </p>
           </div>
-        </div>}
+        </div>
+      )}
 
       <Sheet open={showProfile} onOpenChange={setShowProfile}>
         <SheetContent side="right" className="sm:max-w-md">
@@ -648,7 +700,7 @@ const ChatInterface = () => {
           </div>
         </SheetContent>
       </Sheet>
-      
+
       <Drawer open={showRatingDrawer} onOpenChange={setShowRatingDrawer}>
         <DrawerContent className="max-w-md mx-auto">
           <DrawerHeader>
@@ -674,4 +726,5 @@ const ChatInterface = () => {
       </Drawer>
     </div>;
 };
+
 export default ChatInterface;

@@ -40,10 +40,10 @@
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
     
-    /* Chat bubble colors */
-    --user-bubble: 142, 71%, 30%; /* Green for outgoing/user messages */
-    --bot-bubble: 0, 0%, 20%; /* Dark gray for incoming/bot messages */
-    --agent-bubble: 0, 0%, 24%; /* Slightly lighter gray for agent messages */
+    /* WhatsApp style chat bubble colors */
+    --user-bubble: 142, 71%, 45%; /* WhatsApp green for user/outgoing messages */
+    --bot-bubble: 0, 0%, 20%; /* Dark gray for bot messages */
+    --agent-bubble: 221.2, 83.2%, 53.3%; /* Primary blue for agent messages */
   }
 
   .dark {
@@ -81,10 +81,10 @@
     --sidebar-border: 217.2 32.6% 17.5%;
     --sidebar-ring: 224.3 76.3% 48%;
     
-    /* Chat bubble colors for dark mode */
-    --user-bubble: 142, 71%, 30%; /* Green for outgoing messages */
-    --bot-bubble: 0, 0%, 20%; /* Dark gray for incoming messages */
-    --agent-bubble: 0, 0%, 24%; /* Slightly lighter gray for agent messages */
+    /* WhatsApp style chat bubble colors for dark mode */
+    --user-bubble: 142, 71%, 45%; /* WhatsApp green for user/outgoing messages */
+    --bot-bubble: 0, 0%, 20%; /* Dark gray for bot messages */
+    --agent-bubble: 217.2, 91.2%, 59.8%; /* Primary blue for agent messages */
   }
 }
 
@@ -126,7 +126,7 @@ html, body, #root {
   background: hsl(var(--muted-foreground) / 0.5);
 }
 
-/* Chat styles */
+/* WhatsApp style chat styles */
 .chat-background {
   background-image: url('https://static.whatsapp.net/rsrc.php/v4/yl/r/gi_DckOUM5a.png');
   background-repeat: repeat;
@@ -142,7 +142,7 @@ html, body, #root {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(14, 22, 33, 0.85); /* Dark semi-transparent overlay */
+  background-color: rgba(14, 22, 33, 0.8); /* Slightly more visible background pattern */
   z-index: 0;
 }
 
@@ -151,6 +151,7 @@ html, body, #root {
   z-index: 1;
 }
 
+/* WhatsApp style user message bubble (right side) */
 .user-bubble {
   background-color: hsl(var(--user-bubble));
   color: white;
@@ -158,6 +159,8 @@ html, body, #root {
   box-shadow: 0 1px 0.5px rgba(0,0,0,0.13);
   position: relative;
   padding-right: 4.5rem; /* Extra space for timestamp */
+  max-width: 85%; /* Make bubbles wider as requested */
+  word-wrap: break-word;
 }
 
 .user-bubble::before {
@@ -171,6 +174,7 @@ html, body, #root {
   border-top: 8px solid transparent;
 }
 
+/* WhatsApp style bot message bubble (left side) */
 .bot-bubble {
   background-color: hsl(var(--bot-bubble));
   color: white;
@@ -178,6 +182,8 @@ html, body, #root {
   box-shadow: 0 1px 0.5px rgba(0,0,0,0.13);
   position: relative;
   padding-right: 4.5rem; /* Extra space for timestamp */
+  max-width: 85%; /* Make bubbles wider as requested */
+  word-wrap: break-word;
 }
 
 .bot-bubble::before {
@@ -191,6 +197,7 @@ html, body, #root {
   border-top: 8px solid transparent;
 }
 
+/* WhatsApp style agent message bubble (left side) */
 .agent-bubble {
   background-color: hsl(var(--agent-bubble));
   color: white;
@@ -198,6 +205,8 @@ html, body, #root {
   box-shadow: 0 1px 0.5px rgba(0,0,0,0.13);
   position: relative;
   padding-right: 4.5rem; /* Extra space for timestamp */
+  max-width: 85%; /* Make bubbles wider as requested */
+  word-wrap: break-word;
 }
 
 .agent-bubble::before {
@@ -238,7 +247,7 @@ html, body, #root {
   position: absolute;
   width: 14px;
   height: 14px;
-  background-color: #4CAF50;
+  background-color: #4CAF50; /* Keep the green dot as requested */
   border-radius: 50%;
   bottom: 0;
   right: 0;
