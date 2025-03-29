@@ -170,55 +170,52 @@ export function useMessages(conversationId: string | undefined) {
     },
   });
 
-  // Send message via API endpoint instead of direct Supabase call
+  // Send message directly to Supabase instead of via API
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
       if (!conversationId || !user?.id) {
         throw new Error("Falta información para enviar mensaje");
       }
       
-      const apiEndpoint = import.meta.env.VITE_API_BASE_URL || '';
-      const url = `${apiEndpoint}/api/v1/agent/message`;
-      
-      // Create the payload for the API
-      const payload = {
-        conversation_id: conversationId,
-        agent_id: user.id,
-        mensaje: content,
-        deactivate_chatbot: false, // By default, don't deactivate chatbot
-        metadata: {
-          agent_name: user.name || "Agente", // Using name instead of fullName
-          department: "Ventas" // Default to "Ventas" as user doesn't have a department property
-        }
-      };
-      
-      console.log("Enviando mensaje a la API:", payload);
-      
-      // Get the auth token from Supabase
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
-      
-      if (!token) {
-        throw new Error("No hay sesión de autenticación");
-      }
-      
-      // Make the API request
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(payload)
+      console.log("Enviando mensaje directamente a Supabase:", {
+        conversacion_id: conversationId,
+        remitente_id: user.id,
+        contenido: content
       });
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error("Error en la respuesta de la API:", errorData);
-        throw new Error(`Error al enviar mensaje: ${response.statusText}`);
+      // Generate a UUID for the message
+      const messageId = crypto.randomUUID();
+      
+      // Create the message directly in Supabase
+      const { data, error } = await supabase
+        .from("mensajes")
+        .insert({
+          id: messageId,
+          conversacion_id: conversationId,
+          contenido: content,
+          origen: "agente",
+          remitente_id: user.id,
+          tipo_contenido: "texto",
+          leido: true,
+          metadata: {
+            agent_name: user.name || "Agente",
+            department: "Ventas",
+            agent_id: user.id
+          }
+        })
+        .select();
+      
+      if (error) {
+        console.error("Error al enviar mensaje a Supabase:", error);
+        throw error;
       }
       
-      return await response.json();
+      console.log("Mensaje enviado correctamente a Supabase:", data);
+      
+      return { 
+        mensaje_id: messageId, 
+        mensaje: content 
+      };
     },
     onSuccess: (data) => {
       console.log("Message sent successfully, response:", data);
