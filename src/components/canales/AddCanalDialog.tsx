@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
@@ -8,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -16,9 +18,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { Canal } from "@/hooks/useCanales";
 import { useChatbots } from "@/hooks/useChatbots";
 import { CanalIcon } from "./CanalIcon";
+import { Card } from "@/components/ui/card";
+import { getCanalColor } from "./CanalIcon";
 
 type AddCanalDialogProps = {
   canales: Canal[];
