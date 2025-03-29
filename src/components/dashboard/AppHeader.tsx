@@ -63,7 +63,7 @@ export function AppHeader({ toggleSidebar }: AppHeaderProps) {
   const breadcrumbItems = getBreadcrumbItems();
 
   return (
-    <header className="sticky top-0 z-20 w-full bg-background border-b">
+    <header className="sticky top-0 z-20 w-full bg-[#020817] border-b">
       <div className="flex h-16 items-center px-4 md:px-6">
         <Button 
           variant="ghost" 

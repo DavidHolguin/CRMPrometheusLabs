@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -333,7 +334,7 @@ const ConversationsPage = () => {
       <div className="flex-1 flex flex-col h-full overflow-hidden">
         {conversationId ? (
           <>
-            <div className="p-4 border-b bg-card/50 shadow-sm flex items-center justify-between sticky top-0 z-10">
+            <div className="p-4 border-b bg-[#020817] shadow-sm flex items-center justify-between sticky top-0 z-10">
               <div className="flex items-center">
                 <Avatar className="h-10 w-10 mr-3">
                   <AvatarFallback className="bg-primary/10 text-primary">
@@ -469,7 +470,7 @@ const ConversationsPage = () => {
               )}
             </ScrollArea>
 
-            <div className="p-4 border-t bg-card/50 shadow-md mt-auto sticky bottom-0">
+            <div className="p-4 border-t bg-[#020817] shadow-md mt-auto sticky bottom-0">
               <div className="relative">
                 <div className="flex">
                   <div className="relative flex-1">

@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -125,25 +126,13 @@ html, body, #root {
   background: hsl(var(--muted-foreground) / 0.5);
 }
 
-/* WhatsApp style chat styles */
+/* Chat background - updated to use solid dark color instead of image */
 .chat-background {
-  background-image: url('https://static.whatsapp.net/rsrc.php/v4/yl/r/gi_DckOUM5a.png');
-  background-repeat: repeat;
-  background-size: 210px;
+  background-color: #020817; /* Solid dark background as requested */
   position: relative;
-  background-color: #0b141a; /* Actualizado a #0b141a como solicitado */
 }
 
-.chat-background::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(11, 20, 26, 0.8); /* Actualizado a #0b141a con transparencia */
-  z-index: 0;
-}
+/* Removed the ::before pseudo-element with transparency overlay */
 
 .chat-message-container {
   position: relative;
@@ -222,7 +211,7 @@ html, body, #root {
 .whatsapp-input-container {
   display: flex;
   align-items: center;
-  background-color: #1f2c34;
+  background-color: #020817; /* Updated to match header */
   border-radius: 24px;
   padding: 2px 6px;
 }
@@ -258,3 +247,4 @@ html, body, #root {
   background-color: #00a884;
   color: white;
 }
+

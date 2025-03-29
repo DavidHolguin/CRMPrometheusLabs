@@ -20,7 +20,7 @@ const DashboardLayout = () => {
 
   // Show loading state while checking authentication
   if (isLoading) {
-    return <div className="flex h-screen w-full items-center justify-center">
+    return <div className="flex h-screen w-full items-center justify-center bg-[#020817]">
         <div className="animate-pulse text-primary">Cargando...</div>
       </div>;
   }
@@ -40,7 +40,7 @@ const DashboardLayout = () => {
   }
   
   return <SidebarProvider defaultCollapsed={true}>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full bg-[#020817]">
         <AppSidebar isMobileOpen={isMobileSidebarOpen} setIsMobileOpen={setIsMobileSidebarOpen} />
         
         <div className="flex flex-col flex-1 transition-all duration-300 ease-in-out ml-[70px] md:ml-[70px] max-w-[calc(100%-70px)]">
