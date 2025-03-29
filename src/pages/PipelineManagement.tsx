@@ -21,7 +21,6 @@ const PipelineManagement = () => {
   const { pipelines, isLoading: pipelinesLoading } = usePipelines();
   const [selectedPipeline, setSelectedPipeline] = useState<string | null>(null);
   const { leadsByStage, updateLeadStage } = usePipelineLeads(selectedPipeline);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   // Select the first pipeline by default when data loads
   useEffect(() => {
@@ -113,7 +112,7 @@ const PipelineManagement = () => {
                 
                 {/* Pipeline Stages using Carousel */}
                 {currentPipeline?.stages && currentPipeline.stages.length > 0 ? (
-                  <div className="relative w-full" ref={containerRef}>
+                  <div className="relative w-full">
                     <DragDropContext onDragEnd={handleDragEnd}>
                       <Carousel className="w-full">
                         <CarouselContent className="ml-0">

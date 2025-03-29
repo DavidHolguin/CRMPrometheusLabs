@@ -1,3 +1,6 @@
+
+"use client"
+
 import * as React from "react"
 import useEmblaCarousel, {
   type UseEmblaCarouselType,
@@ -56,7 +59,7 @@ const Carousel = React.forwardRef<
     },
     ref
   ) => {
-    const [carouselRef, api] = useEmblaCarousel(
+    const [emblaRef, emblaApi] = useEmblaCarousel(
       {
         ...opts,
         axis: orientation === "horizontal" ? "x" : "y",
@@ -66,22 +69,20 @@ const Carousel = React.forwardRef<
     const [canScrollPrev, setCanScrollPrev] = React.useState(false)
     const [canScrollNext, setCanScrollNext] = React.useState(false)
 
-    const onSelect = React.useCallback((api: CarouselApi) => {
-      if (!api) {
-        return
-      }
-
-      setCanScrollPrev(api.canScrollPrev())
-      setCanScrollNext(api.canScrollNext())
-    }, [])
-
     const scrollPrev = React.useCallback(() => {
-      api?.scrollPrev()
-    }, [api])
+      if (emblaApi) emblaApi.scrollPrev()
+    }, [emblaApi])
 
     const scrollNext = React.useCallback(() => {
-      api?.scrollNext()
-    }, [api])
+      if (emblaApi) emblaApi.scrollNext()
+    }, [emblaApi])
+
+    const onSelect = React.useCallback(() => {
+      if (!emblaApi) return
+
+      setCanScrollPrev(emblaApi.canScrollPrev())
+      setCanScrollNext(emblaApi.canScrollNext())
+    }, [emblaApi])
 
     const handleKeyDown = React.useCallback(
       (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -97,32 +98,33 @@ const Carousel = React.forwardRef<
     )
 
     React.useEffect(() => {
-      if (!api || !setApi) {
+      if (!emblaApi || !setApi) {
         return
       }
 
-      setApi(api)
-    }, [api, setApi])
+      setApi(emblaApi)
+    }, [emblaApi, setApi])
 
     React.useEffect(() => {
-      if (!api) {
+      if (!emblaApi) {
         return
       }
 
-      onSelect(api)
-      api.on("reInit", onSelect)
-      api.on("select", onSelect)
+      onSelect()
+      emblaApi.on("select", onSelect)
+      emblaApi.on("reInit", onSelect)
 
       return () => {
-        api?.off("select", onSelect)
+        emblaApi.off("select", onSelect)
+        emblaApi.off("reInit", onSelect)
       }
-    }, [api, onSelect])
+    }, [emblaApi, onSelect])
 
     return (
       <CarouselContext.Provider
         value={{
-          carouselRef,
-          api: api,
+          carouselRef: emblaRef,
+          api: emblaApi,
           opts,
           orientation:
             orientation || (opts?.axis === "y" ? "vertical" : "horizontal"),
@@ -204,7 +206,7 @@ const CarouselPrevious = React.forwardRef<
       variant={variant}
       size={size}
       className={cn(
-        "absolute  h-8 w-8 rounded-full",
+        "absolute h-8 w-8 rounded-full",
         orientation === "horizontal"
           ? "-left-12 top-1/2 -translate-y-1/2"
           : "-top-12 left-1/2 -translate-x-1/2 rotate-90",
