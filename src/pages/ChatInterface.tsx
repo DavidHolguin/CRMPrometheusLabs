@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useChatbot } from "@/hooks/useChatbots";
@@ -12,6 +13,8 @@ import { useForm } from "react-hook-form";
 import { Smile, Send, ArrowLeft, MessagesSquare } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useMessages } from "@/hooks/useMessages";
+import { v4 as uuidv4 } from 'uuid';
 
 interface Message {
   id: string;
@@ -36,6 +39,7 @@ const ChatInterface = () => {
   const [showUserForm, setShowUserForm] = useState(false);
   const [leadId, setLeadId] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string>("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   
@@ -48,6 +52,16 @@ const ChatInterface = () => {
   });
 
   useEffect(() => {
+    // Generar un sessionId único si no existe
+    const storedSessionId = localStorage.getItem(`session_${chatbotId}`);
+    if (storedSessionId) {
+      setSessionId(storedSessionId);
+    } else {
+      const newSessionId = uuidv4();
+      setSessionId(newSessionId);
+      localStorage.setItem(`session_${chatbotId}`, newSessionId);
+    }
+
     const checkUserSession = async () => {
       const storedLeadId = localStorage.getItem(`lead_${chatbotId}`);
       const storedConversationId = localStorage.getItem(`conversation_${chatbotId}`);
@@ -95,6 +109,7 @@ const ChatInterface = () => {
     setIsSubmitting(true);
     
     try {
+      // Guardar mensaje en Supabase
       const { error: msgError } = await supabase
         .from("mensajes")
         .insert({
@@ -106,40 +121,64 @@ const ChatInterface = () => {
       
       if (msgError) throw msgError;
       
-      setTimeout(() => {
-        const botResponses = [
-          "Gracias por tu mensaje. ¿En qué más puedo ayudarte?",
-          "Entiendo, ¿hay algo más que necesites saber?",
-          "Estoy procesando tu consulta. ¿Hay algún otro detalle que quieras compartir?",
-          `Estoy aquí para ayudarte con cualquier duda sobre ${chatbot.nombre}.`
-        ];
-        
-        const botResponse = botResponses[Math.floor(Math.random() * botResponses.length)];
-        
-        const botMsg = {
-          id: Date.now().toString(),
-          content: botResponse,
-          sender: "bot" as const,
-          timestamp: new Date(),
-        };
-        
-        setMessages((prev) => [...prev, botMsg]);
-        
-        supabase
-          .from("mensajes")
-          .insert({
-            contenido: botResponse,
-            conversacion_id: conversationId,
-            origen: "chatbot",
-            remitente_id: chatbotId,
-          })
-          .then(({ error }) => {
-            if (error) console.error("Error saving bot message:", error);
-          });
-      }, 1000);
+      // Enviar mensaje al endpoint
+      const response = await fetch('https://web-production-01457.up.railway.app/api/v1/channels/web', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          empresa_id: chatbot.empresa_id,
+          chatbot_id: chatbot.id,
+          mensaje: userMessage,
+          session_id: sessionId,
+          lead_id: leadId,
+          metadata: {
+            source: 'web_chat',
+            browser: navigator.userAgent
+          }
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Error al enviar mensaje al API');
+      }
+      
+      const data = await response.json();
+      
+      // Mostrar respuesta del chatbot
+      const botMsg = {
+        id: Date.now().toString(),
+        content: data.respuesta || "Lo siento, no pude procesar tu mensaje en este momento.",
+        sender: "bot" as const,
+        timestamp: new Date(),
+      };
+      
+      setMessages((prev) => [...prev, botMsg]);
+      
+      // Guardar respuesta del chatbot en Supabase
+      await supabase
+        .from("mensajes")
+        .insert({
+          contenido: botMsg.content,
+          conversacion_id: conversationId,
+          origen: "chatbot",
+          remitente_id: chatbotId,
+        });
+      
     } catch (error) {
       console.error("Error sending message:", error);
       toast.error("Error al enviar el mensaje. Por favor intente de nuevo.");
+      
+      // Mensaje de error como respuesta del bot
+      const errorMsg = {
+        id: Date.now().toString(),
+        content: "Lo siento, hubo un problema al procesar tu mensaje. Por favor intenta de nuevo más tarde.",
+        sender: "bot" as const,
+        timestamp: new Date(),
+      };
+      
+      setMessages((prev) => [...prev, errorMsg]);
     } finally {
       setIsSubmitting(false);
     }
