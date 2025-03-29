@@ -14,13 +14,24 @@ const ChatInterface = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [conversationId, setConversationId] = useState<string | undefined>(undefined);
+  const [sessionId, setSessionId] = useState<string>("");
   
-  // Use the new hook to get messages with real-time updates
+  // Use the chat messages hook to get messages with real-time updates
   const { messages, isLoading: messagesLoading } = useChatMessages(conversationId);
   
   useEffect(() => {
     // Focus the input field when the component mounts
     inputRef.current?.focus();
+    
+    // Generate or retrieve a session ID
+    const storedSessionId = localStorage.getItem(`session_${chatbotId}`);
+    if (storedSessionId) {
+      setSessionId(storedSessionId);
+    } else {
+      const newSessionId = crypto.randomUUID();
+      localStorage.setItem(`session_${chatbotId}`, newSessionId);
+      setSessionId(newSessionId);
+    }
     
     // Try to get a conversation ID from local storage
     const storedConversationId = localStorage.getItem(`conversation_${chatbotId}`);
@@ -34,31 +45,84 @@ const ChatInterface = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
   
-  const createConversation = async () => {
+  const sendMessageToAPI = async (messageText: string) => {
     try {
-      const { data, error } = await supabase
-        .from("conversaciones")
-        .insert({
-          chatbot_id: chatbotId,
-          canal_id: null,
-          canal_identificador: "web",
-          estado: "activa",
-          chatbot_activo: true,
-        })
-        .select()
-        .single();
+      if (!chatbotId) {
+        throw new Error("No se ha especificado el ID del chatbot");
+      }
       
-      if (error) throw error;
+      const apiEndpoint = import.meta.env.VITE_API_BASE_URL || '';
+      const url = `${apiEndpoint}/api/v1/channels/web`;
       
-      console.log("Created conversation:", data);
-      setConversationId(data.id);
-      localStorage.setItem(`conversation_${chatbotId}`, data.id);
+      // Extract empresa_id from chatbot if needed (this would require an additional API call)
+      // For simplicity, we're using chatbotId as the only required identifier and letting the API handle the rest
       
-      return data.id;
+      // Extract lead info if provided in the message
+      const nameMatch = messageText.match(/nombre:?\s*([^,;]+)/i);
+      const phoneMatch = messageText.match(/tel[eé]fono:?\s*([^,;]+)/i);
+      const emailMatch = messageText.match(/email:?\s*([^,;]+)/i);
+      
+      let updatedLeadInfo = { ...leadInfo };
+      
+      if (nameMatch) {
+        updatedLeadInfo.name = nameMatch[1].trim();
+      }
+      
+      if (phoneMatch) {
+        updatedLeadInfo.phone = phoneMatch[1].trim();
+      }
+      
+      if (emailMatch) {
+        updatedLeadInfo.email = emailMatch[1].trim();
+      }
+      
+      setLeadInfo(updatedLeadInfo);
+      
+      // Construct the payload
+      const payload = {
+        chatbot_id: chatbotId,
+        mensaje: messageText,
+        session_id: sessionId,
+        metadata: {
+          lead_info: updatedLeadInfo,
+          client_info: {
+            device: navigator.userAgent,
+            referrer: document.referrer,
+            locale: navigator.language
+          }
+        }
+      };
+      
+      console.log("Enviando mensaje a la API:", payload);
+      
+      // Make the API request
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("Error en la respuesta de la API:", errorData);
+        throw new Error(`Error al enviar mensaje: ${response.statusText}`);
+      }
+      
+      const responseData = await response.json();
+      console.log("Respuesta de la API:", responseData);
+      
+      // Store the conversation ID for future messages
+      if (responseData.conversacion_id && !conversationId) {
+        setConversationId(responseData.conversacion_id);
+        localStorage.setItem(`conversation_${chatbotId}`, responseData.conversacion_id);
+      }
+      
+      return responseData;
     } catch (error) {
-      console.error("Error creating conversation:", error);
-      toast.error("Error al iniciar conversación");
-      return null;
+      console.error("Error al enviar mensaje a la API:", error);
+      throw error;
     }
   };
   
@@ -68,114 +132,10 @@ const ChatInterface = () => {
     setIsLoading(true);
     
     try {
-      // Create conversation if it doesn't exist
-      let currentConversationId = conversationId;
-      
-      if (!currentConversationId) {
-        currentConversationId = await createConversation();
-        if (!currentConversationId) {
-          throw new Error("Failed to create conversation");
-        }
-      }
-      
-      // Extract lead info if name and phone are included in the message
-      const nameMatch = message.match(/nombre:?\s*([^,;]+)/i);
-      const phoneMatch = message.match(/tel[eé]fono:?\s*([^,;]+)/i);
-      const emailMatch = message.match(/email:?\s*([^,;]+)/i);
-      
-      if (nameMatch) {
-        setLeadInfo(prev => ({ ...prev, name: nameMatch[1].trim() }));
-      }
-      
-      if (phoneMatch) {
-        setLeadInfo(prev => ({ ...prev, phone: phoneMatch[1].trim() }));
-      }
-      
-      if (emailMatch) {
-        setLeadInfo(prev => ({ ...prev, email: emailMatch[1].trim() }));
-      }
-      
-      // Send the message
-      const { data: messageData, error: messageError } = await supabase
-        .from("mensajes")
-        .insert({
-          conversacion_id: currentConversationId,
-          origen: "user",
-          contenido: message,
-          tipo_contenido: "text",
-          metadata: {},
-          score_impacto: 1,
-        })
-        .select()
-        .single();
-      
-      if (messageError) throw messageError;
+      await sendMessageToAPI(message);
       
       // Clear the input
       setMessage("");
-      
-      console.log("Message sent:", messageData);
-      
-      // Check if we need to create or update a lead
-      if (nameMatch || phoneMatch || emailMatch) {
-        // Get conversation to check if there's already a lead_id
-        const { data: conversation, error: convError } = await supabase
-          .from("conversaciones")
-          .select("*, lead:lead_id(*)")
-          .eq("id", currentConversationId)
-          .single();
-        
-        if (convError) {
-          console.error("Error fetching conversation:", convError);
-        } else {
-          // If lead doesn't exist, create one
-          if (!conversation.lead_id) {
-            const { data: leadData, error: leadError } = await supabase
-              .from("leads")
-              .insert({
-                nombre: leadInfo.name || (nameMatch ? nameMatch[1].trim() : ""),
-                telefono: leadInfo.phone || (phoneMatch ? phoneMatch[1].trim() : ""),
-                email: leadInfo.email || (emailMatch ? emailMatch[1].trim() : ""),
-                canal_origen: "web",
-                estado: "nuevo",
-                empresa_id: null, // Can't access conversation.chatbot.empresa_id as it doesn't exist
-              })
-              .select()
-              .single();
-            
-            if (leadError) {
-              console.error("Error creating lead:", leadError);
-            } else {
-              // Update conversation with lead_id
-              const { error: updateError } = await supabase
-                .from("conversaciones")
-                .update({ lead_id: leadData.id })
-                .eq("id", currentConversationId);
-              
-              if (updateError) {
-                console.error("Error updating conversation with lead:", updateError);
-              }
-            }
-          } else {
-            // Update existing lead if we have new information
-            const updates: any = {};
-            if (nameMatch && !conversation.lead.nombre) updates.nombre = nameMatch[1].trim();
-            if (phoneMatch && !conversation.lead.telefono) updates.telefono = phoneMatch[1].trim();
-            if (emailMatch && !conversation.lead.email) updates.email = emailMatch[1].trim();
-            
-            if (Object.keys(updates).length > 0) {
-              const { error: updateError } = await supabase
-                .from("leads")
-                .update(updates)
-                .eq("id", conversation.lead_id);
-              
-              if (updateError) {
-                console.error("Error updating lead:", updateError);
-              }
-            }
-          }
-        }
-      }
     } catch (error) {
       console.error("Error sending message:", error);
       toast.error("Error al enviar mensaje");
