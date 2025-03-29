@@ -84,7 +84,7 @@ export function useMessages(conversationId: string | undefined) {
         deactivate_chatbot: false, // By default, don't deactivate chatbot
         metadata: {
           agent_name: user.name || "Agente", // Using name instead of fullName
-          rol: "Agente humano"
+          department: user.department || "Ventas" // Default to "Ventas" if not specified
         }
       };
       

@@ -1,69 +1,64 @@
 
+import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { useState, useEffect } from "react";
+import { toast } from "sonner";
 
 export function useChat(conversationId: string | undefined) {
   const { user } = useAuth();
   const [chatbotEnabled, setChatbotEnabled] = useState(true);
   const [isToggling, setIsToggling] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    if (conversationId) {
-      fetchChatbotStatus();
-    }
-  }, [conversationId]);
-
-  const fetchChatbotStatus = async () => {
-    if (!conversationId) return;
-    
-    setIsLoading(true);
-    
-    try {
-      const { data, error } = await supabase
-        .from("conversaciones")
-        .select("chatbot_activo")
-        .eq("id", conversationId)
-        .single();
-      
-      if (error) {
-        console.error("Error obteniendo estado del chatbot:", error);
-        throw error;
-      }
-      
-      // If the column doesn't exist or is null, default to true
-      setChatbotEnabled(data.chatbot_activo !== false);
-    } catch (error) {
-      console.error("Error al consultar estado del chatbot:", error);
-      // Default to enabled
-      setChatbotEnabled(true);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const toggleChatbot = async () => {
-    if (!conversationId || isToggling) return;
+    if (!conversationId || !user?.id) return;
     
     setIsToggling(true);
     
     try {
-      const newStatus = !chatbotEnabled;
+      const apiEndpoint = import.meta.env.VITE_API_BASE_URL || '';
+      const url = `${apiEndpoint}/api/v1/agent/message`;
       
-      const { error } = await supabase
-        .from("conversaciones")
-        .update({ chatbot_activo: newStatus })
-        .eq("id", conversationId);
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
       
-      if (error) {
-        console.error("Error actualizando estado del chatbot:", error);
-        throw error;
+      if (!token) {
+        throw new Error("No hay sesión de autenticación");
       }
       
-      setChatbotEnabled(newStatus);
+      // Create a special message to toggle the chatbot
+      const payload = {
+        conversation_id: conversationId,
+        agent_id: user.id,
+        mensaje: chatbotEnabled 
+          ? "El chatbot ha sido desactivado para esta conversación." 
+          : "El chatbot ha sido activado para esta conversación.",
+        deactivate_chatbot: !chatbotEnabled, // Toggle the current state
+        metadata: {
+          agent_name: user.name || "Agente",
+          department: "Sistema",
+          is_system_message: true
+        }
+      };
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error al ${chatbotEnabled ? 'desactivar' : 'activar'} el chatbot.`);
+      }
+      
+      setChatbotEnabled(!chatbotEnabled);
+      toast.success(`Chatbot ${chatbotEnabled ? 'desactivado' : 'activado'} correctamente.`);
+      
     } catch (error) {
-      console.error("Error al cambiar estado del chatbot:", error);
+      console.error("Error al cambiar el estado del chatbot:", error);
+      toast.error(`No se pudo ${chatbotEnabled ? 'desactivar' : 'activar'} el chatbot.`);
     } finally {
       setIsToggling(false);
     }
@@ -72,7 +67,6 @@ export function useChat(conversationId: string | undefined) {
   return {
     chatbotEnabled,
     toggleChatbot,
-    isToggling,
-    isLoading
+    isToggling
   };
 }

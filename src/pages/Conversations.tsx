@@ -43,18 +43,15 @@ const ConversationsPage = () => {
   const navigate = useNavigate();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Get available channels
   const { useCanalesQuery } = useCanales();
   const { data: canales = [] } = useCanalesQuery();
 
-  // Get conversations
   const { 
     data: conversations = [],
     isLoading: conversationsLoading, 
     isError: conversationsError 
   } = useConversations();
   
-  // Get messages for selected conversation
   const { 
     data: messages = [], 
     isLoading: messagesLoading,
@@ -63,22 +60,18 @@ const ConversationsPage = () => {
     sendMessage
   } = useMessages(conversationId);
   
-  // Get selected conversation
   const selectedConversation = conversations.find(conv => conv.id === conversationId);
   
-  // Get chatbot status
   const { 
     chatbotEnabled,
     toggleChatbot,
     isToggling 
   } = useChat(conversationId);
 
-  // Scroll to bottom of messages
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
-  // Mark messages as read when conversation is opened
   useEffect(() => {
     if (conversationId) {
       markAsRead(conversationId);
@@ -114,7 +107,6 @@ const ConversationsPage = () => {
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setMessage(e.target.value);
     
-    // Auto-resize textarea
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
       textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
@@ -136,7 +128,6 @@ const ConversationsPage = () => {
       .substring(0, 2);
   };
 
-  // Filter and sort conversations
   const filteredConversations = conversations.filter(conv => {
     const leadName = `${conv.lead?.nombre || ''} ${conv.lead?.apellido || ''}`.toLowerCase();
     const matchesSearch = searchTerm ? leadName.includes(searchTerm.toLowerCase()) : true;
@@ -144,19 +135,16 @@ const ConversationsPage = () => {
     return matchesSearch && matchesFilter;
   });
 
-  // Sort conversations by last message date (newest first)
   const sortedConversations = [...filteredConversations].sort((a, b) => {
     return new Date(b.ultimo_mensaje || 0).getTime() - new Date(a.ultimo_mensaje || 0).getTime();
   });
 
-  // Get channel name by id
   const getChannelName = (canalId: string | null) => {
     if (!canalId) return "N/A";
     const canal = canales.find(c => c.id === canalId);
     return canal ? canal.nombre : "N/A";
   };
 
-  // Get channel type by id
   const getChannelType = (canalId: string | null) => {
     if (!canalId) return "default";
     const canal = canales.find(c => c.id === canalId);
@@ -188,7 +176,6 @@ const ConversationsPage = () => {
 
   return (
     <div className="flex h-[calc(100vh-4rem)] overflow-hidden bg-background">
-      {/* Conversations Sidebar */}
       <div className="w-80 border-r flex flex-col">
         <div className="p-4 border-b bg-card/50">
           <h2 className="font-semibold text-lg mb-4">Conversaciones</h2>
@@ -296,11 +283,9 @@ const ConversationsPage = () => {
         </ScrollArea>
       </div>
 
-      {/* Conversation Area */}
       <div className="flex-1 flex flex-col h-full overflow-hidden">
         {conversationId ? (
           <>
-            {/* Conversation Header - Fixed */}
             <div className="p-4 border-b bg-card/50 shadow-sm flex items-center justify-between sticky top-0 z-10">
               <div className="flex items-center">
                 <Avatar className="h-10 w-10 mr-3">
@@ -354,7 +339,6 @@ const ConversationsPage = () => {
               </Button>
             </div>
 
-            {/* Messages Area - Scrollable */}
             <ScrollArea className="flex-1 p-4 overflow-y-auto">
               {messagesLoading ? (
                 <div className="h-full flex items-center justify-center">
@@ -423,7 +407,6 @@ const ConversationsPage = () => {
               )}
             </ScrollArea>
 
-            {/* Message Input - Fixed at bottom */}
             <div className="p-4 border-t bg-card/50 shadow-md mt-auto sticky bottom-0">
               <div className="relative">
                 <div className="flex">
@@ -466,7 +449,6 @@ const ConversationsPage = () => {
             </div>
           </>
         ) : (
-          // No conversation selected state
           <div className="h-full flex items-center justify-center bg-card/5">
             <div className="text-center max-w-md mx-auto p-8">
               <MessageSquare className="h-16 w-16 text-muted-foreground mx-auto mb-6 opacity-20" />
