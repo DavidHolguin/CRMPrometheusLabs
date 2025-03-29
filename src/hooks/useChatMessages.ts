@@ -1,6 +1,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { v4 as uuidv4 } from "uuid";
 
 export interface ChatMessage {
   id: string;
@@ -45,7 +46,13 @@ export function useChatMessages(conversationId: string | null) {
     // Clean up any existing subscription
     if (channelRef.current) {
       console.log("Removing existing channel subscription");
-      supabase.removeChannel(channelRef.current);
+      supabase.removeChannel(channelRef.current)
+        .then(response => {
+          console.log(`Enhanced realtime subscription cleanup for conversation ${conversationId}:`, response);
+        })
+        .catch(err => {
+          console.error(`Error removing channel for conversation ${conversationId}:`, err);
+        });
       channelRef.current = null;
     }
     
@@ -135,8 +142,49 @@ export function useChatMessages(conversationId: string | null) {
     });
   };
 
+  // Nueva función para enviar mensajes directamente a Supabase
+  const sendMessageToSupabase = async (content: string, origin: string = 'user', metadata: any = {}) => {
+    if (!conversationId || !content.trim()) {
+      console.error("No se puede enviar el mensaje: falta el ID de conversación o el contenido");
+      return null;
+    }
+
+    try {
+      const messageId = uuidv4();
+      const newMessage = {
+        id: messageId,
+        conversacion_id: conversationId,
+        contenido: content,
+        origen: origin,
+        metadata: metadata,
+        created_at: new Date().toISOString(),
+      };
+
+      // Optimistically add the message to the UI
+      addMessage(newMessage as ChatMessage);
+
+      // Send to Supabase
+      const { data, error } = await supabase
+        .from("mensajes")
+        .insert(newMessage)
+        .select();
+
+      if (error) {
+        console.error("Error sending message to Supabase:", error);
+        return null;
+      }
+
+      console.log("Message sent successfully to Supabase:", data);
+      return data[0];
+    } catch (error) {
+      console.error("Error in sendMessageToSupabase:", error);
+      return null;
+    }
+  };
+
   return {
     messages,
-    addMessage
+    addMessage,
+    sendMessageToSupabase
   };
 }
