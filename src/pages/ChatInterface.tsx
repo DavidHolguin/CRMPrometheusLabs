@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Send, User, Bot, Smile, Check } from "lucide-react";
+import { Send, User, Bot, Smile } from "lucide-react";
 import { toast } from "sonner";
 import { useChatMessages } from "@/hooks/useChatMessages";
 
@@ -138,7 +138,7 @@ const ChatInterface = () => {
                 email: leadInfo.email || (emailMatch ? emailMatch[1].trim() : ""),
                 canal_origen: "web",
                 estado: "nuevo",
-                empresa_id: null, // Can't access conversation.chatbot.empresa_id as it doesn't exist
+                empresa_id: conversation.chatbot?.empresa_id,
               })
               .select()
               .single();
@@ -294,8 +294,8 @@ const ChatInterface = () => {
                             {messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             {isLead && (
                               <>
-                                <Check className="h-3 w-3" />
-                                <Check className="h-3 w-3" />
+                                <CheckCheck className="h-3 w-3" />
+                                <CheckCheck className="h-3 w-3" />
                               </>
                             )}
                           </div>
