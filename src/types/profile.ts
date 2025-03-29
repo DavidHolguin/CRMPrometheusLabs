@@ -15,4 +15,6 @@ export interface Profile {
   updated_at?: string;
   name?: string; // Alias for full_name
   avatarUrl?: string; // Alias for avatar_url
+  onboardingStep?: string; // Alias for onboarding_step
+  onboardingCompleted?: boolean; // Alias for onboarding_completed
 }

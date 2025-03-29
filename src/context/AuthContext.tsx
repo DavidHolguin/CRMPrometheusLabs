@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,7 +19,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<any>;
   register: (name: string, email: string, password: string) => Promise<any>;
   logout: () => Promise<void>;
-  loginWithGoogle: () => Promise<any>;
+  loginWithGoogle: () => Promise<void>;
   createCompany: (data: any) => Promise<any>;
   saveServices: (data: any) => Promise<any>;
 }
@@ -59,7 +58,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             throw profileError;
           }
 
-          setUser(profileData);
+          // Add camelCase aliases to the profile data
+          const enhancedProfile: Profile = {
+            ...profileData,
+            name: profileData.full_name,
+            avatarUrl: profileData.avatar_url,
+            companyId: profileData.empresa_id,
+            onboardingStep: profileData.onboarding_step,
+            onboardingCompleted: profileData.onboarding_completed
+          };
+          
+          setUser(enhancedProfile);
         }
       } catch (error) {
         console.error("Error getting session:", error);
@@ -82,7 +91,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (profileError) {
           throw profileError;
         }
-        setUser(profileData);
+        
+        // Add camelCase aliases to the profile data
+        const enhancedProfile: Profile = {
+          ...profileData,
+          name: profileData.full_name,
+          avatarUrl: profileData.avatar_url,
+          companyId: profileData.empresa_id,
+          onboardingStep: profileData.onboarding_step,
+          onboardingCompleted: profileData.onboarding_completed
+        };
+        
+        setUser(enhancedProfile);
       } else {
         setUser(null);
       }
@@ -318,13 +338,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const { error } = await supabase
         .from('empresas')
         .update({ onboarding_completed: true })
-        .eq('id', user?.companyId);
+        .eq('id', user?.companyId || user?.empresa_id);
 
       if (error) {
         throw error;
       }
 
-      setUser({ ...user, onboardingCompleted: true } as Profile);
+      // Update both the snake_case and camelCase properties
+      setUser((prevUser) => 
+        prevUser ? {
+          ...prevUser,
+          onboarding_completed: true,
+          onboardingCompleted: true
+        } as Profile : null
+      );
     } catch (error: any) {
       toast({
         title: "Error",
@@ -336,7 +363,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  // Add alias methods for better compatibility
   const login = async (email: string, password: string) => {
     return signIn({ email, password });
   };
