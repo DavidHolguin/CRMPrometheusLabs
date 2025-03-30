@@ -58,22 +58,49 @@ export function LeadCommentsTab({ lead, formatDate }: LeadCommentsTabProps) {
           created_at,
           is_private,
           parent_id,
-          usuario:usuario_id(id, full_name, avatar_url, email)
+          usuario_id
         `)
         .eq("lead_id", lead.id)
         .order("created_at", { ascending: false });
       
       if (error) throw error;
       
+      // Fetch user profiles for all comments
+      const userIds = [...new Set(data.map(comment => comment.usuario_id))];
+      
+      const { data: profiles, error: profilesError } = await supabase
+        .from("profiles")
+        .select("id, full_name, avatar_url, email")
+        .in("id", userIds);
+        
+      if (profilesError) throw profilesError;
+      
+      // Create a map of user profiles by ID
+      const profileMap: Record<string, any> = {};
+      profiles?.forEach(profile => {
+        profileMap[profile.id] = profile;
+      });
+      
+      // Combine data with user profiles
+      const commentsWithProfiles = data.map(comment => ({
+        ...comment,
+        usuario: profileMap[comment.usuario_id] || {
+          id: comment.usuario_id,
+          full_name: "Usuario desconocido",
+          email: "sin email",
+          avatar_url: ""
+        }
+      }));
+      
       // Organize comments into a tree structure (top-level comments and replies)
       const commentMap: Record<string, Comment> = {};
       const topLevelComments: Comment[] = [];
       
-      data.forEach(comment => {
+      commentsWithProfiles.forEach(comment => {
         commentMap[comment.id] = { ...comment, replies: [] };
       });
       
-      data.forEach(comment => {
+      commentsWithProfiles.forEach(comment => {
         if (comment.parent_id && commentMap[comment.parent_id]) {
           if (!commentMap[comment.parent_id].replies) {
             commentMap[comment.parent_id].replies = [];
@@ -110,14 +137,14 @@ export function LeadCommentsTab({ lead, formatDate }: LeadCommentsTabProps) {
         
       if (error) throw error;
       
-      // Fetch the user info
-      const { data: userData, error: userError } = await supabase
+      // Get the user profile info
+      const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("id, full_name, avatar_url, email")
         .eq("id", user.id)
         .single();
         
-      if (userError) throw userError;
+      if (profileError) throw profileError;
       
       // Add new comment to state
       const newCommentObj: Comment = {
@@ -127,10 +154,10 @@ export function LeadCommentsTab({ lead, formatDate }: LeadCommentsTabProps) {
         is_private: false,
         parent_id: null,
         usuario: {
-          id: userData.id,
-          full_name: userData.full_name,
-          avatar_url: userData.avatar_url,
-          email: userData.email
+          id: profile.id,
+          full_name: profile.full_name,
+          avatar_url: profile.avatar_url,
+          email: profile.email
         }
       };
       
@@ -161,14 +188,14 @@ export function LeadCommentsTab({ lead, formatDate }: LeadCommentsTabProps) {
         
       if (error) throw error;
       
-      // Fetch the user info
-      const { data: userData, error: userError } = await supabase
+      // Get the user profile info
+      const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("id, full_name, avatar_url, email")
         .eq("id", user.id)
         .single();
         
-      if (userError) throw userError;
+      if (profileError) throw profileError;
       
       // Add reply to state
       const newReply: Comment = {
@@ -178,10 +205,10 @@ export function LeadCommentsTab({ lead, formatDate }: LeadCommentsTabProps) {
         is_private: false,
         parent_id: replyingTo,
         usuario: {
-          id: userData.id,
-          full_name: userData.full_name,
-          avatar_url: userData.avatar_url,
-          email: userData.email
+          id: profile.id,
+          full_name: profile.full_name,
+          avatar_url: profile.avatar_url,
+          email: profile.email
         }
       };
       
