@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+
+import { useState, useEffect, useRef } from "react";
 import { usePipelines } from "@/hooks/usePipelines";
 import { usePipelineLeads } from "@/hooks/usePipelineLeads";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -21,7 +22,8 @@ import {
   DragEndEvent,
   MouseSensor,
   TouchSensor,
-  KeyboardSensor
+  KeyboardSensor,
+  DragMoveEvent
 } from "@dnd-kit/core";
 import { 
   arrayMove, 
@@ -40,6 +42,7 @@ const PipelineManagement = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [visibleStages, setVisibleStages] = useState(3);
   const [activeLead, setActiveLead] = useState<Lead | null>(null);
+  const boardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (pipelines.length > 0 && !selectedPipeline) {
@@ -70,15 +73,13 @@ const PipelineManagement = () => {
   const sensors = useSensors(
     useSensor(MouseSensor, {
       activationConstraint: {
-        distance: 3,
-        delay: 0,
-        tolerance: 10
+        distance: 8,  // Slightly more distance to prevent accidental drags
       }
     }),
     useSensor(TouchSensor, {
       activationConstraint: {
-        delay: 0,
-        tolerance: 10
+        delay: 250,  // Short delay for touch devices
+        tolerance: 5, // Small tolerance to prevent jitter
       }
     }),
     useSensor(KeyboardSensor, {
@@ -95,7 +96,48 @@ const PipelineManagement = () => {
     }
   };
 
+  const handleDragMove = (event: DragMoveEvent) => {
+    // Implement auto-scroll when dragging near edges
+    if (!boardRef.current) return;
+    
+    const board = boardRef.current;
+    const { active } = event;
+    const { clientX, clientY } = event.activatorEvent as MouseEvent;
+    
+    const rect = board.getBoundingClientRect();
+    const threshold = 100; // pixels from edge to start scrolling
+    const scrollSpeed = 10;
+    
+    // Horizontal scroll
+    if (clientX > rect.right - threshold) {
+      board.scrollLeft += scrollSpeed;
+    } else if (clientX < rect.left + threshold) {
+      board.scrollLeft -= scrollSpeed;
+    }
+    
+    // For vertical scroll in each stage column
+    const columns = board.querySelectorAll('[data-stage-id]');
+    columns.forEach((column) => {
+      const columnRect = column.getBoundingClientRect();
+      
+      if (clientX >= columnRect.left && 
+          clientX <= columnRect.right &&
+          clientY <= columnRect.bottom &&
+          clientY >= columnRect.top) {
+        
+        // Vertical scroll within column
+        if (clientY > columnRect.bottom - threshold) {
+          (column as HTMLElement).scrollTop += scrollSpeed;
+        } else if (clientY < columnRect.top + threshold) {
+          (column as HTMLElement).scrollTop -= scrollSpeed;
+        }
+      }
+    });
+  };
+
   const handleDragOver = (event: DragOverEvent) => {
+    // We only need logic here if implementing drag between items in same column
+    // For now we're just tracking stage changes
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -114,9 +156,11 @@ const PipelineManagement = () => {
       if (sourceStageId !== destinationStageId) {
         console.log('Moving lead:', leadId, 'from stage:', sourceStageId, 'to stage:', destinationStageId);
         
+        // Create a modified copy of the lead for optimistic UI update
         const leadToMove = { ...active.data.current.lead };
         leadToMove.stage_id = destinationStageId;
         
+        // Update the lead stage in the database
         updateLeadStage(
           { leadId, stageId: destinationStageId },
           {
@@ -239,6 +283,7 @@ const PipelineManagement = () => {
             sensors={sensors}
             collisionDetection={closestCorners}
             onDragStart={handleDragStart}
+            onDragMove={handleDragMove}
             onDragOver={handleDragOver}
             onDragEnd={handleDragEnd}
           >
@@ -246,7 +291,7 @@ const PipelineManagement = () => {
               items={visibleStageData.map(stage => stage.id)}
               strategy={horizontalListSortingStrategy}
             >
-              <div className="h-full px-4 relative flex">
+              <div ref={boardRef} className="h-full px-4 relative flex kanban-board">
                 {currentSlide > 0 && (
                   <Button 
                     variant="ghost" 
@@ -260,7 +305,7 @@ const PipelineManagement = () => {
 
                 <div className="flex h-full w-full gap-4 transition-transform duration-300 pb-2">
                   {visibleStageData.map((stage) => (
-                    <div key={stage.id} className="flex-1 min-w-0 max-w-[400px]">
+                    <div key={stage.id} className="flex-1 min-w-0 max-w-[400px] kanban-column">
                       <StageCard 
                         stage={stage} 
                         leads={leadsByStage[stage.id] || []}

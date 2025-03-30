@@ -50,6 +50,7 @@ export function LeadItem({ lead, index }: { lead: Lead; index: number }) {
       {...attributes}
       {...listeners}
       className="mb-2 touch-manipulation"
+      data-lead-id={lead.id}
     >
       <motion.div
         initial={{ opacity: 0, y: 10 }}
@@ -116,6 +117,7 @@ export function StageCard({ stage, leads, onAddLead }: StageCardProps) {
           "flex-1 transition-colors duration-300",
           isOver ? "bg-muted/60 border-2 border-dashed border-primary/30" : "bg-transparent"
         )}
+        data-stage-id={stage.id}
       >
         <ScrollArea className="h-[calc(100vh-180px)] w-full pr-2">
           <div className="p-2 space-y-2">
