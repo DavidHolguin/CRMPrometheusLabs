@@ -42,37 +42,40 @@ export function LeadItem({ lead, index }: { lead: Lead; index: number }) {
   };
 
   return (
-    <motion.div
+    <div
       ref={setNodeRef}
       style={style}
       {...attributes}
       {...listeners}
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ 
-        opacity: 1, 
-        y: 0,
-        scale: isDragging ? 1.02 : 1,
-        boxShadow: isDragging ? "0 10px 25px -5px rgba(0, 0, 0, 0.1)" : "none",
-      }}
-      exit={{ opacity: 0, y: -10 }}
-      transition={{ 
-        type: "spring", 
-        stiffness: 500, 
-        damping: 30,
-        mass: 1
-      }}
-      className="mb-2"
+      className="mb-2 touch-manipulation"
     >
-      <LeadCard 
-        lead={lead} 
-        isDragging={isDragging}
-      />
-    </motion.div>
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ 
+          opacity: 1, 
+          y: 0,
+          scale: isDragging ? 1.02 : 1,
+          boxShadow: isDragging ? "0 10px 25px -5px rgba(0, 0, 0, 0.1)" : "none",
+        }}
+        exit={{ opacity: 0, y: -10 }}
+        transition={{ 
+          type: "spring", 
+          stiffness: 500, 
+          damping: 30,
+          mass: 1
+        }}
+      >
+        <LeadCard 
+          lead={lead} 
+          isDragging={isDragging}
+        />
+      </motion.div>
+    </div>
   );
 }
 
 export function StageCard({ stage, leads, onAddLead }: StageCardProps) {
-  const { setNodeRef, isOver } = useDroppable({
+  const { setNodeRef, isOver, active } = useDroppable({
     id: stage.id,
     data: {
       type: "stage",

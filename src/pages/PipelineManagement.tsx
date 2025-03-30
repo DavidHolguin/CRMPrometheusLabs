@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { usePipelines } from "@/hooks/usePipelines";
 import { usePipelineLeads } from "@/hooks/usePipelineLeads";
@@ -18,9 +19,17 @@ import {
   useSensors,
   DragStartEvent,
   DragOverEvent,
-  DragEndEvent
+  DragEndEvent,
+  MouseSensor,
+  TouchSensor,
+  KeyboardSensor
 } from "@dnd-kit/core";
-import { arrayMove, SortableContext, horizontalListSortingStrategy } from "@dnd-kit/sortable";
+import { 
+  arrayMove, 
+  SortableContext, 
+  horizontalListSortingStrategy, 
+  sortableKeyboardCoordinates 
+} from "@dnd-kit/sortable";
 import { Lead } from "@/hooks/useLeads";
 import { LeadCard } from "@/components/pipeline/LeadCard";
 
@@ -60,10 +69,23 @@ const PipelineManagement = () => {
   }, []);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, {
+    useSensor(MouseSensor, {
+      // Lower activationConstraint for easier dragging
       activationConstraint: {
         distance: 5,
-      },
+        delay: 0,
+        tolerance: 5
+      }
+    }),
+    useSensor(TouchSensor, {
+      // Improved touch handling with lower thresholds
+      activationConstraint: {
+        delay: 0,
+        tolerance: 5
+      }
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates
     })
   );
 
@@ -77,6 +99,8 @@ const PipelineManagement = () => {
   };
 
   const handleDragOver = (event: DragOverEvent) => {
+    // This is intentionally left empty for now
+    // Future implementation could handle drag sorting within a stage
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -258,9 +282,12 @@ const PipelineManagement = () => {
                 )}
               </div>
 
-              <DragOverlay>
+              <DragOverlay adjustScale={true} dropAnimation={{
+                duration: 250,
+                easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
+              }}>
                 {activeLead ? (
-                  <div className="opacity-80">
+                  <div className="opacity-80 transform-gpu">
                     <LeadCard lead={activeLead} isDragging={true} />
                   </div>
                 ) : null}
