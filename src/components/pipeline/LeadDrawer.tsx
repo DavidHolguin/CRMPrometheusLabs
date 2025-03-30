@@ -5,16 +5,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LeadDataTab } from "./LeadDataTab";
 import { LeadHistoryTab } from "./LeadHistoryTab";
 import { LeadCommentsTab } from "./LeadCommentsTab";
-import { LeadActionBar } from "./LeadActionBar";
 import { formatLeadDate } from "./LeadDateUtils";
 import { getScoreCircleClass } from "./LeadScoreUtils";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Mail, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { usePipelines } from "@/hooks/usePipelines";
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 import { LeadAIEvaluation } from "./LeadAIEvaluation";
 
 interface LeadDrawerProps {
@@ -33,118 +27,6 @@ export function LeadDrawer({
   normalizedScore 
 }: LeadDrawerProps) {
   const scoreCircleClass = getScoreCircleClass(scoreColorClass);
-  const { pipelines = [] } = usePipelines();
-  const [stages, setStages] = useState<any[]>([]);
-  const [tags, setTags] = useState<any[]>([]);
-  
-  useEffect(() => {
-    if (open) {
-      fetchTags();
-      fetchStages();
-    }
-  }, [open]);
-  
-  const fetchTags = async () => {
-    try {
-      const { data } = await supabase
-        .from('lead_tags')
-        .select('*')
-        .eq('empresa_id', lead.empresa_id);
-      
-      if (data) {
-        setTags(data);
-      }
-    } catch (error) {
-      console.error('Error fetching tags:', error);
-    }
-  };
-  
-  const fetchStages = async () => {
-    try {
-      // Get all stages for pipelines
-      const { data } = await supabase
-        .from('pipeline_stages')
-        .select('*')
-        .eq('is_active', true)
-        .order('posicion', { ascending: true });
-      
-      if (data) {
-        setStages(data);
-      }
-    } catch (error) {
-      console.error('Error fetching stages:', error);
-    }
-  };
-  
-  const handleStageChange = async (stageId: string) => {
-    try {
-      await supabase
-        .from('leads')
-        .update({ stage_id: stageId })
-        .eq('id', lead.id);
-      
-      toast.success('Etapa actualizada');
-    } catch (error) {
-      toast.error('Error al actualizar la etapa');
-      console.error(error);
-    }
-  };
-  
-  const handlePipelineChange = async (pipelineId: string) => {
-    try {
-      await supabase
-        .from('leads')
-        .update({ pipeline_id: pipelineId })
-        .eq('id', lead.id);
-      
-      toast.success('Pipeline actualizado');
-    } catch (error) {
-      toast.error('Error al actualizar el pipeline');
-      console.error(error);
-    }
-  };
-  
-  const handleTagToggle = async (tagId: string) => {
-    try {
-      const isTagged = lead.tags?.some(t => t.id === tagId);
-      
-      if (isTagged) {
-        // Remove tag
-        await supabase
-          .from('lead_tag_relation')
-          .delete()
-          .eq('lead_id', lead.id)
-          .eq('tag_id', tagId);
-        
-        toast.success('Etiqueta removida');
-      } else {
-        // Add tag
-        await supabase
-          .from('lead_tag_relation')
-          .insert({
-            lead_id: lead.id,
-            tag_id: tagId
-          });
-        
-        toast.success('Etiqueta añadida');
-      }
-    } catch (error) {
-      toast.error('Error al gestionar etiquetas');
-      console.error(error);
-    }
-  };
-  
-  // Format pipeline and stage data for dropdowns
-  const pipelinesOptions = pipelines.map(p => ({
-    value: p.id,
-    label: p.nombre
-  }));
-  
-  const stagesOptions = stages.map(s => ({
-    value: s.id,
-    label: s.nombre,
-    color: s.color
-  }));
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
@@ -202,7 +84,7 @@ export function LeadDrawer({
           </div>
         </DrawerHeader>
         
-        <div className="px-4 pb-20">
+        <div className="px-4 pb-8">
           <div className="flex flex-col-reverse lg:flex-row gap-4">
             {/* Columna izquierda - Evaluación IA */}
             <div className="lg:w-1/3 space-y-4">
@@ -234,17 +116,6 @@ export function LeadDrawer({
             </div>
           </div>
         </div>
-        
-        <LeadActionBar
-          lead={lead}
-          pipelines={pipelinesOptions}
-          stages={stagesOptions}
-          tags={tags}
-          onStageChange={handleStageChange}
-          onPipelineChange={handlePipelineChange}
-          onTagToggle={handleTagToggle}
-          className="w-[80%] mx-auto"
-        />
       </DrawerContent>
     </Drawer>
   );

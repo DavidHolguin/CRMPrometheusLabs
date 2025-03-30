@@ -2,12 +2,17 @@
 import { Lead } from "@/hooks/useLeads";
 import { LeadScoreChart } from "./LeadScoreChart";
 import { getScoreColorClass } from "./LeadScoreUtils";
-import { badgeVariants } from "@/components/ui/badge";
-import { Info, Mail, Phone, MapPin } from "lucide-react";
+import { Badge, badgeVariants } from "@/components/ui/badge";
+import { Info, Mail, Phone, MapPin, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LeadActivityChart } from "./LeadActivityChart";
 import { LeadPersonalDataTab } from "./LeadPersonalDataTab";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { usePipelines } from "@/hooks/usePipelines";
 
 interface LeadDataTabProps {
   lead: Lead;
@@ -18,6 +23,11 @@ export function LeadDataTab({ lead, formatDate }: LeadDataTabProps) {
   const email = lead.email;
   const phone = lead.telefono;
   const location = lead.ciudad || lead.pais;
+  
+  const { pipelines = [] } = usePipelines();
+  const [stages, setStages] = useState<any[]>([]);
+  const [tags, setTags] = useState<any[]>([]);
+  const [selectedPipelineId, setSelectedPipelineId] = useState<string>(lead.pipeline_id || '');
   
   // Información básica del lead
   const contactInfo = [
@@ -40,28 +50,145 @@ export function LeadDataTab({ lead, formatDate }: LeadDataTabProps) {
     }] : []),
   ];
   
-  // Para la etapa actual del pipeline
-  const stageBadge = (
-    <div 
-      className={cn(
-        badgeVariants({ variant: "outline" }),
-        "whitespace-nowrap border-2 py-1 px-3 font-medium text-xs",
-        lead.stage_color ? "border-opacity-50" : ""
-      )}
-      style={{ 
-        borderColor: lead.stage_color || undefined,
-        backgroundColor: lead.stage_color ? `${lead.stage_color}15` : undefined
-      }}
-    >
-      {lead.stage_name || "Sin etapa"}
-    </div>
-  );
-  
-  // Tags del lead
-  const tags = lead.tags || [];
-  
   // Usar el score normalizado del lead para la visualización
   const normalizedScore = lead.score || 0;
+  
+  // Fetch tags cuando el componente se monta
+  useEffect(() => {
+    fetchTags();
+  }, []);
+  
+  // Fetch stages cuando el pipeline cambia
+  useEffect(() => {
+    if (selectedPipelineId) {
+      fetchStages(selectedPipelineId);
+    }
+  }, [selectedPipelineId]);
+  
+  // Establecer el pipeline inicial
+  useEffect(() => {
+    if (lead.pipeline_id) {
+      setSelectedPipelineId(lead.pipeline_id);
+    } else if (pipelines.length > 0) {
+      setSelectedPipelineId(pipelines[0].id);
+    }
+  }, [lead.pipeline_id, pipelines]);
+  
+  const fetchTags = async () => {
+    try {
+      const { data } = await supabase
+        .from('lead_tags')
+        .select('*')
+        .eq('empresa_id', lead.empresa_id);
+      
+      if (data) {
+        setTags(data);
+      }
+    } catch (error) {
+      console.error('Error fetching tags:', error);
+    }
+  };
+  
+  const fetchStages = async (pipelineId: string) => {
+    try {
+      const { data } = await supabase
+        .from('pipeline_stages')
+        .select('*')
+        .eq('pipeline_id', pipelineId)
+        .eq('is_active', true)
+        .order('posicion', { ascending: true });
+      
+      if (data) {
+        setStages(data);
+      }
+    } catch (error) {
+      console.error('Error fetching stages:', error);
+    }
+  };
+  
+  const handleStageChange = async (stageId: string) => {
+    try {
+      await supabase
+        .from('leads')
+        .update({ stage_id: stageId })
+        .eq('id', lead.id);
+      
+      toast.success('Etapa actualizada');
+    } catch (error) {
+      toast.error('Error al actualizar la etapa');
+      console.error(error);
+    }
+  };
+  
+  const handlePipelineChange = async (pipelineId: string) => {
+    try {
+      setSelectedPipelineId(pipelineId);
+      
+      // Obtener el primer stage del pipeline seleccionado
+      const { data: firstStage } = await supabase
+        .from('pipeline_stages')
+        .select('id')
+        .eq('pipeline_id', pipelineId)
+        .eq('is_active', true)
+        .order('posicion', { ascending: true })
+        .limit(1)
+        .single();
+      
+      // Actualizar el pipeline y establecer el primer stage por defecto
+      await supabase
+        .from('leads')
+        .update({ 
+          pipeline_id: pipelineId,
+          stage_id: firstStage?.id || null 
+        })
+        .eq('id', lead.id);
+      
+      toast.success('Pipeline actualizado');
+    } catch (error) {
+      toast.error('Error al actualizar el pipeline');
+      console.error(error);
+    }
+  };
+  
+  const handleTagToggle = async (tagId: string) => {
+    try {
+      const isTagged = lead.tags?.some(t => t.id === tagId);
+      
+      if (isTagged) {
+        await supabase
+          .from('lead_tag_relation')
+          .delete()
+          .eq('lead_id', lead.id)
+          .eq('tag_id', tagId);
+        
+        toast.success('Etiqueta removida');
+      } else {
+        await supabase
+          .from('lead_tag_relation')
+          .insert({
+            lead_id: lead.id,
+            tag_id: tagId
+          });
+        
+        toast.success('Etiqueta añadida');
+      }
+    } catch (error) {
+      toast.error('Error al gestionar etiquetas');
+      console.error(error);
+    }
+  };
+  
+  // Preparar opciones para los selectores
+  const pipelineOptions = pipelines.map(p => ({
+    value: p.id,
+    label: p.nombre
+  }));
+  
+  const stageOptions = stages.map(s => ({
+    value: s.id,
+    label: s.nombre,
+    color: s.color
+  }));
   
   return (
     <div className="space-y-6">
@@ -92,37 +219,81 @@ export function LeadDataTab({ lead, formatDate }: LeadDataTabProps) {
             ))}
           </div>
           
-          {/* Pipeline stage */}
+          {/* Pipeline selector */}
+          <div className="flex flex-col gap-1 mt-4 pt-3 border-t">
+            <span className="text-xs text-muted-foreground">Pipeline</span>
+            <Select 
+              value={selectedPipelineId} 
+              onValueChange={handlePipelineChange}
+            >
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue placeholder="Seleccionar pipeline" />
+              </SelectTrigger>
+              <SelectContent>
+                {pipelineOptions.map((pipeline) => (
+                  <SelectItem key={pipeline.value} value={pipeline.value}>
+                    {pipeline.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
+          {/* Stage selector */}
           <div className="flex flex-col gap-1 mt-4 pt-3 border-t">
             <span className="text-xs text-muted-foreground">Etapa actual</span>
-            <div className="flex items-center gap-2">
-              {stageBadge}
-            </div>
+            <Select 
+              value={lead.stage_id || ''} 
+              onValueChange={handleStageChange}
+            >
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue placeholder="Seleccionar etapa" />
+              </SelectTrigger>
+              <SelectContent>
+                {stageOptions.map((stage) => (
+                  <SelectItem key={stage.value} value={stage.value}>
+                    <div className="flex items-center gap-2">
+                      <span>{stage.label}</span>
+                      {stage.color && (
+                        <div 
+                          className="h-3 w-3 rounded-full" 
+                          style={{ backgroundColor: stage.color }}
+                        />
+                      )}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           
           {/* Tags */}
-          {tags.length > 0 && (
-            <div className="flex flex-col gap-1 mt-4 pt-3 border-t">
-              <span className="text-xs text-muted-foreground">Etiquetas</span>
-              <div className="flex flex-wrap gap-2 mt-1">
-                {tags.map((tag) => (
-                  <span 
-                    key={tag.id} 
-                    className={cn(
-                      badgeVariants({ variant: "outline" }),
-                      "whitespace-nowrap text-xs"
-                    )}
-                    style={{ 
+          <div className="flex flex-col gap-1 mt-4 pt-3 border-t">
+            <span className="text-xs text-muted-foreground">Etiquetas</span>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {tags.map((tag) => {
+                const isSelected = lead.tags?.some(t => t.id === tag.id);
+                return (
+                  <Badge 
+                    key={tag.id}
+                    variant={isSelected ? "default" : "outline"}
+                    className="cursor-pointer text-xs flex items-center gap-1 px-2 py-1"
+                    onClick={() => handleTagToggle(tag.id)}
+                    style={{
                       borderColor: tag.color || undefined,
-                      backgroundColor: tag.color ? `${tag.color}15` : undefined
+                      color: isSelected ? 'white' : tag.color,
+                      backgroundColor: isSelected ? tag.color : undefined,
                     }}
                   >
                     {tag.nombre}
-                  </span>
-                ))}
-              </div>
+                    {isSelected && (
+                      <X className="h-3 w-3 ml-1 hover:text-white/80" />
+                    )}
+                  </Badge>
+                );
+              })}
             </div>
-          )}
+          </div>
         </div>
         
         {/* Score chart */}

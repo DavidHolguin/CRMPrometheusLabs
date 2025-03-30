@@ -1,3 +1,4 @@
+
 import { Lead } from "@/hooks/useLeads";
 import { Card, CardHeader } from "@/components/ui/card";
 import { useState, useEffect } from "react";
@@ -8,7 +9,6 @@ import { LeadHeader } from "./LeadHeader";
 import { LeadDataTab } from "./LeadDataTab";
 import { LeadHistoryTab } from "./LeadHistoryTab";
 import { LeadCommentsTab } from "./LeadCommentsTab";
-import { LeadActionBar } from "./LeadActionBar";
 import { normalizeLeadScore, getScoreColorClass, getScoreCircleClass } from "./LeadScoreUtils";
 import { formatLeadDate } from "./LeadDateUtils";
 import { LeadDrawer } from "./LeadDrawer";
@@ -16,10 +16,8 @@ import { LeadAIEvaluation } from "./LeadAIEvaluation";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { usePipelines } from "@/hooks/usePipelines";
 import { supabase } from "@/integrations/supabase/client";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Mail, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
 
 interface LeadCardProps {
   lead: Lead;
@@ -80,73 +78,6 @@ export function LeadCard({ lead, isDragging }: LeadCardProps) {
       console.error('Error fetching stages:', error);
     }
   };
-  
-  const handleStageChange = async (stageId: string) => {
-    try {
-      await supabase
-        .from('leads')
-        .update({ stage_id: stageId })
-        .eq('id', lead.id);
-      
-      toast.success('Etapa actualizada');
-    } catch (error) {
-      toast.error('Error al actualizar la etapa');
-      console.error(error);
-    }
-  };
-  
-  const handlePipelineChange = async (pipelineId: string) => {
-    try {
-      await supabase
-        .from('leads')
-        .update({ pipeline_id: pipelineId })
-        .eq('id', lead.id);
-      
-      toast.success('Pipeline actualizado');
-    } catch (error) {
-      toast.error('Error al actualizar el pipeline');
-      console.error(error);
-    }
-  };
-  
-  const handleTagToggle = async (tagId: string) => {
-    try {
-      const isTagged = lead.tags?.some(t => t.id === tagId);
-      
-      if (isTagged) {
-        await supabase
-          .from('lead_tag_relation')
-          .delete()
-          .eq('lead_id', lead.id)
-          .eq('tag_id', tagId);
-        
-        toast.success('Etiqueta removida');
-      } else {
-        await supabase
-          .from('lead_tag_relation')
-          .insert({
-            lead_id: lead.id,
-            tag_id: tagId
-          });
-        
-        toast.success('Etiqueta añadida');
-      }
-    } catch (error) {
-      toast.error('Error al gestionar etiquetas');
-      console.error(error);
-    }
-  };
-  
-  const pipelinesOptions = pipelines.map(p => ({
-    value: p.id,
-    label: p.nombre
-  }));
-  
-  const stagesOptions = stages.map(s => ({
-    value: s.id,
-    label: s.nombre,
-    color: s.color
-  }));
   
   return (
     <>
@@ -236,7 +167,7 @@ export function LeadCard({ lead, isDragging }: LeadCardProps) {
               </div>
             </SheetHeader>
             
-            <div className="flex flex-col-reverse lg:flex-row gap-4 pt-4">
+            <div className="flex flex-col-reverse lg:flex-row gap-4 pt-4 pb-8">
               <div className="lg:w-1/3 space-y-4">
                 <h3 className="text-sm font-medium text-muted-foreground mb-2">Evaluación Inteligente</h3>
                 <LeadAIEvaluation lead={lead} />
@@ -264,19 +195,6 @@ export function LeadCard({ lead, isDragging }: LeadCardProps) {
                 </Tabs>
               </div>
             </div>
-            
-            <div className="pb-16"></div>
-            
-            <LeadActionBar
-              lead={lead}
-              pipelines={pipelinesOptions}
-              stages={stagesOptions}
-              tags={tags}
-              onStageChange={handleStageChange}
-              onPipelineChange={handlePipelineChange}
-              onTagToggle={handleTagToggle}
-              className="w-[80%] mx-auto"
-            />
           </SheetContent>
         </Sheet>
       )}
