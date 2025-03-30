@@ -1,4 +1,5 @@
 
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -8,6 +9,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Interaction {
   id: string;
@@ -22,16 +24,55 @@ interface Interaction {
 }
 
 interface LeadInteractionsListProps {
-  interactions: Interaction[];
-  isLoading: boolean;
+  leadId: string;
+  isLoading?: boolean;
   formatDate: (date: string | null) => string;
 }
 
 export function LeadInteractionsList({ 
-  interactions, 
-  isLoading, 
+  leadId, 
+  isLoading: initialLoading = false, 
   formatDate 
 }: LeadInteractionsListProps) {
+  const [interactions, setInteractions] = useState<Interaction[]>([]);
+  const [isLoading, setIsLoading] = useState(initialLoading);
+  const [showAll, setShowAll] = useState(false);
+  
+  useEffect(() => {
+    if (leadId) {
+      fetchInteractions();
+    }
+  }, [leadId]);
+  
+  const fetchInteractions = async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("lead_interactions")
+        .select(`
+          id,
+          created_at,
+          notas,
+          valor_score,
+          lead_interaction_types:interaction_type_id(id, nombre, color)
+        `)
+        .eq("lead_id", leadId)
+        .order("created_at", { ascending: false });
+        
+      if (error) throw error;
+      console.info("Lead interactions:", data);
+      setInteractions(data || []);
+    } catch (error) {
+      console.error("Error fetching interactions:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const displayInteractions = showAll 
+    ? interactions 
+    : interactions.slice(0, 5);
+    
   return (
     <Card className="shadow-sm">
       <CardHeader className="pb-3">
@@ -56,7 +97,7 @@ export function LeadInteractionsList({
           </div>
         ) : (
           <div className="space-y-3">
-            {interactions.slice(0, 5).map((interaction) => (
+            {displayInteractions.map((interaction) => (
               <div 
                 key={interaction.id} 
                 className="flex items-start gap-3 p-3 border rounded-md hover:bg-muted/30 transition-colors"
@@ -89,8 +130,16 @@ export function LeadInteractionsList({
             ))}
             
             {interactions.length > 5 && (
-              <Button variant="outline" size="sm" className="w-full">
-                Ver todas las interacciones ({interactions.length})
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full"
+                onClick={() => setShowAll(!showAll)}
+              >
+                {showAll 
+                  ? "Mostrar menos" 
+                  : `Ver todas las interacciones (${interactions.length})`
+                }
               </Button>
             )}
           </div>
