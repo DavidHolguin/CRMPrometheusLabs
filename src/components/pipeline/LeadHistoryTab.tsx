@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Lead } from "@/hooks/useLeads";
 import { supabase } from "@/integrations/supabase/client";
@@ -76,15 +77,37 @@ export function LeadHistoryTab({ lead, formatDate }: LeadHistoryTabProps) {
           id,
           created_at,
           tiempo_en_stage,
-          usuario_id,
-          anterior:stage_id_anterior(id, nombre, color),
-          nuevo:stage_id_nuevo(id, nombre, color)
+          usuario_id
         `)
         .eq("lead_id", lead.id)
         .order("created_at", { ascending: false });
       
       if (fieldError) console.error("Error fetching field history:", fieldError);
       if (stageError) console.error("Error fetching stage history:", stageError);
+      
+      // Get the stage data separately to avoid relationship conflicts
+      let stageChangeData: any[] = [];
+      if (stageChanges && stageChanges.length > 0) {
+        for (const change of stageChanges) {
+          const { data: anteriorData } = await supabase
+            .from("pipeline_stages")
+            .select("id, nombre, color")
+            .eq("id", change.stage_id_anterior)
+            .single();
+            
+          const { data: nuevoData } = await supabase
+            .from("pipeline_stages")
+            .select("id, nombre, color")
+            .eq("id", change.stage_id_nuevo)
+            .single();
+            
+          stageChangeData.push({
+            ...change,
+            stage_anterior: anteriorData || { id: '', nombre: 'Sin etapa', color: '#cccccc' },
+            stage_nuevo: nuevoData || { id: '', nombre: 'Sin etapa', color: '#cccccc' }
+          });
+        }
+      }
       
       // Get unique user IDs from both sets of changes
       const userIds = new Set([
@@ -122,7 +145,7 @@ export function LeadHistoryTab({ lead, formatDate }: LeadHistoryTabProps) {
         type: 'field_change' as const
       }));
       
-      const formattedStageChanges = (stageChanges || []).map(item => ({
+      const formattedStageChanges = stageChangeData.map(item => ({
         id: item.id,
         created_at: item.created_at,
         usuario: profileMap[item.usuario_id] || {
@@ -131,9 +154,9 @@ export function LeadHistoryTab({ lead, formatDate }: LeadHistoryTabProps) {
           email: "",
           avatar_url: ""
         },
-        tiempo_en_stage: item.tiempo_en_stage,
-        stage_anterior: item.anterior,
-        stage_nuevo: item.nuevo,
+        tiempo_en_stage: item.tiempo_en_stage?.toString() || '',
+        stage_anterior: item.stage_anterior,
+        stage_nuevo: item.stage_nuevo,
         type: 'stage_change' as const
       }));
       
