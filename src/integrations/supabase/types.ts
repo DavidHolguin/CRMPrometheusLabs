@@ -652,6 +652,57 @@ export type Database = {
           },
         ]
       }
+      lead_comments: {
+        Row: {
+          contenido: string
+          created_at: string | null
+          id: string
+          is_private: boolean | null
+          lead_id: string
+          metadata: Json | null
+          parent_id: string | null
+          updated_at: string | null
+          usuario_id: string
+        }
+        Insert: {
+          contenido: string
+          created_at?: string | null
+          id?: string
+          is_private?: boolean | null
+          lead_id: string
+          metadata?: Json | null
+          parent_id?: string | null
+          updated_at?: string | null
+          usuario_id: string
+        }
+        Update: {
+          contenido?: string
+          created_at?: string | null
+          id?: string
+          is_private?: boolean | null
+          lead_id?: string
+          metadata?: Json | null
+          parent_id?: string | null
+          updated_at?: string | null
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_comments_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_comments_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "lead_comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_history: {
         Row: {
           campo: string
@@ -686,6 +737,236 @@ export type Database = {
             columns: ["lead_id"]
             isOneToOne: false
             referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_intentions: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          descripcion: string | null
+          empresa_id: string | null
+          id: string
+          is_active: boolean | null
+          nombre: string
+          palabras_clave: Json | null
+          prioridad: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          descripcion?: string | null
+          empresa_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          nombre: string
+          palabras_clave?: Json | null
+          prioridad?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          descripcion?: string | null
+          empresa_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          nombre?: string
+          palabras_clave?: Json | null
+          prioridad?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_intentions_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_interaction_types: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          descripcion: string | null
+          empresa_id: string | null
+          id: string
+          is_active: boolean | null
+          is_system: boolean | null
+          nombre: string
+          updated_at: string | null
+          valor_score: number
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          descripcion?: string | null
+          empresa_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_system?: boolean | null
+          nombre: string
+          updated_at?: string | null
+          valor_score: number
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          descripcion?: string | null
+          empresa_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_system?: boolean | null
+          nombre?: string
+          updated_at?: string | null
+          valor_score?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_interaction_types_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_interactions: {
+        Row: {
+          agente_id: string | null
+          conversacion_id: string | null
+          created_at: string | null
+          id: string
+          intencion_id: string | null
+          interaction_type_id: string | null
+          lead_id: string | null
+          mensaje_id: string | null
+          metadata: Json | null
+          notas: string | null
+          valor_score: number
+        }
+        Insert: {
+          agente_id?: string | null
+          conversacion_id?: string | null
+          created_at?: string | null
+          id?: string
+          intencion_id?: string | null
+          interaction_type_id?: string | null
+          lead_id?: string | null
+          mensaje_id?: string | null
+          metadata?: Json | null
+          notas?: string | null
+          valor_score: number
+        }
+        Update: {
+          agente_id?: string | null
+          conversacion_id?: string | null
+          created_at?: string | null
+          id?: string
+          intencion_id?: string | null
+          interaction_type_id?: string | null
+          lead_id?: string | null
+          mensaje_id?: string | null
+          metadata?: Json | null
+          notas?: string | null
+          valor_score?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_interactions_conversacion_id_fkey"
+            columns: ["conversacion_id"]
+            isOneToOne: false
+            referencedRelation: "conversaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_interactions_intencion_id_fkey"
+            columns: ["intencion_id"]
+            isOneToOne: false
+            referencedRelation: "lead_intentions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_interactions_interaction_type_id_fkey"
+            columns: ["interaction_type_id"]
+            isOneToOne: false
+            referencedRelation: "lead_interaction_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_interactions_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_interactions_mensaje_id_fkey"
+            columns: ["mensaje_id"]
+            isOneToOne: false
+            referencedRelation: "mensajes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_stage_history: {
+        Row: {
+          created_at: string | null
+          id: string
+          lead_id: string
+          metadata: Json | null
+          motivo: string | null
+          stage_id_anterior: string | null
+          stage_id_nuevo: string
+          tiempo_en_stage: unknown | null
+          usuario_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          lead_id: string
+          metadata?: Json | null
+          motivo?: string | null
+          stage_id_anterior?: string | null
+          stage_id_nuevo: string
+          tiempo_en_stage?: unknown | null
+          usuario_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          lead_id?: string
+          metadata?: Json | null
+          motivo?: string | null
+          stage_id_anterior?: string | null
+          stage_id_nuevo?: string
+          tiempo_en_stage?: unknown | null
+          usuario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_stage_history_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_stage_history_stage_id_anterior_fkey"
+            columns: ["stage_id_anterior"]
+            isOneToOne: false
+            referencedRelation: "pipeline_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_stage_history_stage_id_nuevo_fkey"
+            columns: ["stage_id_nuevo"]
+            isOneToOne: false
+            referencedRelation: "pipeline_stages"
             referencedColumns: ["id"]
           },
         ]
@@ -938,6 +1219,8 @@ export type Database = {
           conversacion_id: string | null
           created_at: string | null
           id: string
+          intencion_id: string | null
+          interaction_type_id: string | null
           leido: boolean | null
           metadata: Json | null
           origen: string
@@ -950,6 +1233,8 @@ export type Database = {
           conversacion_id?: string | null
           created_at?: string | null
           id?: string
+          intencion_id?: string | null
+          interaction_type_id?: string | null
           leido?: boolean | null
           metadata?: Json | null
           origen: string
@@ -962,6 +1247,8 @@ export type Database = {
           conversacion_id?: string | null
           created_at?: string | null
           id?: string
+          intencion_id?: string | null
+          interaction_type_id?: string | null
           leido?: boolean | null
           metadata?: Json | null
           origen?: string
@@ -975,6 +1262,20 @@ export type Database = {
             columns: ["conversacion_id"]
             isOneToOne: false
             referencedRelation: "conversaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mensajes_intencion_id_fkey"
+            columns: ["intencion_id"]
+            isOneToOne: false
+            referencedRelation: "lead_intentions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mensajes_interaction_type_id_fkey"
+            columns: ["interaction_type_id"]
+            isOneToOne: false
+            referencedRelation: "lead_interaction_types"
             referencedColumns: ["id"]
           },
         ]
@@ -1212,6 +1513,12 @@ export type Database = {
           empresa_id: string
         }
         Returns: boolean
+      }
+      calculate_lead_score: {
+        Args: {
+          lead_uuid: string
+        }
+        Returns: number
       }
       is_admin: {
         Args: {

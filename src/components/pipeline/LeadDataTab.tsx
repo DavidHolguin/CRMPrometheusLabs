@@ -3,41 +3,21 @@ import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
-import { Form, FormField, FormItem, FormLabel, FormControl } from "@/components/ui/form";
+import { Form, FormField, FormItem, FormControl } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Edit, Save, Plus, User, Map, Calendar, 
-  FileText, TrendingUp, MessageSquare, 
-  User as UserIcon, Mail, Phone
+  FileText, Mail, Phone
 } from "lucide-react";
 import { useForm } from "react-hook-form";
-import { motion } from "framer-motion";
-import { cn } from "@/lib/utils";
-import { Progress } from "@/components/ui/progress";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { Lead } from "@/hooks/useLeads";
-import { 
-  ChartConfig, 
-  ChartContainer, 
-  ChartTooltip, 
-  ChartTooltipContent 
-} from "@/components/ui/chart";
-import { 
-  PolarGrid, 
-  PolarRadiusAxis, 
-  RadialBar, 
-  RadialBarChart,
-  Line,
-  LineChart,
-  CartesianGrid,
-  XAxis,
-  Label 
-} from "recharts";
 import { Separator } from "@/components/ui/separator";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Lead } from "@/hooks/useLeads";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { LeadScoreChart } from "./LeadScoreChart";
+import { LeadActivityChart } from "./LeadActivityChart";
+import { LeadInteractionsList } from "./LeadInteractionsList";
 
 interface LeadDataTabProps {
   lead: Lead;
@@ -48,11 +28,10 @@ export function LeadDataTab({ lead, formatDate }: LeadDataTabProps) {
   const [editMode, setEditMode] = useState<Record<string, boolean>>({});
   const [customFields, setCustomFields] = useState<Array<{key: string, value: string}>>([]);
   const [newCustomField, setNewCustomField] = useState({key: "", value: ""});
-  const [interactionTypes, setInteractionTypes] = useState<any[]>([]);
   
   // Convert lead.score to a number for all calculations and displays
   const scoreNumber = Number(lead.score || 0);
-  
+
   // Setup form with default values from the lead
   const form = useForm({
     defaultValues: {
@@ -92,10 +71,10 @@ export function LeadDataTab({ lead, formatDate }: LeadDataTabProps) {
           created_at, 
           valor_score,
           interaction_type_id,
-          lead_interaction_types(nombre, color)
+          lead_interaction_types:interaction_type_id (id, nombre, color)
         `)
         .eq("lead_id", lead.id)
-        .order("created_at", { ascending: true });
+        .order("created_at", { ascending: false });
         
       if (error) {
         console.error("Error fetching interactions:", error);
@@ -106,26 +85,6 @@ export function LeadDataTab({ lead, formatDate }: LeadDataTabProps) {
     },
     enabled: !!lead.id,
   });
-
-  // Fetch interaction types
-  useEffect(() => {
-    const fetchInteractionTypes = async () => {
-      try {
-        const { data, error } = await supabase
-          .from("lead_interaction_types")
-          .select("*")
-          .order("nombre");
-          
-        if (error) throw error;
-        
-        setInteractionTypes(data || []);
-      } catch (error) {
-        console.error("Error fetching interaction types:", error);
-      }
-    };
-    
-    fetchInteractionTypes();
-  }, []);
   
   // Function to render field with edit toggle
   const renderEditableField = (label: string, field: string, icon: JSX.Element, value: string) => {
@@ -181,14 +140,6 @@ export function LeadDataTab({ lead, formatDate }: LeadDataTabProps) {
   const messageCount = lead.message_count || 0;
   const interactionCount = lead.interaction_count || 0;
   
-  // Helper function to get score color
-  function getScoreColor(score: number): string {
-    if (score > 75) return "hsl(var(--chart-3))"; // Green
-    if (score > 50) return "hsl(var(--chart-1))"; // Orange
-    if (score > 25) return "hsl(var(--chart-4))"; // Yellow
-    return "hsl(var(--chart-5))"; // Red
-  }
-
   // Generate message activity data (fake data for now, will be replaced with real data)
   const generateMessageActivityData = () => {
     const today = new Date();
@@ -208,251 +159,34 @@ export function LeadDataTab({ lead, formatDate }: LeadDataTabProps) {
   };
 
   const messageActivityData = useMemo(() => generateMessageActivityData(), []);
-  
-  // Chart configurations
-  const scoreChartConfig = {
-    score: {
-      label: "Puntuación",
-      color: getScoreColor(scoreNumber),
-    },
-  } satisfies ChartConfig;
-
-  const activityChartConfig = {
-    activity: {
-      label: "Actividad",
-    },
-    messages: {
-      label: "Mensajes",
-      color: "hsl(var(--chart-1))",
-    },
-    interactions: {
-      label: "Interacciones",
-      color: "hsl(var(--chart-2))",
-    },
-  } satisfies ChartConfig;
-
-  const [activeActivityChart, setActiveActivityChart] = useState<'messages' | 'interactions'>('messages');
-
-  const scoreChartData = [
-    { name: "score", value: scoreNumber, fill: getScoreColor(scoreNumber) }
-  ];
-
-  // Calculate totals for message data
-  const activityTotals = useMemo(() => ({
-    messages: messageActivityData.reduce((acc, curr) => acc + curr.messages, 0),
-    interactions: messageActivityData.reduce((acc, curr) => acc + curr.interactions, 0),
-  }), [messageActivityData]);
 
   return (
     <div>
-      {/* Tabs for main navigation - changed order, improved styling */}
+      {/* Main Tabs - Reordered to have Progreso first */}
       <Tabs defaultValue="progreso" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 mb-4">
+        <TabsList className="grid w-full grid-cols-2 mb-4 bg-muted/60">
           <TabsTrigger value="progreso">Progreso</TabsTrigger>
           <TabsTrigger value="datos">Datos Personales</TabsTrigger>
         </TabsList>
         
-        {/* Progreso Tab Content - Redesigned with new charts */}
+        {/* Progreso Tab Content - Redesigned with modern charts */}
         <TabsContent value="progreso" className="space-y-4">
-          {/* Score Section */}
-          <Card className="flex flex-col">
-            <CardHeader className="items-center pb-0">
-              <CardTitle className="text-lg">Puntuación del Lead</CardTitle>
-              <CardDescription>Puntaje basado en actividades e interacciones</CardDescription>
-            </CardHeader>
-            <CardContent className="flex-1 pb-0">
-              <ChartContainer
-                config={scoreChartConfig}
-                className="mx-auto aspect-square max-h-[250px]"
-              >
-                <RadialBarChart
-                  data={scoreChartData}
-                  startAngle={0}
-                  endAngle={360}
-                  innerRadius={80}
-                  outerRadius={110}
-                >
-                  <PolarGrid
-                    gridType="circle"
-                    radialLines={false}
-                    stroke="none"
-                    className="first:fill-muted last:fill-background"
-                    polarRadius={[86, 74]}
-                  />
-                  <RadialBar dataKey="value" background cornerRadius={10} />
-                  <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
-                    <Label
-                      content={({ viewBox }) => {
-                        if (viewBox && "cx" in viewBox && "cy" in viewBox) {
-                          return (
-                            <text
-                              x={viewBox.cx}
-                              y={viewBox.cy}
-                              textAnchor="middle"
-                              dominantBaseline="middle"
-                            >
-                              <tspan
-                                x={viewBox.cx}
-                                y={viewBox.cy}
-                                className="fill-foreground text-4xl font-bold"
-                              >
-                                {scoreNumber}
-                              </tspan>
-                              <tspan
-                                x={viewBox.cx}
-                                y={(viewBox.cy || 0) + 24}
-                                className="fill-muted-foreground"
-                              >
-                                puntos
-                              </tspan>
-                            </text>
-                          );
-                        }
-                        return null;
-                      }}
-                    />
-                  </PolarRadiusAxis>
-                </RadialBarChart>
-              </ChartContainer>
-            </CardContent>
-            <CardFooter className="flex-col gap-2 text-sm pt-2">
-              <div className="flex items-center gap-2 font-medium leading-none">
-                <TrendingUp className="h-4 w-4 text-green-500" />
-                Mejorando con {interactionCount} interacciones recientes
-              </div>
-              <div className="leading-none text-muted-foreground">
-                Etapa actual: {lead.stage_name || "Sin etapa"}
-              </div>
-            </CardFooter>
-          </Card>
+          {/* Lead Score Section - Using extracted component */}
+          <LeadScoreChart 
+            score={scoreNumber} 
+            interactionCount={interactionCount} 
+            stageName={lead.stage_name || ""}
+          />
 
-          {/* Activity/Messages Chart */}
-          <Card>
-            <CardHeader className="flex flex-col items-stretch space-y-0 border-b p-0 sm:flex-row">
-              <div className="flex flex-1 flex-col justify-center gap-1 px-6 py-5 sm:py-6">
-                <CardTitle>Actividad del Lead</CardTitle>
-                <CardDescription>
-                  Historial de mensajes e interacciones
-                </CardDescription>
-              </div>
-              <div className="flex">
-                {["messages", "interactions"].map((key) => {
-                  const chart = key as keyof typeof activityTotals;
-                  return (
-                    <button
-                      key={chart}
-                      data-active={activeActivityChart === chart}
-                      className="flex flex-1 flex-col justify-center gap-1 border-t px-6 py-4 text-left even:border-l data-[active=true]:bg-muted/50 sm:border-l sm:border-t-0 sm:px-8 sm:py-6"
-                      onClick={() => setActiveActivityChart(chart as 'messages' | 'interactions')}
-                    >
-                      <span className="text-xs text-muted-foreground">
-                        {activityChartConfig[chart]?.label || chart}
-                      </span>
-                      <span className="text-lg font-bold leading-none sm:text-3xl">
-                        {activityTotals[chart].toLocaleString()}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </CardHeader>
-            <CardContent className="px-2 sm:p-6">
-              <ChartContainer
-                config={activityChartConfig}
-                className="aspect-auto h-[250px] w-full"
-              >
-                <LineChart
-                  accessibilityLayer
-                  data={messageActivityData}
-                  margin={{
-                    left: 12,
-                    right: 12,
-                  }}
-                >
-                  <CartesianGrid vertical={false} />
-                  <XAxis
-                    dataKey="date"
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={8}
-                    minTickGap={32}
-                    tickFormatter={(value) => {
-                      const date = new Date(value);
-                      return date.toLocaleDateString("es-ES", {
-                        month: "short",
-                        day: "numeric",
-                      });
-                    }}
-                  />
-                  <ChartTooltip
-                    content={
-                      <ChartTooltipContent
-                        className="w-[150px]"
-                        nameKey="activity"
-                        labelFormatter={(value) => {
-                          return new Date(value).toLocaleDateString("es-ES", {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          });
-                        }}
-                      />
-                    }
-                  />
-                  <Line
-                    dataKey={activeActivityChart}
-                    type="monotone"
-                    stroke={`var(--color-${activeActivityChart})`}
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                </LineChart>
-              </ChartContainer>
-            </CardContent>
-          </Card>
+          {/* Activity/Messages Chart - Using extracted component */}
+          <LeadActivityChart activityData={messageActivityData} />
 
-          {/* Lead interaction history - mini timeline */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Interacciones Recientes</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {loadingInteractions ? (
-                <div className="flex justify-center py-4">
-                  <div className="animate-pulse h-24 w-full bg-muted rounded" />
-                </div>
-              ) : interactions.length === 0 ? (
-                <div className="text-center py-3 text-muted-foreground text-sm">
-                  No hay interacciones registradas
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {interactions.slice(0, 5).map((interaction: any) => (
-                    <div 
-                      key={interaction.id} 
-                      className="flex items-start gap-3 p-2 border-l-2 rounded-sm"
-                      style={{ borderLeftColor: interaction.lead_interaction_types?.color || '#cccccc' }}
-                    >
-                      <div>
-                        <div className="text-sm font-medium">
-                          {interaction.lead_interaction_types?.nombre || "Interacción"}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {formatDate(interaction.created_at)} · Valor: {interaction.valor_score}/10
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  
-                  {interactions.length > 5 && (
-                    <Button variant="outline" size="sm" className="w-full">
-                      Ver todas las interacciones ({interactions.length})
-                    </Button>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          {/* Lead interaction history - Using extracted component */}
+          <LeadInteractionsList 
+            interactions={interactions} 
+            isLoading={loadingInteractions} 
+            formatDate={formatDate}
+          />
           
           {/* Current stage info */}
           <Card>
