@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Lead } from "@/hooks/useLeads";
 import { supabase } from "@/integrations/supabase/client";
@@ -64,7 +65,8 @@ export function LeadHistoryTab({ lead, formatDate }: LeadHistoryTabProps) {
           campo,
           valor_anterior,
           valor_nuevo,
-          usuario_id
+          usuario_id,
+          profiles:usuario_id(id, full_name, avatar_url, email)
         `)
         .eq("lead_id", lead.id)
         .order("created_at", { ascending: false });
@@ -78,7 +80,8 @@ export function LeadHistoryTab({ lead, formatDate }: LeadHistoryTabProps) {
           tiempo_en_stage,
           usuario_id,
           anterior:stage_id_anterior(id, nombre, color),
-          nuevo:stage_id_nuevo(id, nombre, color)
+          nuevo:stage_id_nuevo(id, nombre, color),
+          profiles:usuario_id(id, full_name, avatar_url, email)
         `)
         .eq("lead_id", lead.id)
         .order("created_at", { ascending: false });
@@ -86,36 +89,11 @@ export function LeadHistoryTab({ lead, formatDate }: LeadHistoryTabProps) {
       if (fieldError) console.error("Error fetching field history:", fieldError);
       if (stageError) console.error("Error fetching stage history:", stageError);
       
-      // Get unique user IDs from both sets of changes
-      const userIds = new Set([
-        ...(fieldChanges || []).map(item => item.usuario_id),
-        ...(stageChanges || []).map(item => item.usuario_id)
-      ]);
-      
-      // Fetch user profiles
-      const { data: profiles, error: profilesError } = await supabase
-        .from("profiles")
-        .select("id, full_name, avatar_url, email")
-        .in("id", Array.from(userIds).filter(Boolean));
-        
-      if (profilesError) console.error("Error fetching profiles:", profilesError);
-      
-      // Create a map of user profiles by ID
-      const profileMap: Record<string, any> = {};
-      profiles?.forEach(profile => {
-        profileMap[profile.id] = profile;
-      });
-      
       // Format and combine the history events
       const formattedFieldChanges = (fieldChanges || []).map(item => ({
         id: item.id,
         created_at: item.created_at,
-        usuario: profileMap[item.usuario_id] || {
-          id: item.usuario_id || 'unknown',
-          full_name: "Usuario del sistema",
-          email: "",
-          avatar_url: ""
-        },
+        usuario: item.profiles,
         campo: item.campo,
         valor_anterior: item.valor_anterior,
         valor_nuevo: item.valor_nuevo,
@@ -125,12 +103,7 @@ export function LeadHistoryTab({ lead, formatDate }: LeadHistoryTabProps) {
       const formattedStageChanges = (stageChanges || []).map(item => ({
         id: item.id,
         created_at: item.created_at,
-        usuario: profileMap[item.usuario_id] || {
-          id: item.usuario_id || 'unknown',
-          full_name: "Usuario del sistema",
-          email: "",
-          avatar_url: ""
-        },
+        usuario: item.profiles,
         tiempo_en_stage: item.tiempo_en_stage,
         stage_anterior: item.anterior,
         stage_nuevo: item.nuevo,
