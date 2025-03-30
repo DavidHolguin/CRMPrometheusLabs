@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useCanales, ChatbotCanal } from "@/hooks/useCanales";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -8,75 +7,56 @@ import AddCanalDialog from "@/components/canales/AddCanalDialog";
 import EditCanalDialog from "@/components/canales/EditCanalDialog";
 import DeleteCanalDialog from "@/components/canales/DeleteCanalDialog";
 import { useChatbots } from "@/hooks/useChatbots";
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardHeader, 
-  CardTitle 
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { 
-  LayoutGrid, 
-  List, 
-  Search, 
-  Filter, 
-  Info,
-  Loader2 
-} from "lucide-react";
+import { LayoutGrid, List, Search, Filter, Info, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 export default function Canales() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState("");
   const [filterChatbot, setFilterChatbot] = useState<string>("");
   const [editingCanal, setEditingCanal] = useState<ChatbotCanal | null>(null);
   const [deletingCanal, setDeletingCanal] = useState<ChatbotCanal | null>(null);
-  
-  const { 
-    useCanalesQuery, 
+  const {
+    useCanalesQuery,
     useChatbotCanalesQuery,
     useAddChatbotCanalMutation,
     useUpdateChatbotCanalMutation,
     useDeleteChatbotCanalMutation
   } = useCanales();
-  
-  const { data: chatbots = [] } = useChatbots();
-  
-  const { data: canales = [], isLoading: isLoadingCanales } = useCanalesQuery();
-  const { data: chatbotCanales = [], isLoading: isLoadingChatbotCanales } = useChatbotCanalesQuery();
-  
-  const { mutate: addChatbotCanal } = useAddChatbotCanalMutation();
-  const { mutate: updateChatbotCanal } = useUpdateChatbotCanalMutation();
-  const { mutate: deleteChatbotCanal } = useDeleteChatbotCanalMutation();
+  const {
+    data: chatbots = []
+  } = useChatbots();
+  const {
+    data: canales = [],
+    isLoading: isLoadingCanales
+  } = useCanalesQuery();
+  const {
+    data: chatbotCanales = [],
+    isLoading: isLoadingChatbotCanales
+  } = useChatbotCanalesQuery();
+  const {
+    mutate: addChatbotCanal
+  } = useAddChatbotCanalMutation();
+  const {
+    mutate: updateChatbotCanal
+  } = useUpdateChatbotCanalMutation();
+  const {
+    mutate: deleteChatbotCanal
+  } = useDeleteChatbotCanalMutation();
 
   // Filtrar canales
   const filteredCanales = chatbotCanales.filter(canal => {
     if (!canal.canal) return false;
-    
+
     // Filtrar por búsqueda
-    const matchesSearch = 
-      searchQuery === "" || 
-      canal.canal.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (canal.canal.descripcion && canal.canal.descripcion.toLowerCase().includes(searchQuery.toLowerCase()));
-    
+    const matchesSearch = searchQuery === "" || canal.canal.nombre.toLowerCase().includes(searchQuery.toLowerCase()) || canal.canal.descripcion && canal.canal.descripcion.toLowerCase().includes(searchQuery.toLowerCase());
+
     // Filtrar por chatbot
     const matchesChatbot = filterChatbot === "" || canal.chatbot_id === filterChatbot;
-    
     return matchesSearch && matchesChatbot;
   });
 
@@ -118,9 +98,7 @@ export default function Canales() {
     const chatbot = chatbots.find(c => c.id === id);
     return chatbot ? chatbot.nombre : 'Desconocido';
   };
-
-  return (
-    <div className="space-y-6">
+  return <div className="space-y-6 px-[20px] py-[20px]">
       <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Canales de comunicación</h1>
@@ -129,10 +107,7 @@ export default function Canales() {
           </p>
         </div>
         
-        <AddCanalDialog 
-          canales={canales} 
-          onAdd={handleAddCanal} 
-        />
+        <AddCanalDialog canales={canales} onAdd={handleAddCanal} />
       </div>
 
       <Separator />
@@ -140,12 +115,7 @@ export default function Canales() {
       <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
         <div className="relative w-full md:w-72">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar canales..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
+          <Input placeholder="Buscar canales..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-9" />
         </div>
         
         <div className="flex gap-2 flex-wrap justify-between w-full md:w-auto">
@@ -157,11 +127,9 @@ export default function Canales() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos los chatbots</SelectItem>
-                {chatbots.map((chatbot) => (
-                  <SelectItem key={chatbot.id} value={chatbot.id}>
+                {chatbots.map(chatbot => <SelectItem key={chatbot.id} value={chatbot.id}>
                     {chatbot.nombre}
-                  </SelectItem>
-                ))}
+                  </SelectItem>)}
               </SelectContent>
             </Select>
             
@@ -183,20 +151,10 @@ export default function Canales() {
           </div>
           
           <div className="flex items-center border rounded-md overflow-hidden">
-            <Button
-              variant={viewMode === "grid" ? "default" : "ghost"}
-              size="sm"
-              className="rounded-none h-9"
-              onClick={() => setViewMode("grid")}
-            >
+            <Button variant={viewMode === "grid" ? "default" : "ghost"} size="sm" className="rounded-none h-9" onClick={() => setViewMode("grid")}>
               <LayoutGrid className="h-4 w-4" />
             </Button>
-            <Button
-              variant={viewMode === "list" ? "default" : "ghost"}
-              size="sm"
-              className="rounded-none h-9"
-              onClick={() => setViewMode("list")}
-            >
+            <Button variant={viewMode === "list" ? "default" : "ghost"} size="sm" className="rounded-none h-9" onClick={() => setViewMode("list")}>
               <List className="h-4 w-4" />
             </Button>
           </div>
@@ -204,100 +162,57 @@ export default function Canales() {
       </div>
 
       {/* Estado de carga */}
-      {(isLoadingCanales || isLoadingChatbotCanales) && (
-        <div className="flex justify-center items-center py-12">
+      {(isLoadingCanales || isLoadingChatbotCanales) && <div className="flex justify-center items-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <span className="ml-2 text-muted-foreground">Cargando canales...</span>
-        </div>
-      )}
+        </div>}
 
       {/* Sin resultados */}
-      {!isLoadingChatbotCanales && filteredCanales.length === 0 && (
-        <Card>
+      {!isLoadingChatbotCanales && filteredCanales.length === 0 && <Card>
           <CardHeader>
             <CardTitle>No hay canales conectados</CardTitle>
             <CardDescription>
-              {searchQuery || filterChatbot 
-                ? "No se encontraron canales con los filtros aplicados." 
-                : "Conecta un nuevo canal para empezar a interactuar con tus clientes."}
+              {searchQuery || filterChatbot ? "No se encontraron canales con los filtros aplicados." : "Conecta un nuevo canal para empezar a interactuar con tus clientes."}
             </CardDescription>
           </CardHeader>
           <CardContent className="flex justify-center pb-6">
             <Button onClick={() => {
-              setSearchQuery("");
-              setFilterChatbot("");
-            }} variant="outline">
-              {searchQuery || filterChatbot 
-                ? "Limpiar filtros" 
-                : "Conectar nuevo canal"}
+          setSearchQuery("");
+          setFilterChatbot("");
+        }} variant="outline">
+              {searchQuery || filterChatbot ? "Limpiar filtros" : "Conectar nuevo canal"}
             </Button>
           </CardContent>
-        </Card>
-      )}
+        </Card>}
 
       {/* Vista de canales */}
-      {!isLoadingChatbotCanales && filteredCanales.length > 0 && (
-        <>
-          {viewMode === "grid" ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filteredCanales.map((canal) => (
-                <div key={canal.id}>
-                  {filterChatbot === "" && (
-                    <div className="mb-1 px-1">
+      {!isLoadingChatbotCanales && filteredCanales.length > 0 && <>
+          {viewMode === "grid" ? <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {filteredCanales.map(canal => <div key={canal.id}>
+                  {filterChatbot === "" && <div className="mb-1 px-1">
                       <span className="text-xs font-medium text-muted-foreground">
                         {getChatbotName(canal.chatbot_id)}
                       </span>
-                    </div>
-                  )}
-                  <CanalCard
-                    canal={canal}
-                    onEdit={setEditingCanal}
-                    onDelete={(id) => setDeletingCanal(canal)}
-                    onToggleActive={handleToggleActive}
-                  />
-                </div>
-              ))}
-            </div>
-          ) : (
-            <Card>
+                    </div>}
+                  <CanalCard canal={canal} onEdit={setEditingCanal} onDelete={id => setDeletingCanal(canal)} onToggleActive={handleToggleActive} />
+                </div>)}
+            </div> : <Card>
               <CardContent className="pt-6 px-2 sm:px-6">
-                {filteredCanales.map((canal) => (
-                  <div key={canal.id}>
-                    {filterChatbot === "" && (
-                      <div className="mb-1 mt-2 first:mt-0">
+                {filteredCanales.map(canal => <div key={canal.id}>
+                    {filterChatbot === "" && <div className="mb-1 mt-2 first:mt-0">
                         <span className="text-sm font-medium">
                           {getChatbotName(canal.chatbot_id)}
                         </span>
-                      </div>
-                    )}
-                    <CanalRow
-                      canal={canal}
-                      onEdit={setEditingCanal}
-                      onDelete={(id) => setDeletingCanal(canal)}
-                      onToggleActive={handleToggleActive}
-                    />
-                  </div>
-                ))}
+                      </div>}
+                    <CanalRow canal={canal} onEdit={setEditingCanal} onDelete={id => setDeletingCanal(canal)} onToggleActive={handleToggleActive} />
+                  </div>)}
               </CardContent>
-            </Card>
-          )}
-        </>
-      )}
+            </Card>}
+        </>}
 
       {/* Dialogs */}
-      <EditCanalDialog
-        canal={editingCanal}
-        open={!!editingCanal}
-        onOpenChange={(open) => !open && setEditingCanal(null)}
-        onSave={handleUpdateCanal}
-      />
+      <EditCanalDialog canal={editingCanal} open={!!editingCanal} onOpenChange={open => !open && setEditingCanal(null)} onSave={handleUpdateCanal} />
       
-      <DeleteCanalDialog
-        open={!!deletingCanal}
-        onOpenChange={(open) => !open && setDeletingCanal(null)}
-        onConfirm={handleDeleteCanal}
-        canalName={deletingCanal?.canal?.nombre}
-      />
-    </div>
-  );
+      <DeleteCanalDialog open={!!deletingCanal} onOpenChange={open => !open && setDeletingCanal(null)} onConfirm={handleDeleteCanal} canalName={deletingCanal?.canal?.nombre} />
+    </div>;
 }
