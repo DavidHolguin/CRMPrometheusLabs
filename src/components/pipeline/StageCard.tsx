@@ -8,6 +8,7 @@ import { Plus } from "lucide-react";
 import { Droppable, Draggable } from "react-beautiful-dnd";
 import { LeadCard } from "@/components/pipeline/LeadCard";
 import { cn } from "@/lib/utils";
+import { AnimatePresence, motion } from "framer-motion";
 
 interface StageCardProps {
   stage: PipelineStage;
@@ -53,48 +54,66 @@ export function StageCard({ stage, leads, onAddLead }: StageCardProps) {
           >
             <ScrollArea className="h-[calc(100vh-180px)] w-full pr-2">
               <div className="p-2 space-y-2">
-                {leads && leads.length > 0 ? (
-                  leads.map((lead: Lead, leadIndex: number) => (
-                    <Draggable 
-                      key={lead.id} 
-                      draggableId={lead.id} 
-                      index={leadIndex}
+                <AnimatePresence>
+                  {leads && leads.length > 0 ? (
+                    leads.map((lead: Lead, leadIndex: number) => (
+                      <Draggable 
+                        key={lead.id} 
+                        draggableId={lead.id} 
+                        index={leadIndex}
+                      >
+                        {(provided, snapshot) => (
+                          <motion.div
+                            ref={provided.innerRef}
+                            {...provided.draggableProps}
+                            {...provided.dragHandleProps}
+                            className="transition-all"
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ 
+                              opacity: 1, 
+                              y: 0,
+                              scale: snapshot.isDragging ? 1.02 : 1,
+                              boxShadow: snapshot.isDragging ? "0 10px 25px -5px rgba(0, 0, 0, 0.1)" : "none",
+                              zIndex: snapshot.isDragging ? 10 : 'auto'
+                            }}
+                            exit={{ opacity: 0, y: -10 }}
+                            transition={{ 
+                              type: "spring", 
+                              stiffness: 500, 
+                              damping: 30,
+                              mass: 1
+                            }}
+                            style={{
+                              ...provided.draggableProps.style,
+                            }}
+                          >
+                            <LeadCard 
+                              lead={lead} 
+                              isDragging={snapshot.isDragging}
+                            />
+                          </motion.div>
+                        )}
+                      </Draggable>
+                    ))
+                  ) : (
+                    <motion.div 
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="flex flex-col justify-center items-center h-24 text-muted-foreground text-sm"
                     >
-                      {(provided, snapshot) => (
-                        <div
-                          ref={provided.innerRef}
-                          {...provided.draggableProps}
-                          {...provided.dragHandleProps}
-                          className="transition-transform"
-                          style={{
-                            ...provided.draggableProps.style,
-                            transform: snapshot.isDragging 
-                              ? provided.draggableProps.style?.transform 
-                              : "none"
-                          }}
-                        >
-                          <LeadCard 
-                            lead={lead} 
-                            isDragging={snapshot.isDragging}
-                          />
-                        </div>
-                      )}
-                    </Draggable>
-                  ))
-                ) : (
-                  <div className="flex flex-col justify-center items-center h-24 text-muted-foreground text-sm">
-                    <span>No hay leads</span>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="mt-2"
-                      onClick={onAddLead}
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Agregar Lead
-                    </Button>
-                  </div>
-                )}
+                      <span>No hay leads</span>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="mt-2"
+                        onClick={onAddLead}
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Agregar Lead
+                      </Button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
                 {provided.placeholder}
               </div>
             </ScrollArea>

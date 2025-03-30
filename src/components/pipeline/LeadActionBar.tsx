@@ -1,8 +1,8 @@
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Check, ChevronsUpDown, Tag, MessageSquare, Edit, Send } from "lucide-react";
+import { Check, ChevronsUpDown, Tag, Edit, Send, Plus, X, ArrowLeft, ArrowRight, GripVertical } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { 
@@ -53,6 +53,11 @@ export function LeadActionBar({
   const [stageOpen, setStageOpen] = useState(false);
   const [newTagName, setNewTagName] = useState("");
   const [selectedColor, setSelectedColor] = useState("#10b981");
+  const [isEditingTag, setIsEditingTag] = useState(false);
+  const [editingTagId, setEditingTagId] = useState<string | null>(null);
+  const [editingTagName, setEditingTagName] = useState("");
+  const [editingTagColor, setEditingTagColor] = useState("");
+  const [showTagManager, setShowTagManager] = useState(false);
   const queryClient = useQueryClient();
   
   // Array of predefined colors for tags
@@ -72,6 +77,41 @@ export function LeadActionBar({
     // Here you'd normally make an API call to create a new tag
     toast.success(`Tag "${newTagName}" creado`);
     setNewTagName("");
+    
+    // Invalidate the tags query to refresh data
+    queryClient.invalidateQueries({ queryKey: ["lead_tags"] });
+  };
+  
+  const startEditingTag = (tag: {id: string, nombre: string, color: string}) => {
+    setIsEditingTag(true);
+    setEditingTagId(tag.id);
+    setEditingTagName(tag.nombre);
+    setEditingTagColor(tag.color);
+  };
+  
+  const saveTagEdit = () => {
+    if (!editingTagId || !editingTagName.trim()) return;
+    
+    // Here you'd make an API call to update the tag
+    toast.success(`Tag "${editingTagName}" actualizado`);
+    setIsEditingTag(false);
+    setEditingTagId(null);
+    
+    // Invalidate the tags query to refresh data
+    queryClient.invalidateQueries({ queryKey: ["lead_tags"] });
+  };
+  
+  const deleteTag = (tagId: string) => {
+    // Here you'd make an API call to delete the tag
+    toast.success(`Tag eliminado`);
+    
+    // Invalidate the tags query to refresh data
+    queryClient.invalidateQueries({ queryKey: ["lead_tags"] });
+  };
+  
+  const moveTag = (tagId: string, direction: 'left' | 'right') => {
+    // This is just a UI representation. In a real app, you'd update the order in the database
+    toast.info(`Reordenando etiquetas`);
     
     // Invalidate the tags query to refresh data
     queryClient.invalidateQueries({ queryKey: ["lead_tags"] });
@@ -174,15 +214,18 @@ export function LeadActionBar({
             <Badge 
               key={tag.id} 
               style={{ backgroundColor: tag.color }}
-              className="cursor-pointer"
+              className="cursor-pointer group flex items-center gap-1"
               onClick={() => onTagToggle(tag.id)}
             >
               {tag.nombre}
+              <span className="opacity-0 group-hover:opacity-100 transition-opacity pl-1">
+                <X className="h-3 w-3" />
+              </span>
             </Badge>
           ))}
         </div>
         
-        <Dialog>
+        <Dialog open={showTagManager} onOpenChange={setShowTagManager}>
           <DialogTrigger asChild>
             <Button variant="outline" size="icon" className="h-9 w-9">
               <Tag className="h-4 w-4" />
@@ -197,23 +240,92 @@ export function LeadActionBar({
                 <h3 className="text-sm font-medium">Etiquetas disponibles</h3>
                 <div className="flex flex-wrap gap-2">
                   {tags.map(tag => (
-                    <Badge 
-                      key={tag.id} 
-                      style={{ backgroundColor: tag.color }}
+                    <div 
+                      key={tag.id}
                       className={cn(
-                        "cursor-pointer",
-                        lead.tags?.some(t => t.id === tag.id) ? "opacity-100" : "opacity-60"
+                        "flex items-center gap-1 p-1 rounded transition-shadow",
+                        editingTagId === tag.id ? "ring-2 ring-primary" : "hover:shadow"
                       )}
-                      onClick={() => onTagToggle(tag.id)}
                     >
-                      {tag.nombre}
-                      <Check
-                        className={cn(
-                          "ml-1 h-3 w-3",
-                          lead.tags?.some(t => t.id === tag.id) ? "opacity-100" : "opacity-0"
-                        )}
-                      />
-                    </Badge>
+                      {isEditingTag && editingTagId === tag.id ? (
+                        <>
+                          <div className="flex items-center bg-background rounded border overflow-hidden">
+                            <div 
+                              className="w-5 h-5"
+                              style={{ backgroundColor: editingTagColor }}
+                            />
+                            <Input 
+                              value={editingTagName} 
+                              onChange={(e) => setEditingTagName(e.target.value)}
+                              className="h-7 w-[100px] border-0 focus-visible:ring-0"
+                            />
+                            <div className="flex">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 w-7 p-0 rounded-none"
+                                onClick={saveTagEdit}
+                              >
+                                <Check className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 w-7 p-0 rounded-none"
+                                onClick={() => setIsEditingTag(false)}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <Badge 
+                            style={{ backgroundColor: tag.color }}
+                            className={cn(
+                              "cursor-pointer",
+                              lead.tags?.some(t => t.id === tag.id) ? "opacity-100" : "opacity-60"
+                            )}
+                            onClick={() => onTagToggle(tag.id)}
+                          >
+                            {tag.nombre}
+                            <Check
+                              className={cn(
+                                "ml-1 h-3 w-3",
+                                lead.tags?.some(t => t.id === tag.id) ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                          </Badge>
+                          <div className="flex gap-1">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-6 w-6"
+                              onClick={() => startEditingTag(tag)}
+                            >
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-6 w-6"
+                              onClick={() => moveTag(tag.id, 'left')}
+                            >
+                              <ArrowLeft className="h-3 w-3" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-6 w-6"
+                              onClick={() => moveTag(tag.id, 'right')}
+                            >
+                              <ArrowRight className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </>
+                      )}
+                    </div>
                   ))}
                 </div>
               </div>
@@ -232,7 +344,7 @@ export function LeadActionBar({
                         key={color}
                         type="button"
                         className={cn(
-                          "w-6 h-6 rounded-full",
+                          "w-6 h-6 rounded-full transition-all",
                           selectedColor === color ? "ring-2 ring-offset-2 ring-primary" : ""
                         )}
                         style={{ backgroundColor: color }}
