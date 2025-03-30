@@ -15,6 +15,7 @@ import { usePipelines } from "@/hooks/usePipelines";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { LeadAIEvaluation } from "./LeadAIEvaluation";
 
 interface LeadDrawerProps {
   lead: Lead;
@@ -202,25 +203,36 @@ export function LeadDrawer({
         </DrawerHeader>
         
         <div className="px-4 pb-20">
-          <Tabs defaultValue="datos" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 mb-4">
-              <TabsTrigger value="datos">Datos y Progreso</TabsTrigger>
-              <TabsTrigger value="historial">Historial</TabsTrigger>
-              <TabsTrigger value="comentarios">Comentarios</TabsTrigger>
-            </TabsList>
+          <div className="flex flex-col-reverse lg:flex-row gap-4">
+            {/* Columna izquierda - Evaluación IA */}
+            <div className="lg:w-1/3 space-y-4">
+              <h3 className="text-sm font-medium text-muted-foreground mb-2">Evaluación Inteligente</h3>
+              <LeadAIEvaluation lead={lead} />
+            </div>
             
-            <TabsContent value="datos" className="space-y-4">
-              <LeadDataTab lead={lead} formatDate={formatLeadDate} />
-            </TabsContent>
-            
-            <TabsContent value="historial">
-              <LeadHistoryTab lead={lead} formatDate={formatLeadDate} />
-            </TabsContent>
-            
-            <TabsContent value="comentarios">
-              <LeadCommentsTab lead={lead} formatDate={formatLeadDate} />
-            </TabsContent>
-          </Tabs>
+            {/* Columna derecha - Información principal */}
+            <div className="lg:w-2/3">
+              <Tabs defaultValue="datos" className="w-full">
+                <TabsList className="grid w-full grid-cols-3 mb-4">
+                  <TabsTrigger value="datos">Datos y Progreso</TabsTrigger>
+                  <TabsTrigger value="historial">Historial</TabsTrigger>
+                  <TabsTrigger value="comentarios">Comentarios</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="datos" className="space-y-4">
+                  <LeadDataTab lead={lead} formatDate={formatLeadDate} />
+                </TabsContent>
+                
+                <TabsContent value="historial">
+                  <LeadHistoryTab lead={lead} formatDate={formatLeadDate} />
+                </TabsContent>
+                
+                <TabsContent value="comentarios">
+                  <LeadCommentsTab lead={lead} formatDate={formatLeadDate} />
+                </TabsContent>
+              </Tabs>
+            </div>
+          </div>
         </div>
         
         <LeadActionBar
@@ -231,6 +243,7 @@ export function LeadDrawer({
           onStageChange={handleStageChange}
           onPipelineChange={handlePipelineChange}
           onTagToggle={handleTagToggle}
+          className="w-[80%] mx-auto"
         />
       </DrawerContent>
     </Drawer>

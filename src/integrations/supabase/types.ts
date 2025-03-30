@@ -532,6 +532,86 @@ export type Database = {
           },
         ]
       }
+      evaluaciones_llm: {
+        Row: {
+          comentario: string | null
+          conversacion_id: string
+          created_at: string
+          fecha_evaluacion: string
+          id: number
+          interes_productos: string[] | null
+          lead_id: string
+          llm_configuracion_id: string | null
+          mensaje_id: string | null
+          palabras_clave: string[] | null
+          prompt_utilizado: string | null
+          score_potencial: number
+          score_satisfaccion: number
+          updated_at: string
+        }
+        Insert: {
+          comentario?: string | null
+          conversacion_id: string
+          created_at?: string
+          fecha_evaluacion?: string
+          id?: number
+          interes_productos?: string[] | null
+          lead_id: string
+          llm_configuracion_id?: string | null
+          mensaje_id?: string | null
+          palabras_clave?: string[] | null
+          prompt_utilizado?: string | null
+          score_potencial: number
+          score_satisfaccion: number
+          updated_at?: string
+        }
+        Update: {
+          comentario?: string | null
+          conversacion_id?: string
+          created_at?: string
+          fecha_evaluacion?: string
+          id?: number
+          interes_productos?: string[] | null
+          lead_id?: string
+          llm_configuracion_id?: string | null
+          mensaje_id?: string | null
+          palabras_clave?: string[] | null
+          prompt_utilizado?: string | null
+          score_potencial?: number
+          score_satisfaccion?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evaluaciones_llm_conversacion_id_fkey"
+            columns: ["conversacion_id"]
+            isOneToOne: false
+            referencedRelation: "conversaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evaluaciones_llm_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evaluaciones_llm_llm_configuracion_id_fkey"
+            columns: ["llm_configuracion_id"]
+            isOneToOne: false
+            referencedRelation: "llm_configuraciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evaluaciones_llm_mensaje_id_fkey"
+            columns: ["mensaje_id"]
+            isOneToOne: false
+            referencedRelation: "mensajes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       eventos: {
         Row: {
           created_at: string | null
@@ -1519,6 +1599,12 @@ export type Database = {
           lead_uuid: string
         }
         Returns: number
+      }
+      ejecutar_sql: {
+        Args: {
+          sql: string
+        }
+        Returns: Json[]
       }
       is_admin: {
         Args: {

@@ -12,6 +12,7 @@ import { LeadActionBar } from "./LeadActionBar";
 import { normalizeLeadScore, getScoreColorClass, getScoreCircleClass } from "./LeadScoreUtils";
 import { formatLeadDate } from "./LeadDateUtils";
 import { LeadDrawer } from "./LeadDrawer";
+import { LeadAIEvaluation } from "./LeadAIEvaluation";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { usePipelines } from "@/hooks/usePipelines";
 import { supabase } from "@/integrations/supabase/client";
@@ -181,7 +182,7 @@ export function LeadCard({ lead, isDragging }: LeadCardProps) {
 
       {!isMobile && (
         <Sheet open={detailsOpen} onOpenChange={setDetailsOpen}>
-          <SheetContent className="sm:max-w-md md:max-w-lg lg:max-w-xl overflow-y-auto">
+          <SheetContent className="sm:max-w-md md:max-w-lg lg:max-w-xl xl:max-w-[80%] overflow-y-auto">
             <SheetHeader className="mb-1 pb-2 border-b">
               <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                 <div className={scoreCircleClass}>
@@ -235,25 +236,34 @@ export function LeadCard({ lead, isDragging }: LeadCardProps) {
               </div>
             </SheetHeader>
             
-            <Tabs defaultValue="datos" className="w-full">
-              <TabsList className="grid w-full grid-cols-3 mb-4">
-                <TabsTrigger value="datos">Datos y Progreso</TabsTrigger>
-                <TabsTrigger value="historial">Historial</TabsTrigger>
-                <TabsTrigger value="comentarios">Comentarios</TabsTrigger>
-              </TabsList>
+            <div className="flex flex-col-reverse lg:flex-row gap-4 pt-4">
+              <div className="lg:w-1/3 space-y-4">
+                <h3 className="text-sm font-medium text-muted-foreground mb-2">Evaluación Inteligente</h3>
+                <LeadAIEvaluation lead={lead} />
+              </div>
               
-              <TabsContent value="datos" className="space-y-4">
-                <LeadDataTab lead={lead} formatDate={formatLeadDate} />
-              </TabsContent>
-              
-              <TabsContent value="historial">
-                <LeadHistoryTab lead={lead} formatDate={formatLeadDate} />
-              </TabsContent>
-              
-              <TabsContent value="comentarios">
-                <LeadCommentsTab lead={lead} formatDate={formatLeadDate} />
-              </TabsContent>
-            </Tabs>
+              <div className="lg:w-2/3">
+                <Tabs defaultValue="datos" className="w-full">
+                  <TabsList className="grid w-full grid-cols-3 mb-4">
+                    <TabsTrigger value="datos">Datos y Progreso</TabsTrigger>
+                    <TabsTrigger value="historial">Historial</TabsTrigger>
+                    <TabsTrigger value="comentarios">Comentarios</TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="datos" className="space-y-4">
+                    <LeadDataTab lead={lead} formatDate={formatLeadDate} />
+                  </TabsContent>
+                  
+                  <TabsContent value="historial">
+                    <LeadHistoryTab lead={lead} formatDate={formatLeadDate} />
+                  </TabsContent>
+                  
+                  <TabsContent value="comentarios">
+                    <LeadCommentsTab lead={lead} formatDate={formatLeadDate} />
+                  </TabsContent>
+                </Tabs>
+              </div>
+            </div>
             
             <div className="pb-16"></div>
             
@@ -265,6 +275,7 @@ export function LeadCard({ lead, isDragging }: LeadCardProps) {
               onStageChange={handleStageChange}
               onPipelineChange={handlePipelineChange}
               onTagToggle={handleTagToggle}
+              className="w-[80%] mx-auto"
             />
           </SheetContent>
         </Sheet>
