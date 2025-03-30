@@ -228,6 +228,7 @@ export function usePipelines() {
 
   return {
     pipelines: pipelinesQuery.data || [],
+    stages: pipelinesQuery.data?.flatMap(p => p.stages || []) || [],
     isLoading: pipelinesQuery.isLoading,
     isError: pipelinesQuery.isError,
     error: pipelinesQuery.error,

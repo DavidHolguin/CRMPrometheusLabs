@@ -1,10 +1,10 @@
 
-import { Lead } from "@/hooks/useLeads";
 import { useState } from "react";
-import { Form, FormField, FormItem, FormLabel, FormControl } from "@/components/ui/form";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Form, FormField, FormItem, FormLabel, FormControl } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Edit, Save, Plus, User, Map, Calendar, FileText } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -12,6 +12,7 @@ import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Lead } from "@/hooks/useLeads";
 
 interface LeadDataTabProps {
   lead: Lead;

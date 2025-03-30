@@ -32,12 +32,14 @@ export function LeadDrawer({
   normalizedScore 
 }: LeadDrawerProps) {
   const scoreCircleClass = getScoreCircleClass(scoreColorClass);
-  const { pipelines = [], stages = [] } = usePipelines();
+  const { pipelines = [] } = usePipelines();
+  const [stages, setStages] = useState<any[]>([]);
   const [tags, setTags] = useState<any[]>([]);
   
   useEffect(() => {
     if (open) {
       fetchTags();
+      fetchStages();
     }
   }, [open]);
   
@@ -53,6 +55,23 @@ export function LeadDrawer({
       }
     } catch (error) {
       console.error('Error fetching tags:', error);
+    }
+  };
+  
+  const fetchStages = async () => {
+    try {
+      // Get all stages for pipelines
+      const { data } = await supabase
+        .from('pipeline_stages')
+        .select('*')
+        .eq('is_active', true)
+        .order('posicion', { ascending: true });
+      
+      if (data) {
+        setStages(data);
+      }
+    } catch (error) {
+      console.error('Error fetching stages:', error);
     }
   };
   

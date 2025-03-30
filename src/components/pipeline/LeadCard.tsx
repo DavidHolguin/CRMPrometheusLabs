@@ -1,4 +1,3 @@
-
 import { Lead } from "@/hooks/useLeads";
 import { Card, CardHeader } from "@/components/ui/card";
 import { useState, useEffect } from "react";
@@ -29,7 +28,8 @@ interface LeadCardProps {
 export function LeadCard({ lead, isDragging }: LeadCardProps) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const isMobile = useIsMobile();
-  const { pipelines = [], stages = [] } = usePipelines();
+  const { pipelines = [] } = usePipelines();
+  const [stages, setStages] = useState<any[]>([]);
   const [tags, setTags] = useState<any[]>([]);
   
   // Normalize score and get color class
@@ -47,6 +47,7 @@ export function LeadCard({ lead, isDragging }: LeadCardProps) {
   useEffect(() => {
     if (detailsOpen) {
       fetchTags();
+      fetchStages();
     }
   }, [detailsOpen]);
   
@@ -62,6 +63,23 @@ export function LeadCard({ lead, isDragging }: LeadCardProps) {
       }
     } catch (error) {
       console.error('Error fetching tags:', error);
+    }
+  };
+  
+  const fetchStages = async () => {
+    try {
+      // Get all stages for pipelines
+      const { data } = await supabase
+        .from('pipeline_stages')
+        .select('*')
+        .eq('is_active', true)
+        .order('posicion', { ascending: true });
+      
+      if (data) {
+        setStages(data);
+      }
+    } catch (error) {
+      console.error('Error fetching stages:', error);
     }
   };
   
@@ -163,7 +181,7 @@ export function LeadCard({ lead, isDragging }: LeadCardProps) {
           lead={lead}
           open={detailsOpen}
           onOpenChange={setDetailsOpen}
-          scoreColorClass={scoreColorClass}
+          scoreColorClass={scoreCircleClass}
           normalizedScore={normalizedScore}
         />
       )}
