@@ -10,3 +10,8 @@ export function getScoreColorClass(score: number): string {
   if (score >= 3) return "bg-orange-500 text-white";
   return "bg-red-500 text-white";
 }
+
+// Ensure the score circle is always perfectly circular with proper styling
+export function getScoreCircleClass(scoreColorClass: string): string {
+  return `${scoreColorClass} w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all flex-shrink-0`;
+}

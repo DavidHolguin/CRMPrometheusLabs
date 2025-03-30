@@ -16,10 +16,7 @@ export function LeadHeader({ lead, expanded, scoreColorClass, normalizedScore, t
   return (
     <div className="flex justify-between items-start">
       <div className="flex gap-2 items-center">
-        <div className={cn(
-          "w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all",
-          scoreColorClass
-        )}>
+        <div className={scoreColorClass}>
           {normalizedScore}
         </div>
         <div>
