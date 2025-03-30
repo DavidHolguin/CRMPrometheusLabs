@@ -44,7 +44,7 @@ export function LeadScoreChart({ score, interactionCount, stageName }: LeadScore
   ];
 
   return (
-    <Card className="flex flex-col">
+    <Card className="flex flex-col shadow-sm">
       <CardHeader className="items-center pb-0">
         <CardTitle className="text-lg">Puntuación del Lead</CardTitle>
         <CardDescription>Puntaje basado en actividades e interacciones</CardDescription>
