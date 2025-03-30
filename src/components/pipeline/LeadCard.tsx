@@ -9,6 +9,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useForm } from "react-hook-form";
 import { Form, FormField, FormItem, FormLabel, FormControl } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 
@@ -19,6 +20,16 @@ interface LeadCardProps {
 
 export function LeadCard({ lead, isDragging }: LeadCardProps) {
   const [expanded, setExpanded] = useState(false);
+
+  // Setup form with default values from the lead
+  const form = useForm({
+    defaultValues: {
+      nombre: lead.nombre || "",
+      apellido: lead.apellido || "",
+      email: lead.email || "",
+      telefono: lead.telefono || "",
+    }
+  });
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return "N/A";
@@ -113,9 +124,10 @@ export function LeadCard({ lead, isDragging }: LeadCardProps) {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <h4 className="text-sm font-medium mb-2">Información personal</h4>
-                  <Form>
+                  <Form {...form}>
                     <div className="space-y-2">
                       <FormField
+                        control={form.control}
                         name="nombre"
                         render={({ field }) => (
                           <FormItem className="grid grid-cols-3 items-center gap-1">
@@ -123,14 +135,15 @@ export function LeadCard({ lead, isDragging }: LeadCardProps) {
                             <FormControl>
                               <Input 
                                 className="col-span-2 h-8 text-sm" 
-                                defaultValue={lead.nombre || ""} 
                                 placeholder="Nombre"
+                                {...field}
                               />
                             </FormControl>
                           </FormItem>
                         )}
                       />
                       <FormField
+                        control={form.control}
                         name="apellido"
                         render={({ field }) => (
                           <FormItem className="grid grid-cols-3 items-center gap-1">
@@ -138,14 +151,15 @@ export function LeadCard({ lead, isDragging }: LeadCardProps) {
                             <FormControl>
                               <Input 
                                 className="col-span-2 h-8 text-sm" 
-                                defaultValue={lead.apellido || ""} 
                                 placeholder="Apellido"
+                                {...field}
                               />
                             </FormControl>
                           </FormItem>
                         )}
                       />
                       <FormField
+                        control={form.control}
                         name="email"
                         render={({ field }) => (
                           <FormItem className="grid grid-cols-3 items-center gap-1">
@@ -153,14 +167,15 @@ export function LeadCard({ lead, isDragging }: LeadCardProps) {
                             <FormControl>
                               <Input 
                                 className="col-span-2 h-8 text-sm" 
-                                defaultValue={lead.email || ""} 
                                 placeholder="Email"
+                                {...field}
                               />
                             </FormControl>
                           </FormItem>
                         )}
                       />
                       <FormField
+                        control={form.control}
                         name="telefono"
                         render={({ field }) => (
                           <FormItem className="grid grid-cols-3 items-center gap-1">
@@ -168,8 +183,8 @@ export function LeadCard({ lead, isDragging }: LeadCardProps) {
                             <FormControl>
                               <Input 
                                 className="col-span-2 h-8 text-sm" 
-                                defaultValue={lead.telefono || ""} 
                                 placeholder="Teléfono"
+                                {...field}
                               />
                             </FormControl>
                           </FormItem>
