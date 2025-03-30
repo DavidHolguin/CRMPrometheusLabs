@@ -6,11 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Edit, Save, Plus, User, Mail, Phone, Map, Calendar, FileText } from "lucide-react";
+import { Edit, Save, Plus, User, Map, Calendar, FileText } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
+import { Progress } from "@/components/ui/progress";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface LeadDataTabProps {
   lead: Lead;
@@ -108,20 +109,17 @@ export function LeadDataTab({ lead, formatDate }: LeadDataTabProps) {
   const scoreNumber = Number(lead.score || 0);
   
   return (
-    <Tabs defaultValue="personal" className="w-full">
-      <TabsList className="grid w-full grid-cols-3 mb-4">
-        <TabsTrigger value="personal">Datos Personales</TabsTrigger>
-        <TabsTrigger value="contacto">Contacto</TabsTrigger>
-        <TabsTrigger value="estadisticas">Estadísticas</TabsTrigger>
+    <Tabs defaultValue="datos" className="w-full">
+      <TabsList className="grid w-full grid-cols-2 mb-4">
+        <TabsTrigger value="datos">Datos Personales</TabsTrigger>
+        <TabsTrigger value="estadisticas">Progreso</TabsTrigger>
       </TabsList>
       
-      <TabsContent value="personal" className="space-y-4">
+      <TabsContent value="datos" className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <Form {...form}>
               <div className="space-y-1">
-                {renderEditableField("Nombre", "nombre", <User size={16} className="text-blue-500" />, form.getValues("nombre"))}
-                {renderEditableField("Apellido", "apellido", <User size={16} className="text-blue-500" />, form.getValues("apellido"))}
                 {renderEditableField("Tipo de Documento", "documento_tipo", <FileText size={16} className="text-purple-500" />, form.getValues("documento_tipo"))}
                 {renderEditableField("Número de Documento", "documento_numero", <FileText size={16} className="text-purple-500" />, form.getValues("documento_numero"))}
                 {renderEditableField("Fecha de Nacimiento", "fecha_nacimiento", <Calendar size={16} className="text-green-500" />, form.getValues("fecha_nacimiento"))}
@@ -182,33 +180,14 @@ export function LeadDataTab({ lead, formatDate }: LeadDataTabProps) {
         </div>
       </TabsContent>
       
-      <TabsContent value="contacto">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Form {...form}>
-            <div className="space-y-1">
-              {renderEditableField("Email", "email", <Mail size={16} className="text-blue-500" />, form.getValues("email"))}
-              {renderEditableField("Teléfono", "telefono", <Phone size={16} className="text-green-500" />, form.getValues("telefono"))}
-            </div>
-          </Form>
-          
-          <div className="bg-card rounded-md p-3 border shadow-sm">
-            <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
-              <span>Canal de Origen</span>
-              <Badge>{lead.canal_origen || "Desconocido"}</Badge>
-            </h4>
-            <div className="text-xs text-muted-foreground">
-              Lead creado el {formatDate(lead.created_at)}
-            </div>
-          </div>
-        </div>
-      </TabsContent>
-      
       <TabsContent value="estadisticas">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <h4 className="text-sm font-medium mb-2">Puntuación</h4>
-            <div className="bg-card rounded-md p-4 border shadow-sm">
-              <div className="flex justify-center">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Puntuación</CardTitle>
+            </CardHeader>
+            <CardContent className="py-2">
+              <div className="flex justify-center mb-2">
                 <div className={cn(
                   "w-32 h-32 rounded-full flex items-center justify-center relative",
                   "bg-gradient-to-r from-slate-200 to-slate-100"
@@ -235,57 +214,44 @@ export function LeadDataTab({ lead, formatDate }: LeadDataTabProps) {
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
           
-          <div>
-            <h4 className="text-sm font-medium mb-2">Actividad</h4>
-            <div className="space-y-3">
-              <div className="bg-card rounded-md p-3 border shadow-sm">
-                <div className="text-sm mb-1">Mensajes</div>
-                <div className="relative pt-1">
-                  <div className="overflow-hidden h-2 mb-1 text-xs flex rounded bg-slate-200">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${Math.min(100, messageCount * 5)}%` }}
-                      transition={{ duration: 1 }}
-                      className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-blue-500"
-                    ></motion.div>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-xs font-semibold inline-block text-blue-500">
-                      {messageCount}
-                    </span>
-                  </div>
+          <div className="space-y-3">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Mensajes</CardTitle>
+              </CardHeader>
+              <CardContent className="py-2">
+                <div className="text-center">
+                  <span className="text-3xl font-bold text-blue-500">{messageCount}</span>
                 </div>
-              </div>
-              
-              <div className="bg-card rounded-md p-3 border shadow-sm">
-                <div className="text-sm mb-1">Interacciones</div>
-                <div className="relative pt-1">
-                  <div className="overflow-hidden h-2 mb-1 text-xs flex rounded bg-slate-200">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${Math.min(100, interactionCount * 10)}%` }}
-                      transition={{ duration: 1 }}
-                      className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-green-500"
-                    ></motion.div>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-xs font-semibold inline-block text-green-500">
-                      {interactionCount}
-                    </span>
-                  </div>
+                <Progress value={Math.min(100, messageCount * 5)} className="h-2 mt-2" />
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Interacciones</CardTitle>
+              </CardHeader>
+              <CardContent className="py-2">
+                <div className="text-center">
+                  <span className="text-3xl font-bold text-green-500">{interactionCount}</span>
                 </div>
-              </div>
-              
-              <div className="bg-card rounded-md p-3 border shadow-sm">
-                <div className="text-sm mb-1">Etapa actual</div>
+                <Progress value={Math.min(100, interactionCount * 10)} className="h-2 mt-2" />
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Etapa actual</CardTitle>
+              </CardHeader>
+              <CardContent className="py-2">
                 <Badge style={{ backgroundColor: lead.stage_color }} className="w-full justify-center py-2 text-center">
                   {lead.stage_name}
                 </Badge>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </TabsContent>
