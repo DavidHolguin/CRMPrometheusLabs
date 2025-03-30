@@ -103,7 +103,8 @@ export function LeadDataTab({ lead, formatDate }: LeadDataTabProps) {
   // Get interaction stats for visuals
   const messageCount = lead.message_count || 0;
   const interactionCount = lead.interaction_count || 0;
-  const scoreValue = Math.round((lead.score / 100) * 100);
+  // Fix: Convert lead.score to number before calculations
+  const scoreValue = lead.score ? Math.round((lead.score / 100) * 100) : 0;
   
   return (
     <Tabs defaultValue="personal" className="w-full">
