@@ -131,12 +131,16 @@ export function LeadAIEvaluation({ lead }: LeadAIEvaluationProps) {
             </div>
           </CardHeader>
           <CardContent>
-            <Progress 
-              value={promedioScorePotencial} 
-              max={100} 
-              className="h-2"
-              indicatorClassName={getProgressColor(promedioScorePotencial)}
-            />
+            <div className="relative w-full">
+              <Progress 
+                value={promedioScorePotencial} 
+                className="h-2"
+              />
+              <div 
+                className={cn("absolute inset-0 h-full rounded-full", getProgressColor(promedioScorePotencial))}
+                style={{ width: `${promedioScorePotencial}%` }}
+              />
+            </div>
           </CardContent>
         </Card>
         
@@ -154,12 +158,16 @@ export function LeadAIEvaluation({ lead }: LeadAIEvaluationProps) {
             </div>
           </CardHeader>
           <CardContent>
-            <Progress 
-              value={promedioScoreSatisfaccion} 
-              max={100} 
-              className="h-2"
-              indicatorClassName={getProgressColor(promedioScoreSatisfaccion)}
-            />
+            <div className="relative w-full">
+              <Progress 
+                value={promedioScoreSatisfaccion}
+                className="h-2"
+              />
+              <div 
+                className={cn("absolute inset-0 h-full rounded-full", getProgressColor(promedioScoreSatisfaccion))}
+                style={{ width: `${promedioScoreSatisfaccion}%` }}
+              />
+            </div>
           </CardContent>
         </Card>
       </div>
