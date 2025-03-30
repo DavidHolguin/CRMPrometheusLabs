@@ -204,7 +204,7 @@ export function LeadDrawer({
         <div className="px-4 pb-20">
           <Tabs defaultValue="datos" className="w-full">
             <TabsList className="grid w-full grid-cols-3 mb-4">
-              <TabsTrigger value="datos">Datos</TabsTrigger>
+              <TabsTrigger value="datos">Datos y Progreso</TabsTrigger>
               <TabsTrigger value="historial">Historial</TabsTrigger>
               <TabsTrigger value="comentarios">Comentarios</TabsTrigger>
             </TabsList>

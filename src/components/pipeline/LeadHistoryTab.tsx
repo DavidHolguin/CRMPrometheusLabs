@@ -77,9 +77,7 @@ export function LeadHistoryTab({ lead, formatDate }: LeadHistoryTabProps) {
           id,
           created_at,
           tiempo_en_stage,
-          usuario_id,
-          stage_id_anterior,
-          stage_id_nuevo
+          usuario_id
         `)
         .eq("lead_id", lead.id)
         .order("created_at", { ascending: false });
