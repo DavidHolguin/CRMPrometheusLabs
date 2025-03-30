@@ -1,6 +1,6 @@
 
 import { Lead } from "@/hooks/useLeads";
-import { Card, CardHeader } from "@/components/ui/card";
+import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -16,7 +16,10 @@ import { LeadAIEvaluation } from "./LeadAIEvaluation";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { usePipelines } from "@/hooks/usePipelines";
 import { supabase } from "@/integrations/supabase/client";
-import { Mail, Phone } from "lucide-react";
+import { Mail, Phone, Tag, Award, Timer, TrendingUp } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 
 interface LeadCardProps {
@@ -30,10 +33,18 @@ export function LeadCard({ lead, isDragging }: LeadCardProps) {
   const { pipelines = [] } = usePipelines();
   const [stages, setStages] = useState<any[]>([]);
   const [tags, setTags] = useState<any[]>([]);
+  const [leadEvaluation, setLeadEvaluation] = useState<any | null>(null);
   
   const normalizedScore = normalizeLeadScore(lead.score);
   const scoreColorClass = getScoreColorClass(normalizedScore);
   const scoreCircleClass = getScoreCircleClass(scoreColorClass);
+  
+  // Get initials from name
+  const getInitials = () => {
+    const firstName = lead.nombre || '';
+    const lastName = lead.apellido || '';
+    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+  };
 
   useEffect(() => {
     if (isDragging) {
@@ -45,6 +56,7 @@ export function LeadCard({ lead, isDragging }: LeadCardProps) {
     if (detailsOpen) {
       fetchTags();
       fetchStages();
+      fetchLeadEvaluation();
     }
   }, [detailsOpen]);
   
@@ -79,26 +91,165 @@ export function LeadCard({ lead, isDragging }: LeadCardProps) {
     }
   };
   
+  const fetchLeadEvaluation = async () => {
+    try {
+      const { data } = await supabase
+        .from('evaluaciones_llm')
+        .select('*')
+        .eq('lead_id', lead.id)
+        .order('created_at', { ascending: false })
+        .limit(1);
+        
+      if (data && data.length > 0) {
+        setLeadEvaluation(data[0]);
+      }
+    } catch (error) {
+      console.error('Error fetching lead evaluation:', error);
+    }
+  };
+  
   return (
     <>
       <Card 
         className={cn(
-          "overflow-hidden transition-all duration-200 mb-2 w-full cursor-move", 
+          "overflow-hidden transition-all duration-200 mb-2 w-full hover:shadow-lg", 
           isDragging 
             ? "opacity-80 shadow-lg ring-2 ring-primary ring-opacity-50 scale-[1.02] border-dashed" 
-            : "hover:shadow-md hover:border-primary/30"
+            : "hover:border-primary/30 hover:shadow-md"
         )}
         onClick={() => setDetailsOpen(true)}
       >
-        <CardHeader className="pb-2 pt-3">
-          <LeadHeader 
-            lead={lead}
-            expanded={false}
-            scoreColorClass={scoreCircleClass}
-            normalizedScore={normalizedScore}
-            toggleExpanded={() => setDetailsOpen(true)}
-          />
+        <CardHeader className="pb-2 pt-3 px-4">
+          <div className="flex justify-between items-start gap-3">
+            <div className="flex items-center gap-3">
+              <Avatar className="h-10 w-10 border-2" style={{ borderColor: lead.stage_color || '#ccc' }}>
+                <AvatarFallback 
+                  className="text-white font-semibold"
+                  style={{ backgroundColor: lead.stage_color || '#ccc' }}
+                >
+                  {getInitials()}
+                </AvatarFallback>
+              </Avatar>
+              
+              <div>
+                <h3 className="font-semibold text-base leading-tight">
+                  {lead.nombre} {lead.apellido}
+                </h3>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-xs text-muted-foreground">
+                    {lead.email || lead.telefono || "Sin contacto"}
+                  </span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex flex-col items-end">
+              <Badge 
+                variant="outline" 
+                className="text-xs font-medium"
+                style={{ 
+                  backgroundColor: `${lead.stage_color}20`, 
+                  color: lead.stage_color,
+                  borderColor: lead.stage_color
+                }}
+              >
+                {lead.stage_name}
+              </Badge>
+              
+              <div className="mt-1 text-xs text-muted-foreground">
+                {formatLeadDate(lead.created_at)}
+              </div>
+            </div>
+          </div>
         </CardHeader>
+        
+        <CardContent className="px-4 pt-1 pb-3">
+          <div className="mb-3">
+            <div className="flex justify-between items-center mb-1">
+              <div className="text-xs font-medium flex items-center gap-1">
+                <Award className="h-3 w-3" />
+                Score
+              </div>
+              <span className="text-xs font-semibold">{lead.score}/100</span>
+            </div>
+            <div className="relative h-2 w-full bg-muted/50 rounded-full overflow-hidden">
+              <div 
+                className="absolute top-0 left-0 h-full rounded-full transition-all duration-500 ease-out"
+                style={{ 
+                  width: `${lead.score}%`, 
+                  backgroundColor: getScoreColorClass(normalizedScore).split(' ')[0]
+                }}
+              />
+            </div>
+          </div>
+          
+          {lead.tags && lead.tags.length > 0 && (
+            <div className="mb-3">
+              <div className="flex items-center gap-1 mb-1.5 text-xs font-medium">
+                <Tag className="h-3 w-3" />
+                <span>Tags</span>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {lead.tags.slice(0, 3).map(tag => (
+                  <Badge 
+                    key={tag.id} 
+                    variant="outline" 
+                    className="text-[10px] py-0 px-1.5 h-5"
+                    style={{ borderColor: tag.color, color: tag.color }}
+                  >
+                    {tag.nombre}
+                  </Badge>
+                ))}
+                {lead.tags.length > 3 && (
+                  <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-5">
+                    +{lead.tags.length - 3}
+                  </Badge>
+                )}
+              </div>
+            </div>
+          )}
+          
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <div className="flex items-center gap-1">
+              <Phone className="h-3 w-3" />
+              <span>{lead.interaction_count || 0} interact.</span>
+            </div>
+            
+            <div className="flex items-center gap-1">
+              <Timer className="h-3 w-3" />
+              <span>Últ. {lead.ultima_interaccion ? formatLeadDate(lead.ultima_interaccion) : "nunca"}</span>
+            </div>
+            
+            <div className="flex items-center gap-1">
+              <TrendingUp className="h-3 w-3" />
+              <span>{lead.canal_origen || "N/A"}</span>
+            </div>
+          </div>
+        </CardContent>
+        
+        {leadEvaluation && leadEvaluation.interes_productos && leadEvaluation.interes_productos.length > 0 && (
+          <CardFooter className="border-t px-4 py-2 bg-muted/20">
+            <div className="w-full">
+              <div className="text-xs font-medium mb-1.5">Interés en productos</div>
+              <div className="flex flex-wrap gap-1">
+                {leadEvaluation.interes_productos.slice(0, 3).map((producto: string, index: number) => (
+                  <Badge 
+                    key={index} 
+                    variant="secondary" 
+                    className="text-[10px] py-0 px-1.5 h-5"
+                  >
+                    {producto}
+                  </Badge>
+                ))}
+                {leadEvaluation.interes_productos.length > 3 && (
+                  <Badge variant="secondary" className="text-[10px] py-0 px-1.5 h-5">
+                    +{leadEvaluation.interes_productos.length - 3}
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </CardFooter>
+        )}
       </Card>
 
       {isMobile && (
