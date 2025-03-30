@@ -11,6 +11,7 @@ import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { LeadCard } from "@/components/pipeline/LeadCard";
+import { CSSProperties } from "react";
 
 interface StageCardProps {
   stage: PipelineStage;
@@ -34,12 +35,12 @@ export function LeadItem({ lead, index }: { lead: Lead; index: number }) {
     }
   });
 
-  const style = {
+  const style: CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.4 : 1,
     zIndex: isDragging ? 999 : 1,
-    position: isDragging ? 'relative' : 'static',
+    position: isDragging ? 'relative' as const : 'static' as const,
   };
 
   return (

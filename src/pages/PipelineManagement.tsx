@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { usePipelines } from "@/hooks/usePipelines";
 import { usePipelineLeads } from "@/hooks/usePipelineLeads";
@@ -68,10 +67,8 @@ const PipelineManagement = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Configure sensors with more permissive settings
   const sensors = useSensors(
     useSensor(MouseSensor, {
-      // Even lower activationConstraint for easier dragging
       activationConstraint: {
         distance: 3,
         delay: 0,
@@ -79,7 +76,6 @@ const PipelineManagement = () => {
       }
     }),
     useSensor(TouchSensor, {
-      // Very permissive touch handling
       activationConstraint: {
         delay: 0,
         tolerance: 10
@@ -100,8 +96,6 @@ const PipelineManagement = () => {
   };
 
   const handleDragOver = (event: DragOverEvent) => {
-    // This is intentionally left empty for now
-    // Future implementation could handle drag sorting within a stage
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -120,8 +114,6 @@ const PipelineManagement = () => {
       if (sourceStageId !== destinationStageId) {
         console.log('Moving lead:', leadId, 'from stage:', sourceStageId, 'to stage:', destinationStageId);
         
-        // Immediately update UI optimistically
-        // This is a UI-only update that will be overwritten when the query is invalidated
         const leadToMove = { ...active.data.current.lead };
         leadToMove.stage_id = destinationStageId;
         
@@ -295,7 +287,6 @@ const PipelineManagement = () => {
                 dropAnimation={{
                   duration: 300,
                   easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
-                  dragSourceOpacity: 0.2,
                 }}
                 zIndex={1000}
               >
