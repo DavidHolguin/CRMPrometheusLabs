@@ -16,11 +16,12 @@ import { LeadAIEvaluation } from "./LeadAIEvaluation";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { usePipelines } from "@/hooks/usePipelines";
 import { supabase } from "@/integrations/supabase/client";
-import { Mail, Phone, Tag, Award, Timer, TrendingUp } from "lucide-react";
+import { Mail, Phone, Tag, Award, Info, TrendingUp } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
+import { LeadScoreIndicator } from "./LeadScoreIndicator";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface LeadCardProps {
   lead: Lead;
@@ -155,32 +156,17 @@ export function LeadCard({ lead, isDragging }: LeadCardProps) {
               >
                 {lead.stage_name}
               </Badge>
-              
-              <div className="mt-1 text-xs text-muted-foreground">
-                {formatLeadDate(lead.created_at)}
-              </div>
             </div>
           </div>
         </CardHeader>
         
         <CardContent className="px-4 pt-1 pb-3">
           <div className="mb-3">
-            <div className="flex justify-between items-center mb-1">
-              <div className="text-xs font-medium flex items-center gap-1">
-                <Award className="h-3 w-3" />
-                Score
-              </div>
-              <span className="text-xs font-semibold">{lead.score}/100</span>
-            </div>
-            <div className="relative h-2 w-full bg-muted/50 rounded-full overflow-hidden">
-              <div 
-                className="absolute top-0 left-0 h-full rounded-full transition-all duration-500 ease-out"
-                style={{ 
-                  width: `${lead.score}%`, 
-                  backgroundColor: getScoreColorClass(normalizedScore).split(' ')[0]
-                }}
-              />
-            </div>
+            <LeadScoreIndicator 
+              score={lead.score}
+              showLabel={true}
+              size="md"
+            />
           </div>
           
           {lead.tags && lead.tags.length > 0 && (
@@ -210,19 +196,43 @@ export function LeadCard({ lead, isDragging }: LeadCardProps) {
           )}
           
           <div className="flex justify-between text-xs text-muted-foreground">
-            <div className="flex items-center gap-1">
-              <Phone className="h-3 w-3" />
-              <span>{lead.interaction_count || 0} interact.</span>
-            </div>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-1 cursor-help">
+                    <Badge variant="secondary" className="text-[10px] py-0 px-1.5 h-5 flex items-center gap-1">
+                      <Phone className="h-3 w-3" />
+                      <span>{lead.interaction_count || 0}</span>
+                    </Badge>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Número de interacciones</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-1 cursor-help">
+                    <Badge variant="secondary" className="text-[10px] py-0 px-1.5 h-5 flex items-center gap-1">
+                      <Info className="h-3 w-3" />
+                      <span>{lead.ultima_interaccion ? formatLeadDate(lead.ultima_interaccion) : "Nunca"}</span>
+                    </Badge>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Última interacción</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             
             <div className="flex items-center gap-1">
-              <Timer className="h-3 w-3" />
-              <span>Últ. {lead.ultima_interaccion ? formatLeadDate(lead.ultima_interaccion) : "nunca"}</span>
-            </div>
-            
-            <div className="flex items-center gap-1">
-              <TrendingUp className="h-3 w-3" />
-              <span>{lead.canal_origen || "N/A"}</span>
+              <Badge variant="secondary" className="text-[10px] py-0 px-1.5 h-5 flex items-center gap-1">
+                <TrendingUp className="h-3 w-3" />
+                <span>{lead.canal_origen || "N/A"}</span>
+              </Badge>
             </div>
           </div>
         </CardContent>

@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { cn } from "@/lib/utils";
 import { getScoreColorClass } from "./LeadScoreUtils";
@@ -18,15 +19,16 @@ export function LeadScoreIndicator({
   const normalizedScore = Math.min(100, Math.max(0, score));
   const colorClass = getScoreColorClass(normalizedScore / 10);
   
-  // Remove 'text-white' and other classes, just keep the background color
-  const bgColorClass = colorClass.split(' ')[0];
-  
   // Size classes
   const sizeClasses = {
     sm: "h-1",
     md: "h-2",
     lg: "h-3"
   };
+  
+  // Extract the background color from the colorClass
+  const bgColorMatch = colorClass.match(/bg-([a-z]+-[0-9]+)/);
+  const bgColorClass = bgColorMatch ? bgColorMatch[0] : 'bg-gray-500';
   
   return (
     <div className={cn("w-full", className)}>
@@ -38,11 +40,8 @@ export function LeadScoreIndicator({
       )}
       <div className={cn("w-full bg-muted/50 rounded-full overflow-hidden", sizeClasses[size])}>
         <div 
-          className="h-full rounded-full transition-all duration-500 ease-out"
-          style={{ 
-            width: `${normalizedScore}%`, 
-            backgroundColor: bgColorClass ? `var(--${bgColorClass})` : undefined
-          }}
+          className={cn("h-full rounded-full transition-all duration-500 ease-out", bgColorClass)}
+          style={{ width: `${normalizedScore}%` }}
         />
       </div>
     </div>
