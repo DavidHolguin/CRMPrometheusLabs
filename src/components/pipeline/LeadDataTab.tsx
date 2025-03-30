@@ -1,3 +1,4 @@
+
 import { Lead } from "@/hooks/useLeads";
 import { useState } from "react";
 import { Form, FormField, FormItem, FormLabel, FormControl } from "@/components/ui/form";
@@ -105,8 +106,6 @@ export function LeadDataTab({ lead, formatDate }: LeadDataTabProps) {
   
   // Convert lead.score to a number for all calculations and displays
   const scoreNumber = Number(lead.score || 0);
-  // Calculate score value as percentage for the circle visualization
-  const scorePercentage = scoreNumber; // Already in range 0-100
   
   return (
     <Tabs defaultValue="personal" className="w-full">
