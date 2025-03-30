@@ -1,4 +1,3 @@
-
 import { Lead } from "@/hooks/useLeads";
 import { useState } from "react";
 import { Form, FormField, FormItem, FormLabel, FormControl } from "@/components/ui/form";
@@ -225,9 +224,9 @@ export function LeadDataTab({ lead, formatDate }: LeadDataTabProps) {
                     <path
                       d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                       fill="none"
-                      stroke={scorePercentage > 75 ? "#10b981" : scorePercentage > 50 ? "#f59e0b" : scorePercentage > 25 ? "#f97316" : "#ef4444"}
+                      stroke={scoreNumber > 75 ? "#10b981" : scoreNumber > 50 ? "#f59e0b" : scoreNumber > 25 ? "#f97316" : "#ef4444"}
                       strokeWidth="2"
-                      strokeDasharray={`${scorePercentage}, 100`}
+                      strokeDasharray={`${scoreNumber}, 100`}
                       strokeLinecap="round"
                     />
                   </svg>
