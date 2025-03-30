@@ -104,7 +104,7 @@ export function LeadDataTab({ lead, formatDate }: LeadDataTabProps) {
   const messageCount = lead.message_count || 0;
   const interactionCount = lead.interaction_count || 0;
   // Fix: Convert lead.score to number before calculations
-  const scoreValue = lead.score ? Math.round((lead.score / 100) * 100) : 0;
+  const scoreValue = lead.score ? Math.round((Number(lead.score) / 100) * 100) : 0;
   
   return (
     <Tabs defaultValue="personal" className="w-full">
@@ -229,7 +229,7 @@ export function LeadDataTab({ lead, formatDate }: LeadDataTabProps) {
                     />
                   </svg>
                   <div className="absolute flex flex-col items-center">
-                    <span className="text-3xl font-bold">{lead.score}</span>
+                    <span className="text-3xl font-bold">{Number(lead.score)}</span>
                     <span className="text-xs text-muted-foreground">puntos</span>
                   </div>
                 </div>
