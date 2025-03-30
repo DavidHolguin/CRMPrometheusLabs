@@ -65,8 +65,7 @@ export function LeadHistoryTab({ lead, formatDate }: LeadHistoryTabProps) {
           campo,
           valor_anterior,
           valor_nuevo,
-          usuario_id,
-          profiles:usuario_id(id, full_name, avatar_url, email)
+          usuario_id
         `)
         .eq("lead_id", lead.id)
         .order("created_at", { ascending: false });
@@ -78,10 +77,7 @@ export function LeadHistoryTab({ lead, formatDate }: LeadHistoryTabProps) {
           id,
           created_at,
           tiempo_en_stage,
-          usuario_id,
-          anterior:stage_id_anterior(id, nombre, color),
-          nuevo:stage_id_nuevo(id, nombre, color),
-          profiles:usuario_id(id, full_name, avatar_url, email)
+          usuario_id
         `)
         .eq("lead_id", lead.id)
         .order("created_at", { ascending: false });
@@ -89,24 +85,78 @@ export function LeadHistoryTab({ lead, formatDate }: LeadHistoryTabProps) {
       if (fieldError) console.error("Error fetching field history:", fieldError);
       if (stageError) console.error("Error fetching stage history:", stageError);
       
+      // Get the stage data separately to avoid relationship conflicts
+      let stageChangeData: any[] = [];
+      if (stageChanges && stageChanges.length > 0) {
+        for (const change of stageChanges) {
+          const { data: anteriorData } = await supabase
+            .from("pipeline_stages")
+            .select("id, nombre, color")
+            .eq("id", change.stage_id_anterior)
+            .single();
+            
+          const { data: nuevoData } = await supabase
+            .from("pipeline_stages")
+            .select("id, nombre, color")
+            .eq("id", change.stage_id_nuevo)
+            .single();
+            
+          stageChangeData.push({
+            ...change,
+            stage_anterior: anteriorData || { id: '', nombre: 'Sin etapa', color: '#cccccc' },
+            stage_nuevo: nuevoData || { id: '', nombre: 'Sin etapa', color: '#cccccc' }
+          });
+        }
+      }
+      
+      // Get unique user IDs from both sets of changes
+      const userIds = new Set([
+        ...(fieldChanges || []).map(item => item.usuario_id),
+        ...(stageChanges || []).map(item => item.usuario_id)
+      ]);
+      
+      // Fetch user profiles
+      const { data: profiles, error: profilesError } = await supabase
+        .from("profiles")
+        .select("id, full_name, avatar_url, email")
+        .in("id", Array.from(userIds).filter(Boolean));
+        
+      if (profilesError) console.error("Error fetching profiles:", profilesError);
+      
+      // Create a map of user profiles by ID
+      const profileMap: Record<string, any> = {};
+      profiles?.forEach(profile => {
+        profileMap[profile.id] = profile;
+      });
+      
       // Format and combine the history events
       const formattedFieldChanges = (fieldChanges || []).map(item => ({
         id: item.id,
         created_at: item.created_at,
-        usuario: item.profiles,
+        usuario: profileMap[item.usuario_id] || {
+          id: item.usuario_id || 'unknown',
+          full_name: "Usuario del sistema",
+          email: "",
+          avatar_url: ""
+        },
         campo: item.campo,
         valor_anterior: item.valor_anterior,
         valor_nuevo: item.valor_nuevo,
         type: 'field_change' as const
       }));
       
-      const formattedStageChanges = (stageChanges || []).map(item => ({
+      const formattedStageChanges = stageChangeData.map(item => ({
         id: item.id,
         created_at: item.created_at,
-        usuario: item.profiles,
-        tiempo_en_stage: item.tiempo_en_stage,
-        stage_anterior: item.anterior,
-        stage_nuevo: item.nuevo,
+        usuario: profileMap[item.usuario_id] || {
+          id: item.usuario_id || 'unknown',
+          full_name: "Usuario del sistema",
+          email: "",
+          avatar_url: ""
+        },
+        tiempo_en_stage: item.tiempo_en_stage?.toString() || '',
+        stage_anterior: item.stage_anterior,
+        stage_nuevo: item.stage_nuevo,
         type: 'stage_change' as const
       }));
       
