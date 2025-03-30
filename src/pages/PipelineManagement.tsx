@@ -68,20 +68,21 @@ const PipelineManagement = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Configure sensors with more permissive settings
   const sensors = useSensors(
     useSensor(MouseSensor, {
-      // Lower activationConstraint for easier dragging
+      // Even lower activationConstraint for easier dragging
       activationConstraint: {
-        distance: 5,
+        distance: 3,
         delay: 0,
-        tolerance: 5
+        tolerance: 10
       }
     }),
     useSensor(TouchSensor, {
-      // Improved touch handling with lower thresholds
+      // Very permissive touch handling
       activationConstraint: {
         delay: 0,
-        tolerance: 5
+        tolerance: 10
       }
     }),
     useSensor(KeyboardSensor, {
@@ -117,6 +118,13 @@ const PipelineManagement = () => {
       const destinationStageId = over.id as string;
       
       if (sourceStageId !== destinationStageId) {
+        console.log('Moving lead:', leadId, 'from stage:', sourceStageId, 'to stage:', destinationStageId);
+        
+        // Immediately update UI optimistically
+        // This is a UI-only update that will be overwritten when the query is invalidated
+        const leadToMove = { ...active.data.current.lead };
+        leadToMove.stage_id = destinationStageId;
+        
         updateLeadStage(
           { leadId, stageId: destinationStageId },
           {
@@ -282,12 +290,17 @@ const PipelineManagement = () => {
                 )}
               </div>
 
-              <DragOverlay adjustScale={true} dropAnimation={{
-                duration: 250,
-                easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
-              }}>
+              <DragOverlay 
+                adjustScale={true} 
+                dropAnimation={{
+                  duration: 300,
+                  easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
+                  dragSourceOpacity: 0.2,
+                }}
+                zIndex={1000}
+              >
                 {activeLead ? (
-                  <div className="opacity-80 transform-gpu">
+                  <div className="opacity-90 transform-gpu pointer-events-none">
                     <LeadCard lead={activeLead} isDragging={true} />
                   </div>
                 ) : null}

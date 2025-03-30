@@ -37,8 +37,9 @@ export function LeadItem({ lead, index }: { lead: Lead; index: number }) {
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
-    zIndex: isDragging ? 10 : 1
+    opacity: isDragging ? 0.4 : 1,
+    zIndex: isDragging ? 999 : 1,
+    position: isDragging ? 'relative' : 'static',
   };
 
   return (
@@ -54,15 +55,15 @@ export function LeadItem({ lead, index }: { lead: Lead; index: number }) {
         animate={{ 
           opacity: 1, 
           y: 0,
-          scale: isDragging ? 1.02 : 1,
-          boxShadow: isDragging ? "0 10px 25px -5px rgba(0, 0, 0, 0.1)" : "none",
+          scale: isDragging ? 1.03 : 1,
+          boxShadow: isDragging ? "0 10px 25px -5px rgba(0, 0, 0, 0.2)" : "none",
         }}
         exit={{ opacity: 0, y: -10 }}
         transition={{ 
           type: "spring", 
-          stiffness: 500, 
-          damping: 30,
-          mass: 1
+          stiffness: 400, 
+          damping: 25,
+          mass: 0.8
         }}
       >
         <LeadCard 
@@ -111,8 +112,8 @@ export function StageCard({ stage, leads, onAddLead }: StageCardProps) {
       <div 
         ref={setNodeRef}
         className={cn(
-          "flex-1 transition-colors",
-          isOver ? "bg-muted/40" : "bg-transparent"
+          "flex-1 transition-colors duration-300",
+          isOver ? "bg-muted/60 border-2 border-dashed border-primary/30" : "bg-transparent"
         )}
       >
         <ScrollArea className="h-[calc(100vh-180px)] w-full pr-2">
