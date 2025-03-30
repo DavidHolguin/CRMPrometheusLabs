@@ -32,12 +32,10 @@ export function LeadCard({ lead, isDragging }: LeadCardProps) {
   const [stages, setStages] = useState<any[]>([]);
   const [tags, setTags] = useState<any[]>([]);
   
-  // Normalize score and get color class
   const normalizedScore = normalizeLeadScore(lead.score);
   const scoreColorClass = getScoreColorClass(normalizedScore);
   const scoreCircleClass = getScoreCircleClass(scoreColorClass);
 
-  // Close drawer/sheet when dragging starts
   useEffect(() => {
     if (isDragging) {
       setDetailsOpen(false);
@@ -68,7 +66,6 @@ export function LeadCard({ lead, isDragging }: LeadCardProps) {
   
   const fetchStages = async () => {
     try {
-      // Get all stages for pipelines
       const { data } = await supabase
         .from('pipeline_stages')
         .select('*')
@@ -116,7 +113,6 @@ export function LeadCard({ lead, isDragging }: LeadCardProps) {
       const isTagged = lead.tags?.some(t => t.id === tagId);
       
       if (isTagged) {
-        // Remove tag
         await supabase
           .from('lead_tag_relation')
           .delete()
@@ -125,7 +121,6 @@ export function LeadCard({ lead, isDragging }: LeadCardProps) {
         
         toast.success('Etiqueta removida');
       } else {
-        // Add tag
         await supabase
           .from('lead_tag_relation')
           .insert({
@@ -141,7 +136,6 @@ export function LeadCard({ lead, isDragging }: LeadCardProps) {
     }
   };
   
-  // Format pipeline and stage data for dropdowns
   const pipelinesOptions = pipelines.map(p => ({
     value: p.id,
     label: p.nombre
@@ -175,7 +169,6 @@ export function LeadCard({ lead, isDragging }: LeadCardProps) {
         </CardHeader>
       </Card>
 
-      {/* Mobile drawer */}
       {isMobile && (
         <LeadDrawer
           lead={lead}
@@ -186,7 +179,6 @@ export function LeadCard({ lead, isDragging }: LeadCardProps) {
         />
       )}
 
-      {/* Desktop/tablet sheet */}
       {!isMobile && (
         <Sheet open={detailsOpen} onOpenChange={setDetailsOpen}>
           <SheetContent className="sm:max-w-md md:max-w-lg lg:max-w-xl overflow-y-auto">
@@ -245,7 +237,7 @@ export function LeadCard({ lead, isDragging }: LeadCardProps) {
             
             <Tabs defaultValue="datos" className="w-full">
               <TabsList className="grid w-full grid-cols-3 mb-4">
-                <TabsTrigger value="datos">Datos y Progreso</TabsTrigger>
+                <TabsTrigger value="datos">Datos</TabsTrigger>
                 <TabsTrigger value="historial">Historial</TabsTrigger>
                 <TabsTrigger value="comentarios">Comentarios</TabsTrigger>
               </TabsList>
