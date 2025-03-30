@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { usePipelines } from "@/hooks/usePipelines";
 import { usePipelineLeads } from "@/hooks/usePipelineLeads";
@@ -8,9 +7,22 @@ import { CreateStageDialog } from "@/components/pipeline/CreateStageDialog";
 import { Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { DragDropContext, DropResult } from "react-beautiful-dnd";
 import { StageCard } from "@/components/pipeline/StageCard";
 import { toast } from "sonner";
+import { 
+  DndContext, 
+  DragOverlay, 
+  closestCorners,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragStartEvent,
+  DragOverEvent,
+  DragEndEvent
+} from "@dnd-kit/core";
+import { arrayMove, SortableContext, horizontalListSortingStrategy } from "@dnd-kit/sortable";
+import { Lead } from "@/hooks/useLeads";
+import { LeadCard } from "@/components/pipeline/LeadCard";
 
 const PipelineManagement = () => {
   const { pipelines, isLoading: pipelinesLoading } = usePipelines();
@@ -19,17 +31,15 @@ const PipelineManagement = () => {
   const [showAddStageDialog, setShowAddStageDialog] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [visibleStages, setVisibleStages] = useState(3);
+  const [activeLead, setActiveLead] = useState<Lead | null>(null);
 
-  // Select the first pipeline by default when data loads
   useEffect(() => {
     if (pipelines.length > 0 && !selectedPipeline) {
-      // Find the default pipeline or use the first one
       const defaultPipeline = pipelines.find(p => p.is_default) || pipelines[0];
       setSelectedPipeline(defaultPipeline.id);
     }
   }, [pipelines, selectedPipeline]);
 
-  // Update visible stages based on screen size
   useEffect(() => {
     const handleResize = () => {
       const width = window.innerWidth;
@@ -44,63 +54,61 @@ const PipelineManagement = () => {
       }
     };
 
-    handleResize(); // Initial call
+    handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const handleDragEnd = (result: DropResult) => {
-    const { source, destination } = result;
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    })
+  );
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event;
+    const { data } = active;
     
-    // Dropped outside a valid area
-    if (!destination) return;
+    if (data?.current?.type === "lead") {
+      setActiveLead(data.current.lead);
+    }
+  };
+
+  const handleDragOver = (event: DragOverEvent) => {
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
     
-    // Dropped in the same place
-    if (source.droppableId === destination.droppableId && source.index === destination.index) return;
+    if (!over) {
+      setActiveLead(null);
+      return;
+    }
     
-    // If we're dragging a lead
-    if (result.type === "lead") {
-      // Get the lead that was dragged
-      const sourceStageId = source.droppableId;
-      const destinationStageId = destination.droppableId;
+    if (active.data.current?.type === "lead" && over.data.current?.type === "stage") {
+      const leadId = active.id as string;
+      const sourceStageId = active.data.current.lead.stage_id;
+      const destinationStageId = over.id as string;
       
-      // If source and destination are different, we're moving to a new stage
       if (sourceStageId !== destinationStageId) {
-        const leadId = result.draggableId;
-        
-        // Optimistically update the UI first (no need to refresh after the API call)
-        const sourceLeads = [...(leadsByStage[sourceStageId] || [])];
-        const destinationLeads = [...(leadsByStage[destinationStageId] || [])];
-        
-        const [movedLead] = sourceLeads.splice(source.index, 1);
-        if (movedLead) {
-          // Update the lead's stage before adding to destination
-          const updatedLead = { ...movedLead, stage_id: destinationStageId };
-          destinationLeads.splice(destination.index, 0, updatedLead);
-          
-          // Create a temporary updated state
-          const updatedLeadsByStage = {
-            ...leadsByStage,
-            [sourceStageId]: sourceLeads,
-            [destinationStageId]: destinationLeads
-          };
-          
-          // Update the lead stage in Supabase via our hook
-          updateLeadStage(
-            { leadId, stageId: destinationStageId },
-            {
-              onSuccess: () => {
-                toast.success("Lead movido correctamente");
-              },
-              onError: (error) => {
-                toast.error("Error al mover el lead");
-                console.error("Error moving lead:", error);
-              }
+        updateLeadStage(
+          { leadId, stageId: destinationStageId },
+          {
+            onSuccess: () => {
+              toast.success("Lead movido correctamente");
+            },
+            onError: (error) => {
+              toast.error("Error al mover el lead");
+              console.error("Error moving lead:", error);
             }
-          );
-        }
+          }
+        );
       }
     }
+    
+    setActiveLead(null);
   };
 
   const getCurrentPipeline = () => {
@@ -134,7 +142,6 @@ const PipelineManagement = () => {
 
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] overflow-hidden bg-background max-w-full">
-      {/* Pipeline Selector */}
       {pipelines.length > 0 ? (
         <div className="p-4 w-full z-10 bg-background/95 backdrop-blur-sm border-b sticky top-0">
           <div className="flex items-center justify-between">
@@ -202,49 +209,64 @@ const PipelineManagement = () => {
         </div>
       )}
       
-      {/* Pipeline Stages with Improved Drag and Drop */}
       {currentPipeline?.stages && currentPipeline.stages.length > 0 ? (
         <div className="flex-1 relative overflow-hidden">
-          <DragDropContext onDragEnd={handleDragEnd}>
-            <div className="h-full px-4 relative flex">
-              {/* Left Navigation Button */}
-              {currentSlide > 0 && (
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  onClick={handlePrev}
-                  className="absolute left-1 top-1/2 -translate-y-1/2 z-10 bg-background/80 shadow-md h-10 w-10 rounded-full"
-                >
-                  <ChevronLeft className="h-6 w-6" />
-                </Button>
-              )}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCorners}
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext 
+              items={visibleStageData.map(stage => stage.id)}
+              strategy={horizontalListSortingStrategy}
+            >
+              <div className="h-full px-4 relative flex">
+                {currentSlide > 0 && (
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={handlePrev}
+                    className="absolute left-1 top-1/2 -translate-y-1/2 z-10 bg-background/80 shadow-md h-10 w-10 rounded-full"
+                  >
+                    <ChevronLeft className="h-6 w-6" />
+                  </Button>
+                )}
 
-              {/* Visible Stages */}
-              <div className="flex h-full w-full gap-4 transition-transform duration-300 pb-2">
-                {visibleStageData.map((stage) => (
-                  <div key={stage.id} className="flex-1 min-w-0 max-w-[400px]">
-                    <StageCard 
-                      stage={stage} 
-                      leads={leadsByStage[stage.id] || []}
-                      onAddLead={() => toast.info("Función de agregar lead en construcción")}
-                    />
-                  </div>
-                ))}
+                <div className="flex h-full w-full gap-4 transition-transform duration-300 pb-2">
+                  {visibleStageData.map((stage) => (
+                    <div key={stage.id} className="flex-1 min-w-0 max-w-[400px]">
+                      <StageCard 
+                        stage={stage} 
+                        leads={leadsByStage[stage.id] || []}
+                        onAddLead={() => toast.info("Función de agregar lead en construcción")}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                {currentSlide + visibleStages < stages.length && (
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={handleNext}
+                    className="absolute right-1 top-1/2 -translate-y-1/2 z-10 bg-background/80 shadow-md h-10 w-10 rounded-full"
+                  >
+                    <ChevronRight className="h-6 w-6" />
+                  </Button>
+                )}
               </div>
 
-              {/* Right Navigation Button */}
-              {currentSlide + visibleStages < stages.length && (
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  onClick={handleNext}
-                  className="absolute right-1 top-1/2 -translate-y-1/2 z-10 bg-background/80 shadow-md h-10 w-10 rounded-full"
-                >
-                  <ChevronRight className="h-6 w-6" />
-                </Button>
-              )}
-            </div>
-          </DragDropContext>
+              <DragOverlay>
+                {activeLead ? (
+                  <div className="opacity-80">
+                    <LeadCard lead={activeLead} isDragging={true} />
+                  </div>
+                ) : null}
+              </DragOverlay>
+            </SortableContext>
+          </DndContext>
         </div>
       ) : (
         <div className="flex-1 flex items-center justify-center">
