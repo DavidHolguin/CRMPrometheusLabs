@@ -12,7 +12,7 @@ import { LeadHistoryTab } from "./LeadHistoryTab";
 import { normalizeLeadScore, getScoreColorClass, getScoreCircleClass } from "./LeadScoreUtils";
 import { formatLeadDate } from "./LeadDateUtils";
 import { LeadDrawer } from "./LeadDrawer";
-import { useMobile } from "@/hooks/use-mobile";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface LeadCardProps {
   lead: Lead;
@@ -21,7 +21,7 @@ interface LeadCardProps {
 
 export function LeadCard({ lead, isDragging }: LeadCardProps) {
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const isMobile = useMobile();
+  const isMobile = useIsMobile();
   
   // Normalize score and get color class
   const normalizedScore = normalizeLeadScore(lead.score);
