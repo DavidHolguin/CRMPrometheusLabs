@@ -40,7 +40,7 @@ export function LeadItem({ lead, index }: { lead: Lead; index: number }) {
     transition,
     opacity: isDragging ? 0.4 : 1,
     zIndex: isDragging ? 999 : 1,
-    position: isDragging ? 'relative' as const : 'static' as const,
+    position: isDragging ? 'relative' : 'static',
   };
 
   return (
@@ -86,6 +86,7 @@ export function StageCard({ stage, leads, onAddLead }: StageCardProps) {
     }
   });
 
+  // Improved stage card with better visual feedback
   return (
     <div className="flex flex-col h-full overflow-hidden rounded-lg border border-border/40 shadow-sm bg-gradient-to-b from-card/90 to-card/70 backdrop-blur-sm">
       <div 
@@ -114,11 +115,18 @@ export function StageCard({ stage, leads, onAddLead }: StageCardProps) {
       <div 
         ref={setNodeRef}
         className={cn(
-          "flex-1 transition-colors duration-300",
+          "flex-1 transition-colors duration-300 relative",
           isOver ? "bg-muted/60 border-2 border-dashed border-primary/30" : "bg-transparent"
         )}
         data-stage-id={stage.id}
       >
+        {isOver && active && (
+          <div className="absolute inset-0 bg-primary/5 border-2 border-dashed border-primary/30 z-10 pointer-events-none flex items-center justify-center">
+            <div className="bg-primary/10 backdrop-blur-sm rounded-lg px-3 py-1 text-sm font-medium text-primary-foreground">
+              Soltar aquí
+            </div>
+          </div>
+        )}
         <ScrollArea className="h-[calc(100vh-180px)] w-full pr-2">
           <div className="p-2 space-y-2">
             <SortableContext items={leads.map(lead => lead.id)} strategy={verticalListSortingStrategy}>

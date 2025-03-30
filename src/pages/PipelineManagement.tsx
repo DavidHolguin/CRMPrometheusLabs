@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { usePipelines } from "@/hooks/usePipelines";
 import { usePipelineLeads } from "@/hooks/usePipelineLeads";
@@ -73,13 +72,13 @@ const PipelineManagement = () => {
   const sensors = useSensors(
     useSensor(MouseSensor, {
       activationConstraint: {
-        distance: 8,  // Slightly more distance to prevent accidental drags
+        distance: 5,
       }
     }),
     useSensor(TouchSensor, {
       activationConstraint: {
-        delay: 250,  // Short delay for touch devices
-        tolerance: 5, // Small tolerance to prevent jitter
+        delay: 150,
+        tolerance: 5,
       }
     }),
     useSensor(KeyboardSensor, {
@@ -93,55 +92,39 @@ const PipelineManagement = () => {
     
     if (data?.current?.type === "lead") {
       setActiveLead(data.current.lead);
+      document.body.style.overflow = 'hidden';
     }
   };
 
   const handleDragMove = (event: DragMoveEvent) => {
-    // Implement auto-scroll when dragging near edges
     if (!boardRef.current) return;
     
     const board = boardRef.current;
-    const { active } = event;
-    const { clientX, clientY } = event.activatorEvent as MouseEvent;
+    const { clientX } = event.activatorEvent as MouseEvent;
     
     const rect = board.getBoundingClientRect();
-    const threshold = 100; // pixels from edge to start scrolling
-    const scrollSpeed = 10;
+    const threshold = 100;
+    const scrollSpeed = 15;
     
-    // Horizontal scroll
     if (clientX > rect.right - threshold) {
       board.scrollLeft += scrollSpeed;
     } else if (clientX < rect.left + threshold) {
       board.scrollLeft -= scrollSpeed;
     }
-    
-    // For vertical scroll in each stage column
-    const columns = board.querySelectorAll('[data-stage-id]');
-    columns.forEach((column) => {
-      const columnRect = column.getBoundingClientRect();
-      
-      if (clientX >= columnRect.left && 
-          clientX <= columnRect.right &&
-          clientY <= columnRect.bottom &&
-          clientY >= columnRect.top) {
-        
-        // Vertical scroll within column
-        if (clientY > columnRect.bottom - threshold) {
-          (column as HTMLElement).scrollTop += scrollSpeed;
-        } else if (clientY < columnRect.top + threshold) {
-          (column as HTMLElement).scrollTop -= scrollSpeed;
-        }
-      }
-    });
   };
 
   const handleDragOver = (event: DragOverEvent) => {
-    // We only need logic here if implementing drag between items in same column
-    // For now we're just tracking stage changes
+    const { active, over } = event;
+    
+    if (over && active.data.current?.type === "lead" && over.data.current?.type === "stage") {
+      console.log("Dragging over stage:", over.id);
+    }
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
+    
+    document.body.style.overflow = '';
     
     if (!over) {
       setActiveLead(null);
@@ -156,11 +139,20 @@ const PipelineManagement = () => {
       if (sourceStageId !== destinationStageId) {
         console.log('Moving lead:', leadId, 'from stage:', sourceStageId, 'to stage:', destinationStageId);
         
-        // Create a modified copy of the lead for optimistic UI update
         const leadToMove = { ...active.data.current.lead };
         leadToMove.stage_id = destinationStageId;
         
-        // Update the lead stage in the database
+        const localLeadsByStage = { ...leadsByStage };
+        
+        if (sourceStageId && localLeadsByStage[sourceStageId]) {
+          localLeadsByStage[sourceStageId] = localLeadsByStage[sourceStageId].filter(l => l.id !== leadId);
+        }
+        
+        if (!localLeadsByStage[destinationStageId]) {
+          localLeadsByStage[destinationStageId] = [];
+        }
+        localLeadsByStage[destinationStageId].push(leadToMove);
+        
         updateLeadStage(
           { leadId, stageId: destinationStageId },
           {
@@ -336,7 +328,7 @@ const PipelineManagement = () => {
                 zIndex={1000}
               >
                 {activeLead ? (
-                  <div className="opacity-90 transform-gpu pointer-events-none">
+                  <div className="opacity-90 transform-gpu pointer-events-none w-[370px]">
                     <LeadCard lead={activeLead} isDragging={true} />
                   </div>
                 ) : null}
