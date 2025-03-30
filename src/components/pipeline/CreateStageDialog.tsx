@@ -20,15 +20,21 @@ interface CreateStageDialogProps {
   pipeline: Pipeline;
   onComplete?: () => void;
   children?: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-export function CreateStageDialog({ pipeline, onComplete, children }: CreateStageDialogProps) {
-  const [open, setOpen] = useState(false);
+export function CreateStageDialog({ pipeline, onComplete, children, open, onOpenChange }: CreateStageDialogProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [color, setColor] = useState("#3498db");
   const [score, setScore] = useState("0");
   const { createStage } = usePipelines();
+  
+  // Use either the controlled or uncontrolled state
+  const isOpen = open !== undefined ? open : internalOpen;
+  const setIsOpen = onOpenChange || setInternalOpen;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,7 +59,7 @@ export function CreateStageDialog({ pipeline, onComplete, children }: CreateStag
       },
       {
         onSuccess: () => {
-          setOpen(false);
+          setIsOpen(false);
           setName("");
           setDescription("");
           setScore("0");
@@ -64,7 +70,7 @@ export function CreateStageDialog({ pipeline, onComplete, children }: CreateStag
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         {children || (
           <Button variant="outline" className="gap-1 w-full flex justify-center" size="lg">

@@ -62,37 +62,44 @@ export function StageCard({ stage, leads, onAddLead }: StageCardProps) {
                         draggableId={lead.id} 
                         index={leadIndex}
                       >
-                        {(provided, snapshot) => (
-                          <motion.div
-                            ref={provided.innerRef}
-                            {...provided.draggableProps}
-                            {...provided.dragHandleProps}
-                            className="transition-all"
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ 
+                        {(provided, snapshot) => {
+                          // Create a separate variable for motion props
+                          const motionProps = {
+                            initial: { opacity: 0, y: 10 },
+                            animate: { 
                               opacity: 1, 
                               y: 0,
                               scale: snapshot.isDragging ? 1.02 : 1,
                               boxShadow: snapshot.isDragging ? "0 10px 25px -5px rgba(0, 0, 0, 0.1)" : "none",
                               zIndex: snapshot.isDragging ? 10 : 'auto'
-                            }}
-                            exit={{ opacity: 0, y: -10 }}
-                            transition={{ 
+                            },
+                            exit: { opacity: 0, y: -10 },
+                            transition: { 
                               type: "spring", 
                               stiffness: 500, 
                               damping: 30,
                               mass: 1
-                            }}
-                            style={{
-                              ...provided.draggableProps.style,
-                            }}
-                          >
-                            <LeadCard 
-                              lead={lead} 
-                              isDragging={snapshot.isDragging}
-                            />
-                          </motion.div>
-                        )}
+                            }
+                          };
+                          
+                          return (
+                            <motion.div
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              {...provided.dragHandleProps}
+                              className="transition-all"
+                              {...motionProps}
+                              style={{
+                                ...provided.draggableProps.style,
+                              }}
+                            >
+                              <LeadCard 
+                                lead={lead} 
+                                isDragging={snapshot.isDragging}
+                              />
+                            </motion.div>
+                          );
+                        }}
                       </Draggable>
                     ))
                   ) : (
