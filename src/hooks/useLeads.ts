@@ -24,7 +24,7 @@ export interface Lead {
   is_active: boolean;
   created_at: string;
   updated_at: string;
-  datos_adicionales?: Record<string, any>;
+  datos_adicionales?: Record<string, any> | null;
   // Stats derived from other tables
   message_count?: number;
   interaction_count?: number;
@@ -63,6 +63,11 @@ export function useLeads() {
     // Get message counts for all leads
     const enhancedLeads = await Promise.all(
       leads.map(async (lead) => {
+        // Process datos_adicionales to ensure it's a proper object
+        const datos_adicionales = typeof lead.datos_adicionales === 'string' 
+          ? JSON.parse(lead.datos_adicionales) 
+          : lead.datos_adicionales || {};
+        
         // Get tags for this lead
         const { data: tagRelations } = await supabase
           .from("lead_tag_relation")
@@ -117,6 +122,7 @@ export function useLeads() {
         
         return {
           ...lead,
+          datos_adicionales,
           message_count: messageCount,
           interaction_count: interactionCount,
           stage_name: stage?.nombre || "Sin etapa",
@@ -126,7 +132,7 @@ export function useLeads() {
       })
     );
     
-    return enhancedLeads;
+    return enhancedLeads as Lead[];
   };
 
   const leadsQuery = useQuery({
