@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { format, startOfMonth, subMonths, eachDayOfInterval, endOfMonth } from "date-fns";
+import { format, subMonths, eachDayOfInterval, endOfMonth, startOfMonth, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import {
   CartesianGrid,
@@ -22,7 +22,9 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface ActivityData {
   date: string;
@@ -37,21 +39,22 @@ interface LeadActivityChartProps {
 export function LeadActivityChart({ leadId }: LeadActivityChartProps) {
   const [chartData, setChartData] = useState<ActivityData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [startDate, setStartDate] = useState(() => subMonths(startOfMonth(new Date()), 2));
+  const [startDate, setStartDate] = useState(() => subMonths(new Date(), 1));
+  const [endDate, setEndDate] = useState(() => new Date());
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [totalCounts, setTotalCounts] = useState({ messages: 0, interactions: 0 });
   
   useEffect(() => {
     if (leadId) {
       fetchActivityData();
     }
-  }, [leadId, startDate]);
+  }, [leadId, startDate, endDate]);
   
   const fetchActivityData = async () => {
     setIsLoading(true);
     
     try {
       // Get interactions for this lead in the time period
-      const endDate = endOfMonth(startDate);
       const startDateStr = startDate.toISOString();
       const endDateStr = endDate.toISOString();
       
@@ -142,22 +145,64 @@ export function LeadActivityChart({ leadId }: LeadActivityChartProps) {
     }
   };
   
-  const navigatePrevMonth = () => {
-    setStartDate(prev => subMonths(prev, 3));
-  };
-  
-  const navigateNextMonth = () => {
-    const nextDate = subMonths(new Date(), 2);
-    // Only allow navigating up to current month - 2
-    if (startDate < nextDate) {
-      setStartDate(prev => subMonths(endOfMonth(prev), -3));
+  const handleDateRangeSelect = (date: Date | undefined) => {
+    if (!date) return;
+    
+    if (!startDate || (startDate && endDate)) {
+      // Starting a new range selection
+      setStartDate(date);
+      setEndDate(date);
+    } else {
+      // Completing a range selection
+      if (date < startDate) {
+        setStartDate(date);
+      } else {
+        setEndDate(date);
+        setIsCalendarOpen(false); // Close the calendar after selecting the range
+      }
     }
   };
   
-  const canNavigateNext = startDate < subMonths(new Date(), 2);
+  const formatDateRange = () => {
+    return `${format(startDate, 'dd MMM yyyy', { locale: es })} - ${format(endDate, 'dd MMM yyyy', { locale: es })}`;
+  };
   
-  // Get formatted month range for display
-  const monthRangeDisplay = `${format(startDate, 'MMMM yyyy', { locale: es })} - ${format(endOfMonth(startDate), 'MMMM yyyy', { locale: es })}`;
+  const navigatePrevPeriod = () => {
+    const daysInRange = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    
+    const newEndDate = new Date(startDate);
+    newEndDate.setDate(newEndDate.getDate() - 1);
+    
+    const newStartDate = new Date(newEndDate);
+    newStartDate.setDate(newStartDate.getDate() - daysInRange);
+    
+    setStartDate(newStartDate);
+    setEndDate(newEndDate);
+  };
+  
+  const navigateNextPeriod = () => {
+    const daysInRange = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    const today = new Date();
+    
+    let newStartDate = new Date(endDate);
+    newStartDate.setDate(newStartDate.getDate() + 1);
+    
+    // If we're trying to move beyond today, cap it
+    if (newStartDate > today) return;
+    
+    let newEndDate = new Date(newStartDate);
+    newEndDate.setDate(newEndDate.getDate() + daysInRange);
+    
+    // If end date exceeds today, cap it to today
+    if (newEndDate > today) {
+      newEndDate = today;
+    }
+    
+    setStartDate(newStartDate);
+    setEndDate(newEndDate);
+  };
+  
+  const canNavigateNext = endDate < new Date();
   
   const chartConfig = {
     messages: {
@@ -183,18 +228,43 @@ export function LeadActivityChart({ leadId }: LeadActivityChartProps) {
           <Button
             variant="outline"
             size="icon"
-            onClick={navigatePrevMonth}
+            onClick={navigatePrevPeriod}
             className="h-7 w-7"
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <span className="text-xs text-muted-foreground whitespace-nowrap">
-            {monthRangeDisplay}
-          </span>
+          
+          <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8 text-xs">
+                <CalendarIcon className="h-3.5 w-3.5 mr-1" />
+                <span className="whitespace-nowrap">
+                  {formatDateRange()}
+                </span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="center">
+              <Calendar
+                mode="range"
+                selected={{
+                  from: startDate,
+                  to: endDate
+                }}
+                onSelect={(range) => {
+                  if (range?.from) setStartDate(range.from);
+                  if (range?.to) setEndDate(range.to);
+                  if (range?.to) setIsCalendarOpen(false);
+                }}
+                initialFocus
+                className="p-3 pointer-events-auto"
+              />
+            </PopoverContent>
+          </Popover>
+          
           <Button
             variant="outline"
             size="icon"
-            onClick={navigateNextMonth}
+            onClick={navigateNextPeriod}
             disabled={!canNavigateNext}
             className="h-7 w-7"
           >

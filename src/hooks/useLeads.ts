@@ -24,6 +24,7 @@ export interface Lead {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  datos_adicionales?: Record<string, any>;
   // Stats derived from other tables
   message_count?: number;
   interaction_count?: number;

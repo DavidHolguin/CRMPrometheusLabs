@@ -1,13 +1,13 @@
 
 import { Lead } from "@/hooks/useLeads";
 import { LeadScoreChart } from "./LeadScoreChart";
-import { LeadInteractionsList } from "./LeadInteractionsList";
 import { getScoreColorClass } from "./LeadScoreUtils";
 import { badgeVariants } from "@/components/ui/badge";
 import { Info, Mail, Phone, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LeadActivityChart } from "./LeadActivityChart";
+import { LeadPersonalDataTab } from "./LeadPersonalDataTab";
 
 interface LeadDataTabProps {
   lead: Lead;
@@ -137,18 +137,15 @@ export function LeadDataTab({ lead, formatDate }: LeadDataTabProps) {
       <Tabs defaultValue="activity" className="w-full">
         <TabsList className="w-full grid grid-cols-2">
           <TabsTrigger value="activity">Actividad</TabsTrigger>
-          <TabsTrigger value="interactions">Interacciones</TabsTrigger>
+          <TabsTrigger value="personalData">Datos Personales</TabsTrigger>
         </TabsList>
         
         <TabsContent value="activity" className="mt-4">
           <LeadActivityChart leadId={lead.id} />
         </TabsContent>
         
-        <TabsContent value="interactions" className="mt-4">
-          <LeadInteractionsList 
-            leadId={lead.id}
-            formatDate={formatDate}
-          />
+        <TabsContent value="personalData" className="mt-4">
+          <LeadPersonalDataTab lead={lead} />
         </TabsContent>
       </Tabs>
     </div>
