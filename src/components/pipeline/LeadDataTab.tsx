@@ -103,8 +103,11 @@ export function LeadDataTab({ lead, formatDate }: LeadDataTabProps) {
   // Get interaction stats for visuals
   const messageCount = lead.message_count || 0;
   const interactionCount = lead.interaction_count || 0;
-  // Fix: Convert lead.score to number before calculations
-  const scoreValue = lead.score ? Math.round((Number(lead.score) / 100) * 100) : 0;
+  
+  // Convert lead.score to a number for all calculations and displays
+  const scoreNumber = Number(lead.score || 0);
+  // Calculate score value as percentage for the circle visualization
+  const scorePercentage = scoreNumber; // Already in range 0-100
   
   return (
     <Tabs defaultValue="personal" className="w-full">
@@ -222,14 +225,14 @@ export function LeadDataTab({ lead, formatDate }: LeadDataTabProps) {
                     <path
                       d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                       fill="none"
-                      stroke={scoreValue > 75 ? "#10b981" : scoreValue > 50 ? "#f59e0b" : scoreValue > 25 ? "#f97316" : "#ef4444"}
+                      stroke={scorePercentage > 75 ? "#10b981" : scorePercentage > 50 ? "#f59e0b" : scorePercentage > 25 ? "#f97316" : "#ef4444"}
                       strokeWidth="2"
-                      strokeDasharray={`${scoreValue}, 100`}
+                      strokeDasharray={`${scorePercentage}, 100`}
                       strokeLinecap="round"
                     />
                   </svg>
                   <div className="absolute flex flex-col items-center">
-                    <span className="text-3xl font-bold">{Number(lead.score)}</span>
+                    <span className="text-3xl font-bold">{scoreNumber}</span>
                     <span className="text-xs text-muted-foreground">puntos</span>
                   </div>
                 </div>
