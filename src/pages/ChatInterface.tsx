@@ -142,7 +142,79 @@ const ChatInterface = () => {
       }
       
       const empresaId = chatbotInfo.empresa_id;
+      const pipelineId = chatbotInfo.pipeline_id;
       
+      // First, get the pipeline information - if chatbot doesn't have a pipeline, get default pipeline
+      let pipeline;
+      if (pipelineId) {
+        const { data: pipelineData, error: pipelineError } = await supabase
+          .from("pipelines")
+          .select("id")
+          .eq("id", pipelineId)
+          .single();
+          
+        if (!pipelineError) {
+          pipeline = pipelineData;
+        }
+      }
+      
+      // If no pipeline is set on the chatbot or there was an error, get the default pipeline
+      if (!pipeline) {
+        const { data: defaultPipeline, error: defaultPipelineError } = await supabase
+          .from("pipelines")
+          .select("id")
+          .eq("empresa_id", empresaId)
+          .eq("is_default", true)
+          .single();
+          
+        if (defaultPipelineError) {
+          // If no default pipeline, get any pipeline
+          const { data: anyPipeline, error: anyPipelineError } = await supabase
+            .from("pipelines")
+            .select("id")
+            .eq("empresa_id", empresaId)
+            .limit(1)
+            .single();
+            
+          if (anyPipelineError) {
+            console.error("No pipelines found:", anyPipelineError);
+          } else {
+            pipeline = anyPipeline;
+          }
+        } else {
+          pipeline = defaultPipeline;
+        }
+      }
+      
+      // Get the stage 1 (first stage after stage 0) from the pipeline
+      let stageId;
+      if (pipeline) {
+        const { data: stages, error: stagesError } = await supabase
+          .from("pipeline_stages")
+          .select("id")
+          .eq("pipeline_id", pipeline.id)
+          .eq("posicion", 1)  // Position 1 is the second stage (after the initial stage 0)
+          .single();
+          
+        if (stagesError) {
+          // If no stage with position 1, get the first stage (position 0)
+          const { data: firstStage, error: firstStageError } = await supabase
+            .from("pipeline_stages")
+            .select("id")
+            .eq("pipeline_id", pipeline.id)
+            .order("posicion", { ascending: true })
+            .limit(1)
+            .single();
+            
+          if (!firstStageError) {
+            stageId = firstStage.id;
+          }
+        } else {
+          stageId = stages.id;
+        }
+      }
+      
+      // Create the lead with the pipeline and stage
       const { data: leadData, error: leadError } = await supabase
         .from("leads")
         .insert({
@@ -150,6 +222,8 @@ const ChatInterface = () => {
           nombre: userName,
           telefono: userPhone,
           canal_origen: "web",
+          pipeline_id: pipeline?.id || null,
+          stage_id: stageId || null,
           datos_adicionales: {
             session_id: sessionId,
             user_agent: navigator.userAgent,
