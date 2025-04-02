@@ -144,7 +144,10 @@ const ChatInterface = () => {
       const empresaId = chatbotInfo.empresa_id;
       const pipelineId = chatbotInfo.pipeline_id;
       
-      // First, get the pipeline information - if chatbot doesn't have a pipeline, get default pipeline
+      console.log("Creating lead for chatbot:", chatbotInfo.nombre);
+      console.log("Chatbot pipeline_id:", pipelineId);
+      
+      // First, get the pipeline information - if chatbot has a pipeline, use it
       let pipeline;
       if (pipelineId) {
         const { data: pipelineData, error: pipelineError } = await supabase
@@ -153,13 +156,17 @@ const ChatInterface = () => {
           .eq("id", pipelineId)
           .single();
           
-        if (!pipelineError) {
+        if (!pipelineError && pipelineData) {
           pipeline = pipelineData;
+          console.log("Using chatbot's pipeline:", pipeline.id);
+        } else {
+          console.error("Error getting chatbot pipeline:", pipelineError);
         }
       }
       
       // If no pipeline is set on the chatbot or there was an error, get the default pipeline
       if (!pipeline) {
+        console.log("No pipeline assigned to chatbot, looking for default pipeline");
         const { data: defaultPipeline, error: defaultPipelineError } = await supabase
           .from("pipelines")
           .select("id")
@@ -169,6 +176,7 @@ const ChatInterface = () => {
           
         if (defaultPipelineError) {
           // If no default pipeline, get any pipeline
+          console.log("No default pipeline found, getting any pipeline");
           const { data: anyPipeline, error: anyPipelineError } = await supabase
             .from("pipelines")
             .select("id")
@@ -180,27 +188,31 @@ const ChatInterface = () => {
             console.error("No pipelines found:", anyPipelineError);
           } else {
             pipeline = anyPipeline;
+            console.log("Using first available pipeline:", pipeline.id);
           }
         } else {
           pipeline = defaultPipeline;
+          console.log("Using default pipeline:", pipeline.id);
         }
       }
       
       // Get the stage 1 (first stage after stage 0) from the pipeline
       let stageId;
       if (pipeline) {
+        console.log("Finding stage 1 for pipeline:", pipeline.id);
         const { data: stages, error: stagesError } = await supabase
           .from("pipeline_stages")
-          .select("id")
+          .select("id, posicion, nombre")
           .eq("pipeline_id", pipeline.id)
           .eq("posicion", 1)  // Position 1 is the second stage (after the initial stage 0)
           .single();
           
         if (stagesError) {
+          console.error("No stage with position 1 found:", stagesError);
           // If no stage with position 1, get the first stage (position 0)
           const { data: firstStage, error: firstStageError } = await supabase
             .from("pipeline_stages")
-            .select("id")
+            .select("id, posicion, nombre")
             .eq("pipeline_id", pipeline.id)
             .order("posicion", { ascending: true })
             .limit(1)
@@ -208,38 +220,46 @@ const ChatInterface = () => {
             
           if (!firstStageError) {
             stageId = firstStage.id;
+            console.log(`Using first stage (position ${firstStage.posicion}): ${firstStage.nombre} (${stageId})`);
+          } else {
+            console.error("No stages found for pipeline:", firstStageError);
           }
         } else {
           stageId = stages.id;
+          console.log(`Using stage 1: ${stages.nombre} (${stageId})`);
         }
       }
       
       // Create the lead with the pipeline and stage
-      const { data: leadData, error: leadError } = await supabase
+      const leadData = {
+        empresa_id: empresaId,
+        nombre: userName,
+        telefono: userPhone,
+        canal_origen: "web",
+        pipeline_id: pipeline?.id || null,
+        stage_id: stageId || null,
+        datos_adicionales: {
+          session_id: sessionId,
+          user_agent: navigator.userAgent,
+          page: window.location.pathname
+        }
+      };
+      
+      console.log("Creating lead with data:", leadData);
+      
+      const { data: newLead, error: leadError } = await supabase
         .from("leads")
-        .insert({
-          empresa_id: empresaId,
-          nombre: userName,
-          telefono: userPhone,
-          canal_origen: "web",
-          pipeline_id: pipeline?.id || null,
-          stage_id: stageId || null,
-          datos_adicionales: {
-            session_id: sessionId,
-            user_agent: navigator.userAgent,
-            page: window.location.pathname
-          }
-        })
+        .insert(leadData)
         .select()
         .single();
       
       if (leadError) throw leadError;
       
-      console.log("Lead created:", leadData);
+      console.log("Lead created:", newLead);
       
-      if (leadData?.id) {
-        setLeadId(leadData.id);
-        localStorage.setItem(`chatbot_lead_${chatbotId}`, leadData.id);
+      if (newLead?.id) {
+        setLeadId(newLead.id);
+        localStorage.setItem(`chatbot_lead_${chatbotId}`, newLead.id);
       }
     } catch (error) {
       console.error("Error creating lead:", error);
