@@ -13,6 +13,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { LeadCard } from "@/components/pipeline/LeadCard";
 import { CSSProperties, useState } from "react";
 import { usePipelines } from "@/hooks/usePipelines";
+import { useLeads } from "@/hooks/useLeads"; // Added this import to access updateLead
 import { Input } from "@/components/ui/input";
 import { EditStageDialog } from "./EditStageDialog";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -51,7 +52,7 @@ export function LeadItem({ lead, index }: { lead: Lead; index: number }) {
 
   const [showScoreDialog, setShowScoreDialog] = useState(false);
   const [scoreValue, setScoreValue] = useState(lead.score || 0);
-  const { updateLead } = usePipelines();
+  const { updateLead } = useLeads(); // Changed from usePipelines to useLeads
 
   const handleScoreEdit = () => {
     setScoreValue(lead.score || 0);
