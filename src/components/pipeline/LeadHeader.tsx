@@ -13,9 +13,17 @@ interface LeadHeaderProps {
   scoreColorClass: string;
   normalizedScore: number;
   toggleExpanded: () => void;
+  onScoreEdit?: () => void;
 }
 
-export function LeadHeader({ lead, expanded, scoreColorClass, normalizedScore, toggleExpanded }: LeadHeaderProps) {
+export function LeadHeader({ 
+  lead, 
+  expanded, 
+  scoreColorClass, 
+  normalizedScore, 
+  toggleExpanded, 
+  onScoreEdit 
+}: LeadHeaderProps) {
   // Get initials from name
   const getInitials = () => {
     const firstName = lead.nombre || '';

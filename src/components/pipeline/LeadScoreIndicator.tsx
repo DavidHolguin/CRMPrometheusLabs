@@ -2,19 +2,26 @@
 import React from 'react';
 import { cn } from "@/lib/utils";
 import { getScoreColorClass } from "./LeadScoreUtils";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Pencil } from "lucide-react";
+import { Button } from "../ui/button";
 
 interface LeadScoreIndicatorProps {
   score: number;
   showLabel?: boolean;
   size?: 'sm' | 'md' | 'lg';
   className?: string;
+  editable?: boolean;
+  onEdit?: () => void;
 }
 
 export function LeadScoreIndicator({ 
   score, 
   showLabel = true,
   size = 'md',
-  className 
+  className,
+  editable = false,
+  onEdit
 }: LeadScoreIndicatorProps) {
   const normalizedScore = Math.min(100, Math.max(0, score));
   const colorClass = getScoreColorClass(normalizedScore / 10);
@@ -31,11 +38,32 @@ export function LeadScoreIndicator({
   const bgColorClass = bgColorMatch ? bgColorMatch[0] : 'bg-gray-500';
   
   return (
-    <div className={cn("w-full", className)}>
+    <div className={cn("w-full group", className)}>
       {showLabel && (
         <div className="flex justify-between items-center mb-1 text-xs">
           <span className="font-medium">Score</span>
-          <span className="font-semibold">{normalizedScore}/100</span>
+          <div className="flex items-center gap-1">
+            <span className="font-semibold">{normalizedScore}/100</span>
+            {editable && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={onEdit}
+                      className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Pencil size={12} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Editar score</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
         </div>
       )}
       <div className={cn("w-full bg-muted/50 rounded-full overflow-hidden", sizeClasses[size])}>
