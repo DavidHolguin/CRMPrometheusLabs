@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { usePipelines } from "@/hooks/usePipelines";
 import { usePipelineLeads } from "@/hooks/usePipelineLeads";
@@ -93,7 +92,6 @@ const PipelineManagement = () => {
     
     if (data?.current?.type === "lead") {
       setActiveLead(data.current.lead);
-      document.body.style.cursor = 'grabbing';
       document.body.style.overflow = 'hidden';
     }
   };
@@ -126,7 +124,6 @@ const PipelineManagement = () => {
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     
-    document.body.style.cursor = '';
     document.body.style.overflow = '';
     
     if (!over) {

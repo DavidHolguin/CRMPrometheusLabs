@@ -4,21 +4,14 @@ import { Lead } from "@/hooks/useLeads";
 import { PipelineStage } from "@/hooks/usePipelines";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Pencil, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { LeadCard } from "@/components/pipeline/LeadCard";
-import { CSSProperties, useState } from "react";
-import { usePipelines } from "@/hooks/usePipelines";
-import { useLeads } from "@/hooks/useLeads"; // Added this import to access updateLead
-import { Input } from "@/components/ui/input";
-import { EditStageDialog } from "./EditStageDialog";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Slider } from "@/components/ui/slider";
+import { CSSProperties } from "react";
 
 interface StageCardProps {
   stage: PipelineStage;
@@ -50,90 +43,37 @@ export function LeadItem({ lead, index }: { lead: Lead; index: number }) {
     position: isDragging ? 'relative' : 'static',
   };
 
-  const [showScoreDialog, setShowScoreDialog] = useState(false);
-  const [scoreValue, setScoreValue] = useState(lead.score || 0);
-  const { updateLead } = useLeads(); // Changed from usePipelines to useLeads
-
-  const handleScoreEdit = () => {
-    setScoreValue(lead.score || 0);
-    setShowScoreDialog(true);
-  };
-
-  const handleScoreSave = () => {
-    updateLead({
-      id: lead.id,
-      score: scoreValue
-    }, {
-      onSuccess: () => {
-        setShowScoreDialog(false);
-      }
-    });
-  };
-
   return (
-    <>
-      <div
-        ref={setNodeRef}
-        style={style}
-        {...attributes}
-        {...listeners}
-        className="mb-2 touch-manipulation"
-        data-lead-id={lead.id}
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className="mb-2 touch-manipulation"
+      data-lead-id={lead.id}
+    >
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ 
+          opacity: 1, 
+          y: 0,
+          scale: isDragging ? 1.03 : 1,
+          boxShadow: isDragging ? "0 10px 25px -5px rgba(0, 0, 0, 0.2)" : "none",
+        }}
+        exit={{ opacity: 0, y: -10 }}
+        transition={{ 
+          type: "spring", 
+          stiffness: 400, 
+          damping: 25,
+          mass: 0.8
+        }}
       >
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ 
-            opacity: 1, 
-            y: 0,
-            scale: isDragging ? 1.03 : 1,
-            boxShadow: isDragging ? "0 10px 25px -5px rgba(0, 0, 0, 0.2)" : "none",
-          }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{ 
-            type: "spring", 
-            stiffness: 400, 
-            damping: 25,
-            mass: 0.8
-          }}
-        >
-          <LeadCard 
-            lead={lead} 
-            isDragging={isDragging}
-            onScoreEdit={handleScoreEdit}
-          />
-        </motion.div>
-      </div>
-      
-      <Dialog open={showScoreDialog} onOpenChange={setShowScoreDialog}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Editar Score del Lead</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>Valor del Score (0-100)</Label>
-                <span className="bg-primary/10 px-2 py-0.5 rounded text-sm font-medium">{scoreValue}</span>
-              </div>
-              <Slider
-                defaultValue={[scoreValue]}
-                max={100}
-                step={1}
-                value={[scoreValue]}
-                onValueChange={(vals) => setScoreValue(vals[0])}
-                className="cursor-pointer"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowScoreDialog(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleScoreSave}>Guardar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+        <LeadCard 
+          lead={lead} 
+          isDragging={isDragging}
+        />
+      </motion.div>
+    </div>
   );
 }
 
@@ -162,14 +102,13 @@ export function StageCard({ stage, leads, onAddLead }: StageCardProps) {
             {leads?.length || 0}
           </Badge>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <Badge 
             variant="secondary" 
             className="text-xs"
           >
             Score: {stage.probabilidad}
           </Badge>
-          <EditStageDialog stage={stage} />
         </div>
       </div>
       

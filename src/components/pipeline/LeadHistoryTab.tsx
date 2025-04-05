@@ -1,199 +1,330 @@
 
-import { Lead } from "@/hooks/useLeads";
-import { Card, CardContent } from "@/components/ui/card";
-import { Timeline, TimelineItem } from "@/components/ui/timeline";
-import { Activity, ArrowDown, ArrowRight, ArrowUp, Clock, Edit, MessageCircle, Tag, User } from "lucide-react";
 import { useState, useEffect } from "react";
+import { Lead } from "@/hooks/useLeads";
 import { supabase } from "@/integrations/supabase/client";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Clock, ArrowRightLeft, User, Calendar, Tag } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-interface HistoryEvent {
+interface LeadHistoryEvent {
   id: string;
-  lead_id: string;
-  campo: string;
-  valor_anterior: string | null;
-  valor_nuevo: string | null;
-  usuario_id: string | null;
   created_at: string;
-  usuario_nombre?: string;
+  usuario?: {
+    id: string;
+    full_name: string;
+    avatar_url?: string;
+    email: string;
+  };
+  campo?: string;
+  valor_anterior?: string;
+  valor_nuevo?: string;
+  tiempo_en_stage?: string;
+  stage_anterior?: {
+    id: string;
+    nombre: string;
+    color: string;
+  };
+  stage_nuevo?: {
+    id: string;
+    nombre: string;
+    color: string;
+  };
+  type: 'field_change' | 'stage_change';
 }
 
 interface LeadHistoryTabProps {
   lead: Lead;
-  formatDate: (date: string | null) => string;
+  formatDate: (dateStr: string | null) => string;
 }
 
 export function LeadHistoryTab({ lead, formatDate }: LeadHistoryTabProps) {
-  const [history, setHistory] = useState<HistoryEvent[]>([]);
-  const [loading, setLoading] = useState(true);
-
+  const [isLoading, setIsLoading] = useState(true);
+  const [history, setHistory] = useState<LeadHistoryEvent[]>([]);
+  
   useEffect(() => {
-    if (lead.id) {
-      fetchHistory();
-    }
+    fetchHistory();
   }, [lead.id]);
-
+  
   const fetchHistory = async () => {
-    setLoading(true);
+    setIsLoading(true);
+    
     try {
-      // Get lead history
-      const { data: historyData, error: historyError } = await supabase
+      // Fetch field changes
+      const { data: fieldChanges, error: fieldError } = await supabase
         .from("lead_history")
-        .select("*")
+        .select(`
+          id,
+          created_at,
+          campo,
+          valor_anterior,
+          valor_nuevo,
+          usuario_id
+        `)
         .eq("lead_id", lead.id)
         .order("created_at", { ascending: false });
-
-      if (historyError) throw historyError;
-
-      // Get user names
-      const userIds = historyData
-        .map((item) => item.usuario_id)
-        .filter(Boolean) as string[];
-
-      if (userIds.length > 0) {
-        const { data: userData, error: userError } = await supabase
-          .from("usuarios")
-          .select("id, nombre, apellido")
-          .in("id", userIds);
-
-        if (userError) throw userError;
-
-        // Map user names to history events
-        const historyWithUsers = historyData.map((event) => {
-          const user = userData?.find((u) => u.id === event.usuario_id);
-          return {
-            ...event,
-            usuario_nombre: user
-              ? `${user.nombre} ${user.apellido}`
-              : "Usuario del sistema",
-          };
-        });
-
-        setHistory(historyWithUsers);
-      } else {
-        setHistory(historyData);
+      
+      // Fetch stage changes
+      const { data: stageChanges, error: stageError } = await supabase
+        .from("lead_stage_history")
+        .select(`
+          id,
+          created_at,
+          tiempo_en_stage,
+          usuario_id,
+          stage_id_anterior,
+          stage_id_nuevo
+        `)
+        .eq("lead_id", lead.id)
+        .order("created_at", { ascending: false });
+      
+      if (fieldError) console.error("Error fetching field history:", fieldError);
+      if (stageError) console.error("Error fetching stage history:", stageError);
+      
+      // Get the stage data separately to avoid relationship conflicts
+      let stageChangeData: any[] = [];
+      if (stageChanges && stageChanges.length > 0) {
+        for (const change of stageChanges) {
+          const { data: anteriorData } = await supabase
+            .from("pipeline_stages")
+            .select("id, nombre, color")
+            .eq("id", change.stage_id_anterior)
+            .single();
+            
+          const { data: nuevoData } = await supabase
+            .from("pipeline_stages")
+            .select("id, nombre, color")
+            .eq("id", change.stage_id_nuevo)
+            .single();
+            
+          stageChangeData.push({
+            ...change,
+            stage_anterior: anteriorData || { id: '', nombre: 'Sin etapa', color: '#cccccc' },
+            stage_nuevo: nuevoData || { id: '', nombre: 'Sin etapa', color: '#cccccc' }
+          });
+        }
       }
-    } catch (error) {
-      console.error("Error fetching lead history:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getEventIcon = (campo: string) => {
-    switch (campo) {
-      case "stage_id":
-        return <ArrowRight className="h-4 w-4" />;
-      case "score":
-        return <Activity className="h-4 w-4" />;
-      case "tags":
-        return <Tag className="h-4 w-4" />;
-      case "asignado_a":
-        return <User className="h-4 w-4" />;
-      case "message":
-        return <MessageCircle className="h-4 w-4" />;
-      default:
-        return <Edit className="h-4 w-4" />;
-    }
-  };
-
-  const getEventTitle = (event: HistoryEvent) => {
-    switch (event.campo) {
-      case "stage_id":
-        return "Cambio de etapa";
-      case "score":
-        return "Actualización de score";
-      case "tags":
-        return "Modificación de etiquetas";
-      case "asignado_a":
-        return "Reasignación de lead";
-      case "message":
-        return "Nuevo mensaje";
-      default:
-        return `Actualización de ${event.campo}`;
-    }
-  };
-
-  const getEventDescription = (event: HistoryEvent) => {
-    switch (event.campo) {
-      case "stage_id":
-        return (
-          <div className="flex items-center gap-1">
-            <span>{event.valor_anterior || "Sin etapa"}</span>
-            <ArrowRight className="h-3 w-3 text-muted-foreground" />
-            <span>{event.valor_nuevo || "Sin etapa"}</span>
-          </div>
-        );
-      case "score": {
-        const prevScore = Number(event.valor_anterior || 0);
-        const newScore = Number(event.valor_nuevo || 0);
-        const diff = newScore - prevScore;
+      
+      // Get unique user IDs from both sets of changes
+      const userIds = new Set([
+        ...(fieldChanges || []).map(item => item.usuario_id),
+        ...(stageChanges || []).map(item => item.usuario_id)
+      ]);
+      
+      // Fetch user profiles
+      const { data: profiles, error: profilesError } = await supabase
+        .from("profiles")
+        .select("id, full_name, avatar_url, email")
+        .in("id", Array.from(userIds).filter(Boolean));
         
-        return (
-          <div className="flex items-center gap-1">
-            <span>{event.valor_anterior || "0"}</span>
-            {diff > 0 ? (
-              <ArrowUp className="h-3 w-3 text-green-500" />
-            ) : diff < 0 ? (
-              <ArrowDown className="h-3 w-3 text-red-500" />
-            ) : (
-              <ArrowRight className="h-3 w-3 text-muted-foreground" />
-            )}
-            <span>{event.valor_nuevo || "0"}</span>
-          </div>
-        );
-      }
-      default:
-        return (
-          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-            {event.valor_anterior && <span>De: {event.valor_anterior}</span>}
-            {event.valor_anterior && event.valor_nuevo && (
-              <ArrowRight className="h-3 w-3" />
-            )}
-            {event.valor_nuevo && <span>A: {event.valor_nuevo}</span>}
-            {!event.valor_anterior && !event.valor_nuevo && (
-              <span>Sin detalles</span>
-            )}
-          </div>
-        );
+      if (profilesError) console.error("Error fetching profiles:", profilesError);
+      
+      // Create a map of user profiles by ID
+      const profileMap: Record<string, any> = {};
+      profiles?.forEach(profile => {
+        profileMap[profile.id] = profile;
+      });
+      
+      // Format and combine the history events
+      const formattedFieldChanges = (fieldChanges || []).map(item => ({
+        id: item.id,
+        created_at: item.created_at,
+        usuario: profileMap[item.usuario_id] || {
+          id: item.usuario_id || 'unknown',
+          full_name: "Usuario del sistema",
+          email: "",
+          avatar_url: ""
+        },
+        campo: item.campo,
+        valor_anterior: item.valor_anterior,
+        valor_nuevo: item.valor_nuevo,
+        type: 'field_change' as const
+      }));
+      
+      const formattedStageChanges = stageChangeData.map(item => ({
+        id: item.id,
+        created_at: item.created_at,
+        usuario: profileMap[item.usuario_id] || {
+          id: item.usuario_id || 'unknown',
+          full_name: "Usuario del sistema",
+          email: "",
+          avatar_url: ""
+        },
+        tiempo_en_stage: item.tiempo_en_stage?.toString() || '',
+        stage_anterior: item.stage_anterior,
+        stage_nuevo: item.stage_nuevo,
+        type: 'stage_change' as const
+      }));
+      
+      // Combine and sort all events by date
+      const allEvents = [...formattedFieldChanges, ...formattedStageChanges]
+        .sort((a, b) => {
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        });
+      
+      setHistory(allEvents);
+    } catch (error) {
+      console.error("Error:", error);
+    } finally {
+      setIsLoading(false);
     }
+  };
+  
+  const getEventIcon = (event: LeadHistoryEvent) => {
+    if (event.type === 'stage_change') {
+      return <ArrowRightLeft className="h-5 w-5 text-blue-500" />;
+    }
+    
+    switch (event.campo) {
+      case 'nombre':
+      case 'apellido':
+      case 'email':
+      case 'telefono':
+        return <User className="h-5 w-5 text-indigo-500" />;
+      case 'asignado_a':
+        return <User className="h-5 w-5 text-purple-500" />;
+      default:
+        return <Calendar className="h-5 w-5 text-gray-500" />;
+    }
+  };
+  
+  const getEventContent = (event: LeadHistoryEvent) => {
+    if (event.type === 'stage_change') {
+      const anteriorNombre = event.stage_anterior?.nombre || "Sin etapa";
+      const nuevoNombre = event.stage_nuevo?.nombre || "Sin etapa";
+      const stageColor = event.stage_nuevo?.color || "#cccccc";
+      
+      return (
+        <div className="flex flex-col">
+          <div className="font-medium">
+            Cambio de etapa
+          </div>
+          <div className="flex items-center mt-1">
+            <Badge variant="outline" className="mr-2">
+              {anteriorNombre}
+            </Badge>
+            <ArrowRightLeft className="h-4 w-4 mx-1" />
+            <Badge 
+              variant="outline" 
+              className="font-medium" 
+              style={{ backgroundColor: `${stageColor}20`, borderColor: stageColor }}
+            >
+              {nuevoNombre}
+            </Badge>
+          </div>
+          {event.tiempo_en_stage && (
+            <div className="text-xs text-muted-foreground mt-1 flex items-center">
+              <Clock className="h-3 w-3 mr-1" />
+              Tiempo en etapa anterior: {event.tiempo_en_stage.replace(/\.\d+$/, '').replace(/^(\d+):(\d+):(\d+)$/, '$1h $2m $3s')}
+            </div>
+          )}
+        </div>
+      );
+    }
+    
+    // Field change
+    let fieldName = event.campo || "";
+    let readableField = fieldName;
+    
+    switch (fieldName) {
+      case 'nombre': readableField = "Nombre"; break;
+      case 'apellido': readableField = "Apellido"; break;
+      case 'email': readableField = "Email"; break;
+      case 'telefono': readableField = "Teléfono"; break;
+      case 'asignado_a': readableField = "Asignación"; break;
+      case 'score': readableField = "Puntuación"; break;
+      default: readableField = fieldName;
+    }
+    
+    return (
+      <div className="flex flex-col">
+        <div className="font-medium">
+          Cambio en {readableField}
+        </div>
+        <div className="flex flex-col text-sm mt-1">
+          <div className="line-through text-muted-foreground">
+            {event.valor_anterior || "(vacío)"}
+          </div>
+          <div className="font-medium">
+            {event.valor_nuevo || "(vacío)"}
+          </div>
+        </div>
+      </div>
+    );
+  };
+  
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map(part => part[0])
+      .join("")
+      .toUpperCase()
+      .substring(0, 2);
   };
 
   return (
-    <Card>
-      <CardContent className="pt-6">
-        <h3 className="text-sm font-medium mb-4">Historial del Lead</h3>
-        
-        {loading ? (
-          <div className="text-center py-4 text-muted-foreground">
-            Cargando historial...
+    <Card className="shadow-sm">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">Historial de Cambios</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {isLoading ? (
+          <div className="space-y-4">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="flex items-start gap-3">
+                <Skeleton className="h-9 w-9 rounded-full" />
+                <div className="space-y-2 flex-1">
+                  <Skeleton className="h-4 w-1/4" />
+                  <Skeleton className="h-3 w-3/4" />
+                  <Skeleton className="h-3 w-1/2" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : history.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
-            <p>No hay registros de actividad para este lead</p>
+          <div className="text-center py-6 text-muted-foreground">
+            No hay historial de cambios para este lead
           </div>
         ) : (
-          <Timeline>
-            {history.map((event) => (
-              <TimelineItem key={event.id}>
-                <TimelineItem.Indicator>
-                  {getEventIcon(event.campo)}
-                </TimelineItem.Indicator>
-                
-                <TimelineItem.Content>
-                  <TimelineItem.Title>{getEventTitle(event)}</TimelineItem.Title>
-                  <TimelineItem.Description>
-                    {getEventDescription(event)}
-                  </TimelineItem.Description>
-                  
-                  <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
-                    <span>{event.usuario_nombre || "Usuario del sistema"}</span>
-                    <span>{formatDate(event.created_at)}</span>
+          <div className="relative space-y-4">
+            {history.map((event, index) => (
+              <div key={event.id} className="flex items-start gap-3">
+                <Avatar className="h-9 w-9">
+                  <AvatarImage src={event.usuario?.avatar_url || ""} />
+                  <AvatarFallback>{event.usuario?.full_name ? getInitials(event.usuario.full_name) : "U"}</AvatarFallback>
+                </Avatar>
+                <div className="flex-1 space-y-1">
+                  <div className="flex justify-between items-start">
+                    <div className="font-medium text-sm">
+                      {event.usuario?.full_name || "Usuario del sistema"}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {formatDate(event.created_at)}
+                    </div>
                   </div>
-                </TimelineItem.Content>
-              </TimelineItem>
+                  <div className="flex items-start gap-2 rounded-md p-2 bg-muted/50">
+                    <div className="mt-0.5">
+                      {getEventIcon(event)}
+                    </div>
+                    <div className="flex-1">
+                      {getEventContent(event)}
+                    </div>
+                  </div>
+                  {event.usuario?.email && (
+                    <div className="text-xs text-muted-foreground">
+                      {event.usuario.email}
+                    </div>
+                  )}
+                </div>
+              </div>
             ))}
-          </Timeline>
+          </div>
         )}
       </CardContent>
     </Card>
