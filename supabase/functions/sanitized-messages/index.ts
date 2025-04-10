@@ -93,16 +93,17 @@ serve(async (req) => {
         )
       }
 
-      // Store the sanitized message
-      const { data, error } = await supabaseClient.rpc(
-        'insert_mensaje_sanitizado',
-        {
-          p_mensaje_id: mensaje_id,
-          p_token_anonimo: token_anonimo,
-          p_contenido_sanitizado: contenido_sanitizado,
-          p_metadata_sanitizada: metadata_sanitizada || {}
-        }
-      )
+      // Store the sanitized message using direct insert instead of RPC
+      const { data, error } = await supabaseClient
+        .from('mensajes_sanitizados')
+        .insert({
+          mensaje_id,
+          token_anonimo,
+          contenido_sanitizado,
+          metadata_sanitizada: metadata_sanitizada || {}
+        })
+        .select('id')
+        .single()
       
       if (error) {
         return new Response(

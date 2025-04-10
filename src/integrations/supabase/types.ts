@@ -1710,9 +1710,24 @@ export type Database = {
         Args: { lead_uuid: string }
         Returns: number
       }
+      create_anonymous_token: {
+        Args: { p_lead_id: string }
+        Returns: {
+          token_anonimo: string
+        }[]
+      }
       ejecutar_sql: {
         Args: { sql: string }
         Returns: Json[]
+      }
+      insert_mensaje_sanitizado: {
+        Args: {
+          p_mensaje_id: string
+          p_token_anonimo: string
+          p_contenido_sanitizado: string
+          p_metadata_sanitizada?: Json
+        }
+        Returns: string
       }
       is_admin: {
         Args: { user_id: string }
