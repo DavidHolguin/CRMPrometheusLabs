@@ -61,7 +61,24 @@ export function LeadHeader({ lead, expanded, scoreColorClass, normalizedScore, t
         </div>
       </div>
       
-      <div className="flex gap-1">
+      <div className="flex gap-2 items-center">
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="w-24">
+                <LeadScoreIndicator 
+                  score={normalizedScore} 
+                  showLabel={false} 
+                  size="sm"
+                />
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              <p className="text-xs">Lead Score: {normalizedScore}/100</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        
         <Button 
           variant="ghost" 
           size="sm" 

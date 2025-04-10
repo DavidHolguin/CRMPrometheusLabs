@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,6 +16,7 @@ import { Drawer, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, D
 import { EmojiPicker } from "@/components/conversations/EmojiPicker";
 import { useChatMessages, ChatMessage } from "@/hooks/useChatMessages";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { getOrCreateAnonymousToken, sanitizeMessage, storeSanitizedMessage } from "@/utils/piiUtils";
 
 const ChatInterface = () => {
   const { chatbotId } = useParams();
@@ -37,6 +37,8 @@ const ChatInterface = () => {
   const [userRating, setUserRating] = useState(0);
   const [userFeedback, setUserFeedback] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [anonymousToken, setAnonymousToken] = useState<string | null>(null);
+  const [piiMappings, setPiiMappings] = useState<any[]>([]);
   
   const { messages, addMessage } = useChatMessages(conversationId);
   const isMobile = useIsMobile();
@@ -119,7 +121,14 @@ const ChatInterface = () => {
       setUserFormSubmitted(true);
       setShowUserForm(false);
       
-      await createLead();
+      const leadId = await createLead();
+      
+      if (leadId) {
+        const { getOrCreateAnonymousToken } = await import("@/utils/piiUtils");
+        const token = await getOrCreateAnonymousToken(leadId);
+        setAnonymousToken(token);
+        console.log("Anonymous token obtained:", token);
+      }
       
       const welcomeMessage = {
         id: uuidv4(),
@@ -147,7 +156,6 @@ const ChatInterface = () => {
       console.log("Creating lead for chatbot:", chatbotInfo.nombre);
       console.log("Chatbot pipeline_id:", pipelineId);
       
-      // First, get the pipeline information - if chatbot has a pipeline, use it
       let pipeline;
       if (pipelineId) {
         const { data: pipelineData, error: pipelineError } = await supabase
@@ -164,7 +172,6 @@ const ChatInterface = () => {
         }
       }
       
-      // If no pipeline is set on the chatbot or there was an error, get the default pipeline
       if (!pipeline) {
         console.log("No pipeline assigned to chatbot, looking for default pipeline");
         const { data: defaultPipeline, error: defaultPipelineError } = await supabase
@@ -175,7 +182,6 @@ const ChatInterface = () => {
           .single();
           
         if (defaultPipelineError) {
-          // If no default pipeline, get any pipeline
           console.log("No default pipeline found, getting any pipeline");
           const { data: anyPipeline, error: anyPipelineError } = await supabase
             .from("pipelines")
@@ -196,7 +202,6 @@ const ChatInterface = () => {
         }
       }
       
-      // Get the stage 1 (first stage after stage 0) from the pipeline
       let stageId;
       if (pipeline) {
         console.log("Finding stage 1 for pipeline:", pipeline.id);
@@ -204,12 +209,11 @@ const ChatInterface = () => {
           .from("pipeline_stages")
           .select("id, posicion, nombre")
           .eq("pipeline_id", pipeline.id)
-          .eq("posicion", 1)  // Position 1 is the second stage (after the initial stage 0)
+          .eq("posicion", 1)
           .single();
           
         if (stagesError) {
           console.error("No stage with position 1 found:", stagesError);
-          // If no stage with position 1, get the first stage (position 0)
           const { data: firstStage, error: firstStageError } = await supabase
             .from("pipeline_stages")
             .select("id, posicion, nombre")
@@ -230,7 +234,6 @@ const ChatInterface = () => {
         }
       }
       
-      // Create the lead with the pipeline and stage
       const leadData = {
         empresa_id: empresaId,
         nombre: userName,
@@ -260,7 +263,10 @@ const ChatInterface = () => {
       if (newLead?.id) {
         setLeadId(newLead.id);
         localStorage.setItem(`chatbot_lead_${chatbotId}`, newLead.id);
+        return newLead.id;
       }
+      
+      return null;
     } catch (error) {
       console.error("Error creating lead:", error);
       throw error;
@@ -311,19 +317,46 @@ const ChatInterface = () => {
         }
       }
       
-      const apiRequest = {
-        empresa_id: empresaId,
-        chatbot_id: chatbotId,
-        mensaje: messageContent,
-        session_id: sessionId,
-        lead_id: leadId || undefined,
-        metadata: {
-          browser: navigator.userAgent,
-          page: window.location.pathname,
-          name: userName || undefined,
-          phone: userPhone || undefined
-        }
+      const { getOrCreateAnonymousToken, sanitizeMessage, storeSanitizedMessage } = await import("@/utils/piiUtils");
+      
+      if (!anonymousToken && leadId) {
+        const token = await getOrCreateAnonymousToken(leadId);
+        setAnonymousToken(token);
+      }
+      
+      const { sanitizedText, mappings } = sanitizeMessage(messageContent, piiMappings);
+      
+      if (mappings.length > piiMappings.length) {
+        setPiiMappings(mappings);
+      }
+      
+      const sanitizedMetadata = {
+        browser: navigator.userAgent,
+        page: window.location.pathname
       };
+      
+      const apiRequest = anonymousToken 
+        ? {
+            empresa_id: empresaId,
+            chatbot_id: chatbotId,
+            mensaje: sanitizedText,
+            session_id: sessionId,
+            token_anonimo: anonymousToken,
+            metadata: sanitizedMetadata
+          }
+        : {
+            empresa_id: empresaId,
+            chatbot_id: chatbotId,
+            mensaje: messageContent,
+            session_id: sessionId,
+            lead_id: leadId || undefined,
+            metadata: {
+              browser: navigator.userAgent,
+              page: window.location.pathname,
+              name: userName || undefined,
+              phone: userPhone || undefined
+            }
+          };
       
       console.log("Sending message to API:", apiRequest);
       
@@ -343,12 +376,17 @@ const ChatInterface = () => {
       const data = await response.json();
       console.log("API response:", data);
       
-      // We don't add the user message here again since we already added it optimistically
-      
       if (data.respuesta) {
+        let displayResponse = data.respuesta;
+        
+        if (mappings.length > 0) {
+          const { restorePII } = await import("@/utils/piiUtils");
+          displayResponse = restorePII(data.respuesta, mappings);
+        }
+        
         addMessage({
           id: uuidv4(),
-          contenido: data.respuesta,
+          contenido: displayResponse,
           origen: "chatbot",
           created_at: new Date().toISOString(),
           metadata: data.metadata
@@ -363,6 +401,24 @@ const ChatInterface = () => {
       if (data.lead_id && data.lead_id !== leadId) {
         setLeadId(data.lead_id);
         localStorage.setItem(`chatbot_lead_${chatbotId}`, data.lead_id);
+        
+        if (!anonymousToken) {
+          const token = await getOrCreateAnonymousToken(data.lead_id);
+          setAnonymousToken(token);
+        }
+      }
+      
+      if (data.token_anonimo && data.token_anonimo !== anonymousToken) {
+        setAnonymousToken(data.token_anonimo);
+      }
+      
+      if (anonymousToken && data.mensaje_id) {
+        await storeSanitizedMessage(
+          data.mensaje_id,
+          anonymousToken,
+          sanitizedText,
+          sanitizedMetadata
+        );
       }
     } catch (error) {
       console.error("Error sending message:", error);
