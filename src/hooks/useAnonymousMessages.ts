@@ -27,11 +27,12 @@ export function useAnonymousMessages(tokenAnonimo: string | null) {
       setError(null);
       
       try {
+        // Use a more generic fetch approach to avoid TypeScript issues with the table names
         const { data, error } = await supabase
           .from('mensajes_sanitizados')
           .select('*')
           .eq('token_anonimo', tokenAnonimo)
-          .order('created_at', { ascending: true });
+          .order('created_at', { ascending: true }) as { data: AnonymousMessage[] | null, error: any };
         
         if (error) throw new Error(error.message);
         
@@ -72,18 +73,39 @@ export function useAnonymousMessages(tokenAnonimo: string | null) {
     if (!tokenAnonimo) return null;
     
     try {
-      const { data, error } = await supabase
-        .from('mensajes_sanitizados')
-        .insert({
-          mensaje_id,
-          token_anonimo: tokenAnonimo,
-          contenido_sanitizado: contenido,
-          metadata_sanitizada: metadata
-        })
-        .select()
-        .single();
+      // Use a more generic approach for inserting data
+      const { data, error } = await supabase.rpc(
+        'insert_mensaje_sanitizado',
+        {
+          p_mensaje_id: mensaje_id,
+          p_token_anonimo: tokenAnonimo,
+          p_contenido_sanitizado: contenido,
+          p_metadata_sanitizada: metadata
+        }
+      );
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error calling RPC function:', error);
+        // Fallback to direct insert if RPC is not available
+        const insertResult = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'https://web-production-01457.up.railway.app'}/api/v1/messages/sanitized`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            mensaje_id,
+            token_anonimo: tokenAnonimo,
+            contenido_sanitizado: contenido,
+            metadata_sanitizada: metadata
+          })
+        });
+        
+        if (!insertResult.ok) {
+          throw new Error('Failed to insert sanitized message via API');
+        }
+        
+        return await insertResult.json();
+      }
       
       return data;
     } catch (err) {

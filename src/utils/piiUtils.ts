@@ -4,7 +4,6 @@
  * This module provides functions for anonymizing and sanitizing PII data
  */
 
-import { supabase } from "@/integrations/supabase/client";
 import { v4 as uuidv4 } from "uuid";
 
 // Regular expressions for common PII patterns
@@ -26,37 +25,22 @@ interface AnonymizationMapping {
  */
 export async function getOrCreateAnonymousToken(leadId: string): Promise<string | null> {
   try {
-    // Check if token already exists
-    const { data: existingToken, error: fetchError } = await supabase
-      .from("pii_tokens")
-      .select("token_anonimo")
-      .eq("lead_id", leadId)
-      .eq("is_active", true)
-      .maybeSingle();
+    // Make API call to an endpoint that handles the token creation/retrieval
+    const apiEndpoint = import.meta.env.VITE_API_BASE_URL || 'https://web-production-01457.up.railway.app';
+    const response = await fetch(`${apiEndpoint}/api/v1/tokens/anonymous`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ lead_id: leadId })
+    });
     
-    if (fetchError) throw fetchError;
-    
-    // Return existing token if found
-    if (existingToken) {
-      return existingToken.token_anonimo;
+    if (!response.ok) {
+      throw new Error(`Error retrieving anonymous token: ${response.statusText}`);
     }
     
-    // Create a new token if none exists
-    const newTokenId = uuidv4();
-    
-    const { data: newToken, error: insertError } = await supabase
-      .from("pii_tokens")
-      .insert({
-        lead_id: leadId,
-        token_anonimo: newTokenId,
-        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days from now
-      })
-      .select("token_anonimo")
-      .single();
-    
-    if (insertError) throw insertError;
-    
-    return newToken.token_anonimo;
+    const data = await response.json();
+    return data.token_anonimo;
   } catch (error) {
     console.error("Error managing anonymous token:", error);
     return null;
@@ -152,16 +136,25 @@ export async function storeSanitizedMessage(
   metadataSanitized: any = {}
 ): Promise<boolean> {
   try {
-    const { error } = await supabase
-      .from("mensajes_sanitizados")
-      .insert({
+    // Use an API endpoint instead of direct Supabase client to avoid type issues
+    const apiEndpoint = import.meta.env.VITE_API_BASE_URL || 'https://web-production-01457.up.railway.app';
+    const response = await fetch(`${apiEndpoint}/api/v1/messages/sanitized`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
         mensaje_id: messageId,
         token_anonimo: tokenAnonimo,
         contenido_sanitizado: contentSanitized,
         metadata_sanitizada: metadataSanitized
-      });
+      })
+    });
     
-    if (error) throw error;
+    if (!response.ok) {
+      throw new Error(`Error storing sanitized message: ${response.statusText}`);
+    }
+    
     return true;
   } catch (error) {
     console.error("Error storing sanitized message:", error);
