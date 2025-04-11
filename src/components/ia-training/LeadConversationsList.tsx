@@ -4,10 +4,12 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MessageSquare, Search, CalendarDays, Star } from "lucide-react";
+import { MessageSquare, Search, CalendarDays, Star, User } from "lucide-react";
 import { Lead } from "@/hooks/useLeads";
 import { Conversation } from "@/hooks/useConversations";
 import { useEvaluaciones } from "@/hooks/useEvaluaciones";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface LeadConversationsListProps {
   leads: Lead[];
@@ -131,6 +133,15 @@ export function LeadConversationsList({
     return true;
   });
 
+  // Agrupar conversaciones por lead_id
+  const conversationsByLead = filteredConversations.reduce((acc, conv) => {
+    if (!acc[conv.lead_id]) {
+      acc[conv.lead_id] = [];
+    }
+    acc[conv.lead_id].push(conv);
+    return acc;
+  }, {} as Record<string, Conversation[]>);
+
   const isLoadingAny = isLoading || isLoadingEvaluaciones;
 
   if (isLoadingAny && filteredConversations.length === 0) {
@@ -139,49 +150,95 @@ export function LeadConversationsList({
     </div>;
   }
 
+  // Ordenamos los leads por el número de conversaciones (de más a menos)
+  const sortedLeadIds = Object.keys(conversationsByLead).sort((a, b) => 
+    conversationsByLead[b].length - conversationsByLead[a].length
+  );
+
   return (
-    <div className="space-y-2">
+    <div className="space-y-4">
       {isLoadingAny && (
         <div className="flex items-center justify-center py-2">
           <div className="text-xs text-muted-foreground">Cargando evaluaciones...</div>
         </div>
       )}
       
-      {filteredConversations.map((conversation) => {
-        const lead = leads.find((l) => l.id === conversation.lead_id);
-        if (!lead) return null;
-
-        const hasEvaluation = evaluaciones?.some(evaluation => evaluation.mensaje_id === conversation.id);
-        const evaluacionesCount = evaluaciones?.filter(evaluacion => evaluacion.mensaje_id === conversation.id).length || 0;
-
-        return (
-          <button
-            key={conversation.id}
-            className={`w-full text-left p-3 rounded-lg transition-colors ${
-              selectedConversationId === conversation.id
-                ? "bg-primary/10"
-                : "hover:bg-secondary"
-            }`}
-            onClick={() => onSelectConversation(conversation.id)}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex flex-col">
-                <span className="font-medium">
-                  {lead.nombre} {lead.apellido}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {evaluacionesCargadas[conversation.id] 
-                    ? `${evaluacionesCount} evaluaciones` 
-                    : "Cargando..."}
-                </span>
+      {sortedLeadIds.length === 0 ? (
+        <div className="text-center py-4 text-muted-foreground">
+          No se encontraron conversaciones con el filtro actual
+        </div>
+      ) : (
+        sortedLeadIds.map(leadId => {
+          const lead = leads.find(l => l.id === leadId);
+          if (!lead) return null;
+          
+          const leadConversations = conversationsByLead[leadId];
+          const hasEvaluatedConvs = leadConversations.some(conv => 
+            evaluaciones?.some(evaluation => evaluation.mensaje_id === conv.id)
+          );
+          
+          return (
+            <Card key={leadId} className="overflow-hidden">
+              <div className="p-3 bg-muted/50 border-b flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className="bg-primary/10 p-1 rounded-full">
+                    <User className="h-4 w-4 text-primary" />
+                  </div>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="font-medium truncate max-w-[150px]">
+                          {lead.nombre || ""} {lead.apellido || ""}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {lead.nombre || ""} {lead.apellido || ""}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+                <Badge variant={hasEvaluatedConvs ? "default" : "outline"} className="text-xs">
+                  {leadConversations.length} {leadConversations.length === 1 ? "conversación" : "conversaciones"}
+                </Badge>
               </div>
-              {hasEvaluation && (
-                <div className="h-2 w-2 rounded-full bg-green-500" />
-              )}
-            </div>
-          </button>
-        );
-      })}
+              
+              <div className="max-h-[150px] overflow-y-auto">
+                {leadConversations.map((conversation) => {
+                  const hasEvaluation = evaluaciones?.some(evaluation => evaluation.mensaje_id === conversation.id);
+                  const evaluacionesCount = evaluaciones?.filter(evaluacion => evaluacion.mensaje_id === conversation.id).length || 0;
+                  
+                  return (
+                    <button
+                      key={conversation.id}
+                      className={`w-full text-left p-2 border-b last:border-b-0 transition-colors flex items-center justify-between ${
+                        selectedConversationId === conversation.id
+                          ? "bg-primary/10"
+                          : "hover:bg-secondary"
+                      }`}
+                      onClick={() => onSelectConversation(conversation.id)}
+                    >
+                      <div className="flex items-center space-x-2 overflow-hidden">
+                        <MessageSquare className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                        <span className="truncate text-sm">
+                          {conversation.ultimo_mensaje?.substring(0, 25) || "Sin mensajes"}
+                          {conversation.ultimo_mensaje && conversation.ultimo_mensaje.length > 25 ? "..." : ""}
+                        </span>
+                      </div>
+                      {hasEvaluation ? (
+                        <Badge variant="success" className="h-5 w-5 p-0 flex items-center justify-center">
+                          <Star className="h-3 w-3" />
+                        </Badge>
+                      ) : (
+                        <div className="h-5 w-5"></div> 
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </Card>
+          );
+        })
+      )}
     </div>
   );
 }

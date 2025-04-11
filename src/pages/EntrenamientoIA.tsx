@@ -5,8 +5,8 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Clock } from "lucide-react";
-import { useAuth } from "@/context/AuthContext"; // Importamos el contexto de autenticación
+import { Clock, Search } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 import { useChatbots } from "@/hooks/useChatbots";
 import { useConversations } from "@/hooks/useConversations";
 import { useConversationMessages } from "@/hooks/useConversationMessages";
@@ -16,10 +16,9 @@ import { LeadConversationsList } from "@/components/ia-training/LeadConversation
 import { QAPairCard } from "@/components/ia-training/QAPairCard";
 
 export default function EntrenamientoIA() {
-  const { user } = useAuth(); // Obtenemos el usuario del contexto de autenticación
+  const { user } = useAuth();
   const { data: chatbots = [] } = useChatbots();
   const [selectedChatbotId, setSelectedChatbotId] = useState<string | null>(null);
-  // Pasamos el selectedChatbotId al hook useConversations para filtrar por ese chatbot
   const { data: conversations = [], isLoading: isLoadingConversations } = useConversations(selectedChatbotId || undefined);
   const { data: leads = [], isLoading: isLoadingLeads } = useLeads(selectedChatbotId || undefined);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
@@ -170,62 +169,71 @@ export default function EntrenamientoIA() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <Select value={selectedChatbotId || ""} onValueChange={handleChatbotChange}>
-        <SelectTrigger className="w-[300px]">
-          <SelectValue placeholder="Selecciona un chatbot para evaluar" />
-        </SelectTrigger>
-        <SelectContent>
-          {chatbots.map((chatbot) => (
-            <SelectItem key={chatbot.id} value={chatbot.id}>
-              <div className="flex items-center gap-2">
-                <img 
-                  src={chatbot.avatar_url || "/placeholder.svg"} 
-                  alt={chatbot.nombre}
-                  className="w-6 h-6 rounded-full"
-                />
-                <div className="flex flex-col">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <Select value={selectedChatbotId || ""} onValueChange={handleChatbotChange}>
+          <SelectTrigger className="w-full sm:w-[300px]">
+            <SelectValue placeholder="Selecciona un chatbot para evaluar" />
+          </SelectTrigger>
+          <SelectContent>
+            {chatbots.map((chatbot) => (
+              <SelectItem key={chatbot.id} value={chatbot.id}>
+                <div className="flex items-center gap-2">
+                  <img 
+                    src={chatbot.avatar_url || "/placeholder.svg"} 
+                    alt={chatbot.nombre}
+                    className="w-6 h-6 rounded-full object-cover"
+                  />
                   <span>{chatbot.nombre}</span>
-                  <div className="flex items-center text-xs text-muted-foreground">
-                    <Clock className="h-3 w-3 inline mr-1" />
-                    <span>Hace 2 horas</span>
-                  </div>
                 </div>
-              </div>
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        
+        <div className="relative w-full sm:w-[300px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input 
+            placeholder="Buscar conversación o lead..." 
+            value={searchQuery}
+            onChange={handleSearchChange}
+            className="pl-9"
+          />
+        </div>
+      </div>
 
-      <div className="grid grid-cols-12 gap-6">
-        <Card className="h-[calc(100vh-12rem)] col-span-4">
-          <CardContent className="pt-6">
-            <div className="space-y-4">
-              <div className="flex gap-2">
-                <Button 
-                  variant={filterStatus === "all" ? "default" : "outline"}
-                  onClick={() => setFilterStatus("all")}
-                >
-                  Todos
-                </Button>
-                <Button 
-                  variant={filterStatus === "rated" ? "default" : "outline"}
-                  onClick={() => setFilterStatus("rated")}
-                >
-                  Calificados
-                </Button>
-                <Button 
-                  variant={filterStatus === "unrated" ? "default" : "outline"}
-                  onClick={() => setFilterStatus("unrated")}
-                >
-                  Sin calificar
-                </Button>
-              </div>
-              <Input 
-                placeholder="Buscar..." 
-                value={searchQuery}
-                onChange={handleSearchChange}
-              />
-              <ScrollArea className="h-[calc(100vh-20rem)]">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <Card className="h-[calc(100vh-12rem)] lg:col-span-4 flex flex-col">
+          <div className="p-4 border-b">
+            <div className="flex gap-2">
+              <Button 
+                variant={filterStatus === "all" ? "default" : "outline"}
+                onClick={() => setFilterStatus("all")}
+                size="sm"
+                className="flex-1"
+              >
+                Todos
+              </Button>
+              <Button 
+                variant={filterStatus === "rated" ? "default" : "outline"}
+                onClick={() => setFilterStatus("rated")}
+                size="sm"
+                className="flex-1"
+              >
+                Calificados
+              </Button>
+              <Button 
+                variant={filterStatus === "unrated" ? "default" : "outline"}
+                onClick={() => setFilterStatus("unrated")}
+                size="sm"
+                className="flex-1"
+              >
+                Sin calificar
+              </Button>
+            </div>
+          </div>
+          <div className="flex-1 overflow-hidden">
+            <ScrollArea className="h-full">
+              <div className="p-4 space-y-4">
                 {(isLoadingConversations || isLoadingLeads) ? (
                   <div className="flex items-center justify-center h-32">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -246,48 +254,57 @@ export default function EntrenamientoIA() {
                     filterStatus={filterStatus}
                   />
                 )}
-              </ScrollArea>
-            </div>
-          </CardContent>
+              </div>
+            </ScrollArea>
+          </div>
         </Card>
 
-        <Card className="h-[calc(100vh-12rem)] col-span-8">
-          <ScrollArea className="h-full">
-            <div className="p-6 space-y-6">
-              {isLoadingMessages ? (
-                <div className="flex items-center justify-center h-32">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                </div>
-              ) : qaPairs.length === 0 ? (
-                <div className="flex items-center justify-center h-32 text-muted-foreground">
-                  {selectedConversationId 
-                    ? "No hay mensajes en esta conversación"
-                    : selectedChatbotId 
-                      ? conversations.length === 0 
-                        ? "No hay conversaciones para este chatbot" 
-                        : "Selecciona una conversación para ver los mensajes"
-                      : "Selecciona un chatbot para comenzar"}
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {qaPairs.map((pair) => (
-                    <QAPairCard
-                      key={pair.id}
-                      pair={{
-                        id: pair.id,
-                        question: pair.question.content,
-                        answer: pair.answer.content,
-                        rating: evaluaciones[pair.id]?.rating,
-                        feedback: evaluaciones[pair.id]?.feedback,
-                      }}
-                      onRate={(rating) => handleRate(pair.id, pair.question.id, pair.answer.id, rating)}
-                      onFeedback={(feedback) => handleFeedback(pair.id, pair.question.id, pair.answer.id, feedback)}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          </ScrollArea>
+        <Card className="h-[calc(100vh-12rem)] lg:col-span-8 flex flex-col">
+          {selectedConversationId ? (
+            <CardHeader className="pb-2 border-b">
+              <CardTitle className="text-lg">
+                Evaluación de conversación
+              </CardTitle>
+            </CardHeader>
+          ) : null}
+          <div className="flex-1 overflow-hidden">
+            <ScrollArea className="h-full">
+              <div className="p-6 space-y-6">
+                {isLoadingMessages ? (
+                  <div className="flex items-center justify-center h-32">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  </div>
+                ) : qaPairs.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-32 text-muted-foreground space-y-2">
+                    {selectedConversationId 
+                      ? "No hay mensajes en esta conversación"
+                      : selectedChatbotId 
+                        ? conversations.length === 0 
+                          ? "No hay conversaciones para este chatbot" 
+                          : "Selecciona una conversación para ver los mensajes"
+                        : "Selecciona un chatbot para comenzar"}
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {qaPairs.map((pair) => (
+                      <QAPairCard
+                        key={pair.id}
+                        pair={{
+                          id: pair.id,
+                          question: pair.question.content,
+                          answer: pair.answer.content,
+                          rating: evaluaciones[pair.id]?.rating,
+                          feedback: evaluaciones[pair.id]?.feedback,
+                        }}
+                        onRate={(rating) => handleRate(pair.id, pair.question.id, pair.answer.id, rating)}
+                        onFeedback={(feedback) => handleFeedback(pair.id, pair.question.id, pair.answer.id, feedback)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+          </div>
         </Card>
       </div>
     </div>
