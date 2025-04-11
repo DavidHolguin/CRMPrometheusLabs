@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { 
@@ -14,7 +13,8 @@ import {
   LogOut,
   MessagesSquare,
   Database,
-  Link2
+  Link2,
+  Brain
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { 
@@ -200,6 +200,14 @@ export function AppSidebar({ isMobileOpen, setIsMobileOpen }: AppSidebarProps) {
               icon={<MessagesSquare size={20} />}
               label="Chatbots"
               isActive={location.pathname.includes("chatbots")}
+              isCollapsed={isCollapsed}
+              onClick={handleLinkClick}
+            />
+            <NavLink
+              to="/dashboard/entrenamiento-ia"
+              icon={<Brain size={20} />}
+              label="Entrenamiento IA"
+              isActive={location.pathname.includes("entrenamiento-ia")}
               isCollapsed={isCollapsed}
               onClick={handleLinkClick}
             />

@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useLeads } from "@/hooks/useLeads";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
+import { useLocation } from "react-router-dom";
 import { 
   ChevronDown, 
   ChevronUp, 
@@ -25,7 +25,11 @@ import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 
 const LeadsPage = () => {
-  const { leads, isLoading } = useLeads();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const chatbotId = searchParams.get('chatbotId');
+  
+  const { data: leads = [], isLoading } = useLeads(chatbotId || undefined);
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"card" | "list">("card");
   const [sortField, setSortField] = useState<string>("created_at");

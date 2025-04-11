@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -21,6 +20,7 @@ import ConversationsPage from "./pages/Conversations";
 import Leads from "./pages/Leads";
 import PipelineManagement from "./pages/PipelineManagement";
 import Canales from "./pages/Canales";
+import EntrenamientoIA from "./pages/EntrenamientoIA";
 
 // Layout
 import DashboardLayout from "./components/layouts/DashboardLayout";
@@ -68,6 +68,7 @@ const App = () => {
           <Route path="conversations" element={<ConversationsPage />} />
           <Route path="conversations/:conversationId" element={<ConversationsPage />} />
           <Route path="chatbots" element={<Chatbots />} />
+          <Route path="entrenamiento-ia" element={<EntrenamientoIA />} />
           <Route path="settings" element={<Dashboard />} />
         </Route>
         

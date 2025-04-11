@@ -1,4 +1,3 @@
-
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -57,33 +56,51 @@ export const useDashboardStats = () => {
       
       const leadIdArray = leadsIds ? leadsIds.map(lead => lead.id) : [];
       
-      // Obtener el total de conversaciones para estos leads
-      const { count: conversaciones, error: convsError } = await supabase
-        .from("conversaciones")
-        .select("id", { count: "exact", head: true })
-        .eq("chatbot_id", "chatbot_id") // Aquí se necesitaría una relación entre chatbots y empresa_id
-        .in("lead_id", leadIdArray.length > 0 ? leadIdArray : ['no-leads']);
+      // Inicializar variables para conversaciones y mensajes
+      let conversaciones = 0;
+      let mensajes = 0;
+      
+      // Solo realizar las consultas si hay leads
+      if (leadIdArray.length > 0) {
+        try {
+          // Obtener el total de conversaciones para estos leads
+          const { count: convsCount, error: convsError } = await supabase
+            .from("conversaciones")
+            .select("id", { count: "exact", head: true })
+            .eq("chatbot_id", "chatbot_id") // Aquí se necesitaría una relación entre chatbots y empresa_id
+            .in("lead_id", leadIdArray);
+              
+          if (convsError) {
+            console.error("Error obteniendo conversaciones:", convsError);
+          } else {
+            conversaciones = convsCount || 0;
+          }
           
-      if (convsError) {
-        console.error("Error obteniendo conversaciones:", convsError);
-      }
-      
-      // Obtener IDs de conversaciones
-      const { data: conversacionesIds } = await supabase
-        .from("conversaciones")
-        .select("id")
-        .in("lead_id", leadIdArray.length > 0 ? leadIdArray : ['no-leads']);
-      
-      const conversacionIdArray = conversacionesIds ? conversacionesIds.map(conv => conv.id) : [];
-      
-      // Obtener el total de mensajes (para interacciones de chatbot)
-      const { count: mensajes, error: msgsError } = await supabase
-        .from("mensajes")
-        .select("id", { count: "exact", head: true })
-        .in("conversacion_id", conversacionIdArray.length > 0 ? conversacionIdArray : ['no-conversations']);
-            
-      if (msgsError) {
-        console.error("Error obteniendo mensajes:", msgsError);
+          // Obtener IDs de conversaciones
+          const { data: conversacionesIds } = await supabase
+            .from("conversaciones")
+            .select("id")
+            .in("lead_id", leadIdArray);
+          
+          const conversacionIdArray = conversacionesIds ? conversacionesIds.map(conv => conv.id) : [];
+          
+          // Solo obtener mensajes si hay conversaciones
+          if (conversacionIdArray.length > 0) {
+            // Obtener el total de mensajes (para interacciones de chatbot)
+            const { count: msgsCount, error: msgsError } = await supabase
+              .from("mensajes")
+              .select("id", { count: "exact", head: true })
+              .in("conversacion_id", conversacionIdArray);
+                
+            if (msgsError) {
+              console.error("Error obteniendo mensajes:", msgsError);
+            } else {
+              mensajes = msgsCount || 0;
+            }
+          }
+        } catch (error) {
+          console.error("Error procesando estadísticas:", error);
+        }
       }
       
       // Calcular la tasa de conversión (asumiendo que es el % de leads que inician conversación)
@@ -93,9 +110,9 @@ export const useDashboardStats = () => {
       
       return {
         totalLeads: totalLeads || 0,
-        conversaciones: conversaciones || 0,
+        conversaciones,
         tasaConversion,
-        interaccionesChatbot: mensajes || 0
+        interaccionesChatbot: mensajes
       };
     },
     enabled: !!user?.companyId,
@@ -131,45 +148,62 @@ export const useLeadsActivityData = () => {
         const endOfDay = new Date(day);
         endOfDay.setHours(23, 59, 59, 999);
         
-        // Contar leads creados en este día
-        const { count: leadsCount, error: leadsError } = await supabase
-          .from("leads")
-          .select("id", { count: "exact", head: true })
-          .eq("empresa_id", user.companyId)
-          .gte("created_at", startOfDay.toISOString())
-          .lte("created_at", endOfDay.toISOString());
+        try {
+          // Contar leads creados en este día
+          const { count: leadsCount, error: leadsError } = await supabase
+            .from("leads")
+            .select("id", { count: "exact", head: true })
+            .eq("empresa_id", user.companyId)
+            .gte("created_at", startOfDay.toISOString())
+            .lte("created_at", endOfDay.toISOString());
+            
+          if (leadsError) {
+            console.error("Error obteniendo leads por día:", leadsError);
+          }
           
-        if (leadsError) {
-          console.error("Error obteniendo leads por día:", leadsError);
-        }
-        
-        // Obtener los IDs de leads de la empresa para este día
-        const { data: dayLeadsIds } = await supabase
-          .from("leads")
-          .select("id")
-          .eq("empresa_id", user.companyId)
-          .gte("created_at", startOfDay.toISOString())
-          .lte("created_at", endOfDay.toISOString());
-        
-        const dayLeadIdArray = dayLeadsIds ? dayLeadsIds.map(lead => lead.id) : [];
-        
-        // Contar conversaciones creadas en este día
-        const { count: convsCount, error: convsError } = await supabase
-          .from("conversaciones")
-          .select("id", { count: "exact", head: true })
-          .in("lead_id", dayLeadIdArray.length > 0 ? dayLeadIdArray : ['no-leads'])
-          .gte("created_at", startOfDay.toISOString())
-          .lte("created_at", endOfDay.toISOString());
+          // Inicializar contador de conversaciones
+          let convsCount = 0;
           
-        if (convsError) {
-          console.error("Error obteniendo conversaciones por día:", convsError);
+          // Obtener los IDs de leads de la empresa para este día
+          const { data: dayLeadsIds } = await supabase
+            .from("leads")
+            .select("id")
+            .eq("empresa_id", user.companyId)
+            .gte("created_at", startOfDay.toISOString())
+            .lte("created_at", endOfDay.toISOString());
+          
+          const dayLeadIdArray = dayLeadsIds ? dayLeadsIds.map(lead => lead.id) : [];
+          
+          // Solo contar conversaciones si hay leads
+          if (dayLeadIdArray.length > 0) {
+            // Contar conversaciones creadas en este día
+            const { count: convCount, error: convsError } = await supabase
+              .from("conversaciones")
+              .select("id", { count: "exact", head: true })
+              .in("lead_id", dayLeadIdArray)
+              .gte("created_at", startOfDay.toISOString())
+              .lte("created_at", endOfDay.toISOString());
+              
+            if (convsError) {
+              console.error("Error obteniendo conversaciones por día:", convsError);
+            } else {
+              convsCount = convCount || 0;
+            }
+          }
+          
+          return {
+            name: dayNames[day.getDay()],
+            leads: leadsCount || 0,
+            conversations: convsCount
+          };
+        } catch (error) {
+          console.error(`Error procesando datos para el día ${day.toISOString()}:`, error);
+          return {
+            name: dayNames[day.getDay()],
+            leads: 0,
+            conversations: 0
+          };
         }
-        
-        return {
-          name: dayNames[day.getDay()],
-          leads: leadsCount || 0,
-          conversations: convsCount || 0
-        };
       }));
       
       return result;
