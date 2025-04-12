@@ -12,7 +12,9 @@ import { toast } from "sonner";
 import { 
   DndContext, 
   DragOverlay, 
-  closestCorners,
+  pointerWithin,
+  rectIntersection,
+  MeasuringStrategy,
   PointerSensor,
   useSensor,
   useSensors,
@@ -28,8 +30,11 @@ import {
   arrayMove, 
   SortableContext, 
   horizontalListSortingStrategy, 
-  sortableKeyboardCoordinates 
+  sortableKeyboardCoordinates,
+  rectSwappingStrategy,
+  verticalListSortingStrategy 
 } from "@dnd-kit/sortable";
+import { restrictToWindowEdges, snapCenterToCursor } from '@dnd-kit/modifiers';
 import { Lead } from "@/hooks/useLeads";
 import { LeadCard } from "@/components/pipeline/LeadCard";
 
@@ -103,13 +108,40 @@ const PipelineManagement = () => {
     const { clientX } = event.activatorEvent as MouseEvent;
     
     const rect = board.getBoundingClientRect();
-    const threshold = 100;
-    const scrollSpeed = 15;
+    const threshold = 150; // Aumentado para detectar antes
     
+    // Zona de scroll a la derecha
     if (clientX > rect.right - threshold) {
-      board.scrollLeft += scrollSpeed;
-    } else if (clientX < rect.left + threshold) {
-      board.scrollLeft -= scrollSpeed;
+      // Calculamos la velocidad basada en la distancia al borde
+      const distance = rect.right - clientX;
+      const speed = Math.max(5, 30 - (distance / threshold) * 30);
+      
+      // Usamos requestAnimationFrame para un scroll más suave
+      requestAnimationFrame(() => {
+        board.scrollLeft += Math.round(speed);
+      });
+      
+      // Si estamos cerca del final y aún hay más stages, cambiamos de slide
+      const isNearEnd = board.scrollWidth - board.scrollLeft - board.clientWidth < 100;
+      if (isNearEnd && currentSlide + visibleStages < stages.length) {
+        handleNext();
+      }
+    } 
+    // Zona de scroll a la izquierda
+    else if (clientX < rect.left + threshold) {
+      // Calculamos la velocidad basada en la distancia al borde
+      const distance = clientX - rect.left;
+      const speed = Math.max(5, 30 - (distance / threshold) * 30);
+      
+      requestAnimationFrame(() => {
+        board.scrollLeft -= Math.round(speed);
+      });
+      
+      // Si estamos cerca del inicio y hay slides previos, cambiamos de slide
+      const isNearStart = board.scrollLeft < 100;
+      if (isNearStart && currentSlide > 0) {
+        handlePrev();
+      }
     }
   };
 
@@ -273,7 +305,24 @@ const PipelineManagement = () => {
         <div className="flex-1 relative overflow-hidden">
           <DndContext
             sensors={sensors}
-            collisionDetection={closestCorners}
+            collisionDetection={(args) => {
+              // Primero intentamos detectar colisión con rectIntersection (más preciso)
+              const intersections = rectIntersection(args);
+              
+              // Si hay intersecciones, las devolvemos
+              if (intersections.length > 0) {
+                return intersections;
+              }
+              
+              // Si no hay intersecciones, utilizamos pointerWithin para una detección más amplia
+              return pointerWithin(args);
+            }}
+            measuring={{
+              droppable: {
+                strategy: MeasuringStrategy.Always
+              }
+            }}
+            modifiers={[restrictToWindowEdges]}
             onDragStart={handleDragStart}
             onDragMove={handleDragMove}
             onDragOver={handleDragOver}
