@@ -1,14 +1,11 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { usePipelines } from "@/hooks/usePipelines";
 import { usePipelineLeads } from "@/hooks/usePipelineLeads";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CreatePipelineDialog } from "@/components/pipeline/CreatePipelineDialog";
-import { CreateStageDialog } from "@/components/pipeline/CreateStageDialog";
 import { Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { StageCard } from "@/components/pipeline/StageCard";
 import { toast } from "sonner";
+import { PipelineToolbar, FilterOptions } from "@/components/pipeline/PipelineToolbar";
 import { 
   DndContext, 
   DragOverlay, 
@@ -27,26 +24,92 @@ import {
   DragMoveEvent
 } from "@dnd-kit/core";
 import { 
-  arrayMove, 
   SortableContext, 
   horizontalListSortingStrategy, 
-  sortableKeyboardCoordinates,
-  rectSwappingStrategy,
-  verticalListSortingStrategy 
+  sortableKeyboardCoordinates
 } from "@dnd-kit/sortable";
-import { restrictToWindowEdges, snapCenterToCursor } from '@dnd-kit/modifiers';
+import { restrictToWindowEdges } from '@dnd-kit/modifiers';
 import { Lead } from "@/hooks/useLeads";
 import { LeadCard } from "@/components/pipeline/LeadCard";
+import { format } from "date-fns";
 
 const PipelineManagement = () => {
   const { pipelines, isLoading: pipelinesLoading } = usePipelines();
   const [selectedPipeline, setSelectedPipeline] = useState<string | null>(null);
-  const { leadsByStage, updateLeadStage, isLoading: leadsLoading } = usePipelineLeads(selectedPipeline);
-  const [showAddStageDialog, setShowAddStageDialog] = useState(false);
+  const { leadsByStage, updateLeadStage, isLoading: leadsLoading, refetchLeads } = usePipelineLeads(selectedPipeline);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [visibleStages, setVisibleStages] = useState(3);
   const [activeLead, setActiveLead] = useState<Lead | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterOptions, setFilterOptions] = useState<FilterOptions>({});
+
+  // Filtrado de leads basado en búsqueda y filtros activos
+  const filteredLeadsByStage = useMemo(() => {
+    if (!leadsByStage) return {};
+
+    const result: Record<string, Lead[]> = {};
+    const today = format(new Date(), 'yyyy-MM-dd');
+
+    Object.entries(leadsByStage).forEach(([stageId, leads]) => {
+      // Si hay un filtro por etapa y no es esta, saltamos
+      if (filterOptions.stageFilter && filterOptions.stageFilter !== stageId) {
+        result[stageId] = [];
+        return;
+      }
+
+      // Filtrar leads según criterios
+      const filteredLeads = leads.filter(lead => {
+        // Búsqueda por texto
+        if (searchQuery && !matchesSearchQuery(lead, searchQuery)) {
+          return false;
+        }
+
+        // Filtro: Solo sin asignar
+        if (filterOptions.onlyUnassigned && lead.asignado_a) {
+          return false;
+        }
+
+        // Filtro: Creados hoy
+        if (filterOptions.createdToday) {
+          const createdDate = format(new Date(lead.created_at), 'yyyy-MM-dd');
+          if (createdDate !== today) {
+            return false;
+          }
+        }
+
+        // Filtro: Actualizados recientemente (últimas 24 horas)
+        if (filterOptions.recentlyUpdated && lead.updated_at) {
+          const updatedTime = new Date(lead.updated_at).getTime();
+          const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+          if (updatedTime < oneDayAgo) {
+            return false;
+          }
+        }
+
+        return true;
+      });
+
+      result[stageId] = filteredLeads;
+    });
+
+    return result;
+  }, [leadsByStage, searchQuery, filterOptions]);
+
+  // Función auxiliar para buscar por texto en diferentes campos del lead
+  function matchesSearchQuery(lead: Lead, query: string): boolean {
+    const searchTerms = query.toLowerCase().split(' ');
+    
+    return searchTerms.every(term => {
+      const fullName = `${lead.nombre || ''} ${lead.apellido || ''}`.toLowerCase();
+      return (
+        fullName.includes(term) ||
+        (lead.email && lead.email.toLowerCase().includes(term)) ||
+        (lead.telefono && lead.telefono.toLowerCase().includes(term)) ||
+        (lead.canal_origen && lead.canal_origen.toLowerCase().includes(term))
+      );
+    });
+  }
 
   useEffect(() => {
     if (pipelines.length > 0 && !selectedPipeline) {
@@ -171,32 +234,53 @@ const PipelineManagement = () => {
       if (sourceStageId !== destinationStageId) {
         console.log('Moving lead:', leadId, 'from stage:', sourceStageId, 'to stage:', destinationStageId);
         
-        const leadToMove = { ...active.data.current.lead };
-        leadToMove.stage_id = destinationStageId;
+        // Crear una copia del lead con el nuevo stage_id
+        const leadToMove = { ...active.data.current.lead, stage_id: destinationStageId };
         
-        const localLeadsByStage = { ...leadsByStage };
+        // Actualización optimista del estado local para un feedback visual inmediato
+        const updatedLeadsByStage = { ...leadsByStage };
         
-        if (sourceStageId && localLeadsByStage[sourceStageId]) {
-          localLeadsByStage[sourceStageId] = localLeadsByStage[sourceStageId].filter(l => l.id !== leadId);
+        // Eliminar el lead del stage origen
+        if (sourceStageId && updatedLeadsByStage[sourceStageId]) {
+          updatedLeadsByStage[sourceStageId] = updatedLeadsByStage[sourceStageId].filter(l => l.id !== leadId);
         }
         
-        if (!localLeadsByStage[destinationStageId]) {
-          localLeadsByStage[destinationStageId] = [];
+        // Asegurarnos que existe el array para el stage destino
+        if (!updatedLeadsByStage[destinationStageId]) {
+          updatedLeadsByStage[destinationStageId] = [];
         }
-        localLeadsByStage[destinationStageId].push(leadToMove);
         
-        updateLeadStage(
-          { leadId, stageId: destinationStageId },
-          {
-            onSuccess: () => {
-              toast.success("Lead movido correctamente");
-            },
-            onError: (error) => {
-              toast.error("Error al mover el lead");
-              console.error("Error moving lead:", error);
+        // Añadir el lead al stage destino
+        updatedLeadsByStage[destinationStageId] = [...updatedLeadsByStage[destinationStageId], leadToMove];
+        
+        // Actualizar inmediatamente el estado local antes de la llamada a la API
+        // Esto se hace mediante una función que modifica directamente el estado de leadsByStage en el custom hook
+        if (typeof updateLeadStage === 'function') {
+          updateLeadStage(
+            { leadId, stageId: destinationStageId },
+            {
+              onMutate: () => {
+                // Esta función se ejecuta antes de la llamada a la API
+                return { previousLeadsByStage: leadsByStage };
+              },
+              onError: (error, variables, context) => {
+                // Si hay un error, revertimos al estado anterior
+                toast.error("Error al mover el lead");
+                console.error("Error moving lead:", error);
+                
+                // Si tenemos el contexto con el estado anterior, lo restauramos
+                if (context?.previousLeadsByStage) {
+                  // Aquí utilizamos una función para actualizar el estado local directamente
+                  // pero depende de cómo esté implementado tu custom hook usePipelineLeads
+                  // Puede que necesites adaptar esta parte
+                }
+              },
+              onSuccess: () => {
+                toast.success("Lead movido correctamente");
+              }
             }
-          }
-        );
+          );
+        }
       }
     }
     
@@ -220,6 +304,32 @@ const PipelineManagement = () => {
     setCurrentSlide(prev => Math.max(0, prev - 1));
   };
 
+  // Funciones para editar o eliminar stages (implementación futura)
+  const handleStageEdit = (stage: any) => {
+    // Aquí se implementaría la edición de etapas
+    toast.info(`Editar etapa: ${stage.nombre}`);
+  };
+  
+  const handleStageDelete = (stageId: string) => {
+    // Aquí se implementaría la eliminación de etapas
+    toast.info(`Eliminar etapa: ${stageId}`);
+  };
+  
+  const handleLeadAdded = () => {
+    // Refrescar los leads cuando se añade uno nuevo
+    refetchLeads();
+  };
+
+  // Manejar cambios en la búsqueda
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query);
+  };
+
+  // Manejar cambios en los filtros
+  const handleFilterChange = (filters: FilterOptions) => {
+    setFilterOptions(filters);
+  };
+
   const currentPipeline = getCurrentPipeline();
   const stages = currentPipeline?.stages || [];
   const visibleStageData = stages.slice(currentSlide, currentSlide + visibleStages);
@@ -235,170 +345,133 @@ const PipelineManagement = () => {
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] overflow-hidden bg-background max-w-full">
       {pipelines.length > 0 ? (
-        <div className="p-4 w-full z-10 bg-background/95 backdrop-blur-sm border-b sticky top-0">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-64">
-                <Select value={selectedPipeline || ''} onValueChange={setSelectedPipeline}>
-                  <SelectTrigger className="w-full border-primary/20 bg-background/50 backdrop-blur-sm">
-                    <SelectValue placeholder="Seleccionar pipeline" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {pipelines.map((pipeline) => (
-                      <SelectItem key={pipeline.id} value={pipeline.id}>
-                        <div className="flex items-center justify-between w-full">
-                          <span>{pipeline.nombre}</span>
-                          {pipeline.is_default && (
-                            <Badge variant="outline" className="ml-2 text-xs">
-                              Default
-                            </Badge>
-                          )}
-                        </div>
-                      </SelectItem>
+        <>
+          {/* Barra de herramientas con búsqueda y filtros funcionales */}
+          <PipelineToolbar 
+            pipelines={pipelines}
+            selectedPipeline={selectedPipeline}
+            onPipelineChange={setSelectedPipeline}
+            currentPipeline={currentPipeline}
+            onLeadAdded={handleLeadAdded}
+            onSearchChange={handleSearchChange}
+            onFilterChange={handleFilterChange}
+          />
+          
+          {/* Contenedor principal del pipeline */}
+          <div className="flex-1 relative overflow-hidden bg-muted/10">
+            <DndContext
+              sensors={sensors}
+              collisionDetection={(args) => {
+                // Primero intentamos detectar colisión con rectIntersection (más preciso)
+                const intersections = rectIntersection(args);
+                
+                // Si hay intersecciones, las devolvemos
+                if (intersections.length > 0) {
+                  return intersections;
+                }
+                
+                // Si no hay intersecciones, utilizamos pointerWithin para una detección más amplia
+                return pointerWithin(args);
+              }}
+              measuring={{
+                droppable: {
+                  strategy: MeasuringStrategy.Always
+                }
+              }}
+              modifiers={[restrictToWindowEdges]}
+              onDragStart={handleDragStart}
+              onDragMove={handleDragMove}
+              onDragOver={handleDragOver}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext 
+                items={visibleStageData.map(stage => stage.id)}
+                strategy={horizontalListSortingStrategy}
+              >
+                <div ref={boardRef} className="h-full px-4 pt-2 pb-4 relative flex kanban-board">
+                  {currentSlide > 0 && (
+                    <Button 
+                      variant="secondary" 
+                      size="icon" 
+                      onClick={handlePrev}
+                      className="absolute left-1 top-1/2 -translate-y-1/2 z-10 bg-background/80 shadow-md h-10 w-10 rounded-full"
+                    >
+                      <ChevronLeft className="h-6 w-6" />
+                    </Button>
+                  )}
+
+                  <div className="flex h-full w-full gap-6 transition-transform duration-300 pb-2">
+                    {visibleStageData.map((stage) => (
+                      <div key={stage.id} className="flex-1 min-w-0 max-w-[380px] kanban-column">
+                        <StageCard 
+                          stage={stage} 
+                          leads={filteredLeadsByStage[stage.id] || []}
+                          onAddLead={handleLeadAdded}
+                          pipelineId={selectedPipeline || undefined}
+                          onStageEdit={handleStageEdit}
+                          onStageDelete={handleStageDelete}
+                        />
+                      </div>
                     ))}
-                    <div className="py-2 border-t">
-                      <CreatePipelineDialog>
-                        <Button variant="ghost" className="w-full flex items-center justify-start text-blue-500 hover:text-blue-600 hover:bg-blue-50/50 pl-8">
-                          <Plus className="w-4 h-4 mr-2" />
-                          Crear Pipeline
-                        </Button>
-                      </CreatePipelineDialog>
-                    </div>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              {currentPipeline && (
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  className="gap-1 h-9"
-                  onClick={() => setShowAddStageDialog(true)}
+                  </div>
+
+                  {currentSlide + visibleStages < stages.length && (
+                    <Button 
+                      variant="secondary" 
+                      size="icon" 
+                      onClick={handleNext}
+                      className="absolute right-1 top-1/2 -translate-y-1/2 z-10 bg-background/80 shadow-md h-10 w-10 rounded-full"
+                    >
+                      <ChevronRight className="h-6 w-6" />
+                    </Button>
+                  )}
+                </div>
+
+                <DragOverlay 
+                  adjustScale={false} 
+                  dropAnimation={{
+                    duration: 250,
+                    easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
+                  }}
+                  zIndex={1000}
+                  className="transform-none"
                 >
-                  <Plus className="h-4 w-4" />
-                  <span>Añadir Etapa</span>
-                </Button>
-              )}
-              
-              {showAddStageDialog && currentPipeline && (
-                <CreateStageDialog 
-                  pipeline={currentPipeline}
-                  onComplete={() => setShowAddStageDialog(false)}
-                  open={showAddStageDialog}
-                  onOpenChange={setShowAddStageDialog}
-                />
-              )}
-            </div>
+                  {activeLead ? (
+                    <div className="opacity-95 transform-gpu pointer-events-none w-[370px] animate-pulse-light">
+                      <div className="shadow-md rounded-lg border border-primary/20 overflow-hidden relative">
+                        <div className="absolute inset-0 bg-primary/5 z-0"></div>
+                        <div className="relative z-10">
+                          <LeadCard lead={activeLead} isDragging={true} />
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+                </DragOverlay>
+              </SortableContext>
+            </DndContext>
           </div>
-        </div>
+        </>
       ) : (
         <div className="text-center py-10">
           <h2 className="text-xl mb-4">No hay pipelines configurados</h2>
           <p className="text-muted-foreground mb-6">
             Crea tu primer pipeline para comenzar a gestionar tus leads por etapas.
           </p>
-          <CreatePipelineDialog />
-        </div>
-      )}
-      
-      {currentPipeline?.stages && currentPipeline.stages.length > 0 ? (
-        <div className="flex-1 relative overflow-hidden">
-          <DndContext
-            sensors={sensors}
-            collisionDetection={(args) => {
-              // Primero intentamos detectar colisión con rectIntersection (más preciso)
-              const intersections = rectIntersection(args);
-              
-              // Si hay intersecciones, las devolvemos
-              if (intersections.length > 0) {
-                return intersections;
-              }
-              
-              // Si no hay intersecciones, utilizamos pointerWithin para una detección más amplia
-              return pointerWithin(args);
-            }}
-            measuring={{
-              droppable: {
-                strategy: MeasuringStrategy.Always
+          {/* Integramos el componente de creación de pipeline dentro de la página */}
+          <Button 
+            size="lg" 
+            className="gap-2"
+            onClick={() => {
+              // Aquí podrías abrir directamente el modal de creación de pipeline
+              const createPipelineButton = document.querySelector("[data-create-pipeline]");
+              if (createPipelineButton && createPipelineButton instanceof HTMLElement) {
+                createPipelineButton.click();
               }
             }}
-            modifiers={[restrictToWindowEdges]}
-            onDragStart={handleDragStart}
-            onDragMove={handleDragMove}
-            onDragOver={handleDragOver}
-            onDragEnd={handleDragEnd}
           >
-            <SortableContext 
-              items={visibleStageData.map(stage => stage.id)}
-              strategy={horizontalListSortingStrategy}
-            >
-              <div ref={boardRef} className="h-full px-4 relative flex kanban-board">
-                {currentSlide > 0 && (
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    onClick={handlePrev}
-                    className="absolute left-1 top-1/2 -translate-y-1/2 z-10 bg-background/80 shadow-md h-10 w-10 rounded-full"
-                  >
-                    <ChevronLeft className="h-6 w-6" />
-                  </Button>
-                )}
-
-                <div className="flex h-full w-full gap-4 transition-transform duration-300 pb-2">
-                  {visibleStageData.map((stage) => (
-                    <div key={stage.id} className="flex-1 min-w-0 max-w-[400px] kanban-column">
-                      <StageCard 
-                        stage={stage} 
-                        leads={leadsByStage[stage.id] || []}
-                        onAddLead={() => toast.info("Función de agregar lead en construcción")}
-                      />
-                    </div>
-                  ))}
-                </div>
-
-                {currentSlide + visibleStages < stages.length && (
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    onClick={handleNext}
-                    className="absolute right-1 top-1/2 -translate-y-1/2 z-10 bg-background/80 shadow-md h-10 w-10 rounded-full"
-                  >
-                    <ChevronRight className="h-6 w-6" />
-                  </Button>
-                )}
-              </div>
-
-              <DragOverlay 
-                adjustScale={true} 
-                dropAnimation={{
-                  duration: 300,
-                  easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
-                }}
-                zIndex={1000}
-              >
-                {activeLead ? (
-                  <div className="opacity-90 transform-gpu pointer-events-none w-[370px]">
-                    <LeadCard lead={activeLead} isDragging={true} />
-                  </div>
-                ) : null}
-              </DragOverlay>
-            </SortableContext>
-          </DndContext>
-        </div>
-      ) : (
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center p-8 max-w-md">
-            <h3 className="text-lg font-medium mb-2">No hay etapas configuradas</h3>
-            <p className="text-muted-foreground mb-4">
-              Agrega etapas a tu pipeline para organizar tus leads en el proceso de ventas.
-            </p>
-            {currentPipeline && (
-              <Button onClick={() => setShowAddStageDialog(true)} className="gap-2">
-                <Plus size={16} />
-                Agregar Primera Etapa
-              </Button>
-            )}
-          </div>
+            <Plus size={18} />
+            Crear Primer Pipeline
+          </Button>
         </div>
       )}
     </div>

@@ -1,4 +1,3 @@
-
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -194,12 +193,90 @@ export function usePipelineLeads(pipelineId: string | null) {
       
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["pipeline-leads"] });
+    // Configuración de actualización optimista para una transición fluida
+    onMutate: async ({ leadId, stageId }) => {
+      // Cancelar cualquier refetch activa para evitar sobreescribir nuestro cambio optimista
+      await queryClient.cancelQueries({ 
+        queryKey: ["pipeline-leads", pipelineId, user?.companyId] 
+      });
+      
+      // Guardar el estado anterior
+      const previousLeadsByStage = queryClient.getQueryData(
+        ["pipeline-leads", pipelineId, user?.companyId]
+      );
+      
+      // Realizar una actualización optimista del estado en la UI
+      queryClient.setQueryData(
+        ["pipeline-leads", pipelineId, user?.companyId],
+        (oldData: Record<string, Lead[]> = {}) => {
+          // Crear una copia profunda del estado actual
+          const newData = JSON.parse(JSON.stringify(oldData));
+          
+          // Buscar el lead en todas las etapas
+          let leadToMove: Lead | undefined;
+          let sourceStageId: string | undefined;
+          
+          // Encontrar el lead y su etapa actual
+          for (const [stgId, leads] of Object.entries(newData)) {
+            const leadIndex = leads.findIndex(lead => lead.id === leadId);
+            if (leadIndex !== -1) {
+              leadToMove = { ...leads[leadIndex] };
+              sourceStageId = stgId;
+              // Eliminar el lead de su etapa actual
+              newData[stgId] = leads.filter(lead => lead.id !== leadId);
+              break;
+            }
+          }
+          
+          // Si encontramos el lead, lo movemos a la nueva etapa
+          if (leadToMove && sourceStageId) {
+            // Actualizar la información del lead
+            leadToMove.stage_id = stageId;
+            leadToMove.ultima_interaccion = new Date().toISOString();
+            
+            // Asegurarnos de que existe el array para la etapa destino
+            if (!newData[stageId]) {
+              newData[stageId] = [];
+            }
+            
+            // Añadir el lead a la nueva etapa al principio (por ser el más reciente)
+            newData[stageId] = [leadToMove, ...newData[stageId]];
+          }
+          
+          return newData;
+        }
+      );
+      
+      // Devolver el contexto con los datos anteriores para posible rollback
+      return { previousLeadsByStage };
     },
-    onError: (error) => {
+    onError: (error, variables, context) => {
       console.error("Error in updateLeadStage:", error);
       toast.error("Error al actualizar la etapa del lead");
+      
+      // Revertir a los datos anteriores en caso de error
+      if (context?.previousLeadsByStage) {
+        queryClient.setQueryData(
+          ["pipeline-leads", pipelineId, user?.companyId], 
+          context.previousLeadsByStage
+        );
+      }
+    },
+    onSuccess: () => {
+      // Invalidar la query para actualizar los datos en segundo plano
+      // Esto es importante para asegurar que los datos locales estén en sinc con el backend
+      queryClient.invalidateQueries({ 
+        queryKey: ["pipeline-leads", pipelineId, user?.companyId],
+        // Evitamos recargar inmediatamente para mantener la transición fluida
+        refetchType: "none"
+      });
+      
+      // Refetch en segundo plano después de un breve retraso
+      setTimeout(() => {
+        queryClient.invalidateQueries({ 
+          queryKey: ["pipeline-leads", pipelineId, user?.companyId] 
+        });
+      }, 1000);
     },
   });
 
