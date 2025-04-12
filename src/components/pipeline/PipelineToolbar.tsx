@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { CreatePipelineDialog } from "./CreatePipelineDialog";
 import { CreateStageDialog } from "./CreateStageDialog";
 import { AddLeadDialog } from "./AddLeadDialog";
-import { PipelineStage } from "@/hooks/usePipelines";
+import { PipelineStage, Pipeline } from "@/hooks/usePipelines"; // Importar Pipeline desde usePipelines
 import { 
   Plus, 
   Filter, 
@@ -29,13 +29,6 @@ import {
   DropdownMenuCheckboxItem
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-
-interface Pipeline {
-  id: string;
-  nombre: string;
-  is_default?: boolean;
-  stages: PipelineStage[];
-}
 
 interface PipelineToolbarProps {
   pipelines: Pipeline[];

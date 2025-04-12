@@ -218,12 +218,13 @@ export function usePipelineLeads(pipelineId: string | null) {
           
           // Encontrar el lead y su etapa actual
           for (const [stgId, leads] of Object.entries(newData)) {
-            const leadIndex = leads.findIndex(lead => lead.id === leadId);
+            const leadsArray = leads as Lead[]; // Añadir aserción de tipo aquí
+            const leadIndex = leadsArray.findIndex(lead => lead.id === leadId);
             if (leadIndex !== -1) {
-              leadToMove = { ...leads[leadIndex] };
+              leadToMove = { ...leadsArray[leadIndex] };
               sourceStageId = stgId;
               // Eliminar el lead de su etapa actual
-              newData[stgId] = leads.filter(lead => lead.id !== leadId);
+              newData[stgId] = leadsArray.filter(lead => lead.id !== leadId);
               break;
             }
           }

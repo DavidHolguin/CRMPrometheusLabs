@@ -19,6 +19,12 @@ export interface Lead {
   ultima_interaccion?: string;
   stage_name?: string;
   stage_color?: string;
+  asignado_a?: string; // Añadido para soportar la asignación de leads a usuarios
+  empresa_id?: string;
+  direccion?: string;
+  ciudad?: string;
+  pais?: string;
+  datos_adicionales?: Record<string, any>;
   tags?: Array<{
     id: string;
     nombre: string;

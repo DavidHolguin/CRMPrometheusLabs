@@ -36,7 +36,7 @@ import { format } from "date-fns";
 const PipelineManagement = () => {
   const { pipelines, isLoading: pipelinesLoading } = usePipelines();
   const [selectedPipeline, setSelectedPipeline] = useState<string | null>(null);
-  const { leadsByStage, updateLeadStage, isLoading: leadsLoading, refetchLeads } = usePipelineLeads(selectedPipeline);
+  const { leadsByStage, updateLeadStage, isLoading: leadsLoading, refetch } = usePipelineLeads(selectedPipeline);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [visibleStages, setVisibleStages] = useState(3);
   const [activeLead, setActiveLead] = useState<Lead | null>(null);
@@ -259,21 +259,17 @@ const PipelineManagement = () => {
           updateLeadStage(
             { leadId, stageId: destinationStageId },
             {
-              onMutate: () => {
-                // Esta función se ejecuta antes de la llamada a la API
-                return { previousLeadsByStage: leadsByStage };
+              // En lugar de usar onMutate directamente (que causa error de TS),
+              // utilizamos las opciones permitidas por TanStack Query
+              onSettled: () => {
+                // Esta función se ejecuta después de la mutación, sea exitosa o no
               },
               onError: (error, variables, context) => {
-                // Si hay un error, revertimos al estado anterior
+                // Si hay un error, mostramos el mensaje
                 toast.error("Error al mover el lead");
                 console.error("Error moving lead:", error);
                 
-                // Si tenemos el contexto con el estado anterior, lo restauramos
-                if (context?.previousLeadsByStage) {
-                  // Aquí utilizamos una función para actualizar el estado local directamente
-                  // pero depende de cómo esté implementado tu custom hook usePipelineLeads
-                  // Puede que necesites adaptar esta parte
-                }
+                // La lógica de rollback ya está manejada en el hook usePipelineLeads
               },
               onSuccess: () => {
                 toast.success("Lead movido correctamente");
@@ -317,7 +313,7 @@ const PipelineManagement = () => {
   
   const handleLeadAdded = () => {
     // Refrescar los leads cuando se añade uno nuevo
-    refetchLeads();
+    refetch();
   };
 
   // Manejar cambios en la búsqueda
