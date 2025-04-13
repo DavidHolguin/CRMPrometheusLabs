@@ -85,7 +85,7 @@ interface Column {
 interface FilterOption {
   field: string;
   operator: string;
-  value: string | number | Date | null;
+  value: string | number | null; // Removiendo Date como tipo posible para el valor
 }
 
 interface ChartData {

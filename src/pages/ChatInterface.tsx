@@ -88,7 +88,7 @@ const ChatInterface = () => {
     }
 
     return () => {
-      stopRecording();
+      cancelRecording(); // Usar cancelRecording en lugar de stopRecording
       if (audioStreamRef.current) {
         audioStreamRef.current.getTracks().forEach(track => track.stop());
       }
@@ -122,6 +122,24 @@ const ChatInterface = () => {
     } catch (error) {
       console.error("Error fetching chatbot info:", error);
       setLoading(false);
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      
+      if (audioStreamRef.current) {
+        audioStreamRef.current.getTracks().forEach(track => track.stop());
+      }
+      
+      if (recordingInterval) {
+        clearInterval(recordingInterval);
+        setRecordingInterval(null);
+      }
+      
+      setIsRecording(false);
+      setShowRecordingControls(false);
     }
   };
 
@@ -1006,103 +1024,67 @@ const ChatInterface = () => {
 
       {/* User Form Modal */}
       {showUserForm && (
-        <div className="backdrop-blur-sm fixed inset-0 z-10 flex items-center justify-center bg-black/40">
-          <div className="bg-background rounded-lg p-6 w-full max-w-md shadow-lg">
-            <div className="flex justify-center mb-5">
-              <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-green-500 relative">
-                {chatbotInfo?.avatar_url ? (
-                  <img 
-                    src={chatbotInfo.avatar_url} 
-                    alt={chatbotInfo?.nombre || "Chatbot"} 
-                    className="w-full h-full object-cover" 
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card rounded-lg shadow-lg max-w-md w-full p-6 space-y-4 relative">
+            <div className="text-center mb-4">
+              <Avatar className="h-16 w-16 mx-auto mb-2 avatar-border border-2 border-green-500">
+                <AvatarImage src={chatbotInfo?.avatar_url || ''} />
+                <AvatarFallback>
+                  <Bot className="h-8 w-8" />
+                </AvatarFallback>
+              </Avatar>
+              <h2 className="text-xl font-semibold">{chatbotInfo?.nombre || 'Chatbot'}</h2>
+              <p className="text-muted-foreground text-sm mt-1">
+                Para iniciar la conversación, por favor comparte tus datos:
+              </p>
+            </div>
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <label htmlFor="userName" className="text-sm font-medium">
+                  Nombre completo
+                </label>
+                <input id="userName" type="text" value={userName} onChange={e => setUserName(e.target.value)} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" placeholder="Ingresa tu nombre" />
+              </div>
+              <div className="space-y-1">
+                <label htmlFor="userPhone" className="text-sm font-medium">
+                  Número de teléfono
+                </label>
+                <div className="flex">
+                  <select 
+                    id="countryCode"
+                    className="rounded-l-md border border-input bg-background px-2 py-2 text-sm border-r-0" 
+                    defaultValue="+57"
+                  >
+                    <option value="+57">+57 🇨🇴</option>
+                    <option value="+1">+1 🇺🇸</option>
+                    <option value="+52">+52 🇲🇽</option>
+                    <option value="+34">+34 🇪🇸</option>
+                    <option value="+58">+58 🇻🇪</option>
+                  </select>
+                  <input 
+                    id="userPhone" 
+                    type="tel" 
+                    value={userPhone} 
+                    onChange={e => {
+                      // Permitir solo números y limitar a 10 dígitos
+                      const value = e.target.value.replace(/\D/g, '');
+                      if (value.length <= 10) {
+                        setUserPhone(value);
+                      }
+                    }} 
+                    className="flex-1 rounded-r-md border border-input bg-background px-3 py-2 text-sm" 
+                    placeholder="Ej: 3001234567" 
                   />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-primary text-primary-foreground text-lg font-bold">
-                    {chatbotInfo?.nombre ? chatbotInfo.nombre.charAt(0).toUpperCase() : "C"}
-                  </div>
-                )}
-                <div className="absolute bottom-1 right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                </div>
+                {phoneError && <p className="text-xs text-red-500 mt-1">{phoneError}</p>}
               </div>
             </div>
-            
-            <h3 className="text-lg font-medium text-center mb-4">
-              Chatea con {chatbotInfo?.nombre || "nuestro asistente"}
-            </h3>
-            
-            <form onSubmit={(e) => { e.preventDefault(); submitUserForm(); }}>
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="name" className="block text-sm font-medium mb-1">
-                    Nombre completo
-                  </label>
-                  <input
-                    id="name"
-                    type="text"
-                    value={userName}
-                    onChange={(e) => setUserName(e.target.value)}
-                    className="w-full p-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-                    placeholder="Ingresa tu nombre"
-                    required
-                  />
-                </div>
-                
-                <div>
-                  <label htmlFor="phone" className="block text-sm font-medium mb-1">
-                    Número de teléfono
-                  </label>
-                  <div className="flex">
-                    <select
-                      id="countryCode"
-                      className="p-2 border rounded-l-md focus:outline-none focus:ring-1 focus:ring-primary mr-1"
-                      defaultValue="+57"
-                    >
-                      <option value="+57">+57 🇨🇴</option>
-                      <option value="+1">+1 🇺🇸</option>
-                      <option value="+52">+52 🇲🇽</option>
-                      <option value="+34">+34 🇪🇸</option>
-                      <option value="+51">+51 🇵🇪</option>
-                      <option value="+54">+54 🇦🇷</option>
-                      <option value="+56">+56 🇨🇱</option>
-                      <option value="+593">+593 🇪🇨</option>
-                    </select>
-                    <input
-                      id="phone"
-                      type="tel"
-                      value={userPhone}
-                      onChange={(e) => {
-                        // Permitir solo números y limitar a 10 dígitos para números colombianos
-                        const value = e.target.value.replace(/[^0-9]/g, '');
-                        setUserPhone(value.substring(0, 10));
-                        setPhoneError("");
-                      }}
-                      className="flex-1 p-2 border rounded-r-md focus:outline-none focus:ring-1 focus:ring-primary"
-                      placeholder="Celular (10 dígitos)"
-                      pattern="[0-9]{10}"
-                      maxLength={10}
-                      required
-                    />
-                  </div>
-                  {phoneError && (
-                    <p className="text-red-500 text-xs mt-1">{phoneError}</p>
-                  )}
-                  <p className="text-xs text-muted-foreground mt-1">
-                    El número debe tener 10 dígitos sin el prefijo del país
-                  </p>
-                </div>
-                
-                <div className="pt-2">
-                  <button
-                    type="submit"
-                    className="w-full py-2 px-4 bg-primary text-primary-foreground font-medium rounded-md hover:bg-primary/90 transition-colors"
-                  >
-                    Iniciar Chat
-                  </button>
-                  <p className="text-xs text-center text-muted-foreground mt-3">
-                    Al continuar, aceptas nuestra <a href="http://prometheuslabs.com.co/politicas_de_privacidad" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Política de Privacidad</a> y <a href="http://prometheuslabs.com.co/condiciones_de_servicio" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Términos de Uso</a>
-                  </p>
-                </div>
-              </div>
-            </form>
+            <Button className="w-full mt-4" onClick={submitUserForm} disabled={!userName.trim() || !userPhone.trim()}>
+              Iniciar chat
+            </Button>
+            <p className="text-xs text-center text-muted-foreground mt-4">
+              Al continuar, aceptas nuestras <a href="http://prometheuslabs.com.co/politicas_de_privacidad" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">políticas de privacidad</a> y <a href="http://prometheuslabs.com.co/condiciones_de_servicio" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">términos de uso</a>.
+            </p>
           </div>
         </div>
       )}
