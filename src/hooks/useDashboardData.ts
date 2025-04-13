@@ -274,9 +274,21 @@ export const useRecentLeads = (limit = 3) => {
         throw new Error("No hay ID de empresa");
       }
       
+      // Obtener leads con JOIN a lead_datos_personales para obtener la información personal
       const { data, error } = await supabase
         .from("leads")
-        .select("id, nombre, apellido, email, canal_origen, estado, created_at")
+        .select(`
+          id, 
+          canal_origen, 
+          estado, 
+          created_at,
+          lead_datos_personales (
+            nombre,
+            apellido,
+            email,
+            telefono
+          )
+        `)
         .eq("empresa_id", user.companyId)
         .order("created_at", { ascending: false })
         .limit(limit);
@@ -303,10 +315,16 @@ export const useRecentLeads = (limit = 3) => {
           dateText = `Hace ${diffInDays} ${diffInDays === 1 ? 'día' : 'días'}`;
         }
         
+        // Acceder a los datos personales a través de la relación
+        const nombre = Array.isArray(lead.lead_datos_personales) && lead.lead_datos_personales[0]?.nombre || '';
+        const apellido = Array.isArray(lead.lead_datos_personales) && lead.lead_datos_personales[0]?.apellido || '';
+        const email = Array.isArray(lead.lead_datos_personales) && lead.lead_datos_personales[0]?.email || '';
+        
         return {
           id: lead.id,
-          name: `${lead.nombre || ''} ${lead.apellido || ''}`.trim() || 'Sin nombre',
-          email: lead.email || 'Sin email',
+          // Combinar nombre y apellido, o mostrar 'Sin nombre' si ambos están vacíos
+          name: `${nombre} ${apellido}`.trim() || 'Sin nombre',
+          email: email || 'Sin email',
           source: lead.canal_origen || 'Desconocido',
           status: lead.estado || 'Nuevo',
           date: dateText

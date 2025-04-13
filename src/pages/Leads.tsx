@@ -576,7 +576,14 @@ const LeadsPage = () => {
                           <Calendar
                             mode="range"
                             selected={dateRange}
-                            onSelect={(range) => range && setDateRange(range)}
+                            onSelect={(range) => {
+                              if (range) {
+                                setDateRange({
+                                  from: range.from,
+                                  to: range.to || range.from
+                                });
+                              }
+                            }}
                             initialFocus
                           />
                         </PopoverContent>

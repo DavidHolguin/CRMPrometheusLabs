@@ -3,8 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 
 export interface Lead {
   id: string;
-  nombre: string;
-  apellido: string;
+  nombre?: string;
+  apellido?: string;
   email?: string;
   telefono?: string;
   pipeline_id?: string;
@@ -19,7 +19,7 @@ export interface Lead {
   ultima_interaccion?: string;
   stage_name?: string;
   stage_color?: string;
-  asignado_a?: string; // Añadido para soportar la asignación de leads a usuarios
+  asignado_a?: string;
   empresa_id?: string;
   direccion?: string;
   ciudad?: string;
@@ -30,6 +30,16 @@ export interface Lead {
     nombre: string;
     color: string;
   }>;
+  lead_datos_personales?: {
+    nombre: string;
+    apellido: string;
+    email: string;
+    telefono: string;
+    direccion?: string;
+    ciudad?: string;
+    pais?: string;
+    fecha_nacimiento?: string;
+  };
 }
 
 export function useLeads(chatbotId?: string) {
@@ -102,10 +112,22 @@ export function useLeads(chatbotId?: string) {
       
       // Consultar los leads por lotes
       for (const batchIds of batches) {
-        // Primero obtenemos los leads básicos
+        // Obtenemos los leads con JOIN a lead_datos_personales
         const { data: leadsData, error: leadsError } = await supabase
           .from('leads')
-          .select('*')
+          .select(`
+            *,
+            lead_datos_personales (
+              nombre,
+              apellido,
+              email,
+              telefono,
+              direccion,
+              ciudad,
+              pais,
+              fecha_nacimiento
+            )
+          `)
           .in('id', batchIds)
           .order('created_at', { ascending: false });
 
@@ -116,8 +138,28 @@ export function useLeads(chatbotId?: string) {
         
         if (!leadsData || leadsData.length === 0) continue;
         
+        // Procesar los leads para incluir los datos personales como campos de nivel superior
+        // y también mantener los datos originales en la propiedad lead_datos_personales
+        const processedLeads = leadsData.map(lead => {
+          const personalData = lead.lead_datos_personales || {};
+          
+          return {
+            ...lead,
+            // Añadir datos personales como campos de nivel superior para compatibilidad con código existente
+            nombre: personalData.nombre || '',
+            apellido: personalData.apellido || '',
+            email: personalData.email || '',
+            telefono: personalData.telefono || '',
+            // Si hay datos en lead_datos_personales que también están a nivel raíz,
+            // mantenemos ambos pero priorizamos los de lead_datos_personales
+            direccion: personalData.direccion || lead.direccion,
+            ciudad: personalData.ciudad || lead.ciudad,
+            pais: personalData.pais || lead.pais,
+          };
+        });
+        
         // Para cada lead, obtenemos su información de stage en consultas separadas
-        const leadsWithStages = await Promise.all(leadsData.map(async (lead) => {
+        const leadsWithStages = await Promise.all(processedLeads.map(async (lead) => {
           // Solo obtenemos la información del stage si el lead tiene un stage_id
           if (lead.stage_id) {
             const { data: stageData } = await supabase
