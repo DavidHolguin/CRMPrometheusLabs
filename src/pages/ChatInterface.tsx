@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import ReactMarkdown from 'react-markdown';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Send, Bot, User, Mic, MicOff, Smile, ChevronLeft, MoreVertical, Check, Star, Phone, Users, Info, Shield, ExternalLink } from "lucide-react";
+import { Send, Bot, User, Mic, Smile, MoreVertical, Check, Star, Phone, Info, Shield, ExternalLink, Square } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
@@ -14,9 +14,11 @@ import { Separator } from "@/components/ui/separator";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Drawer, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { EmojiPicker } from "@/components/conversations/EmojiPicker";
+import { AudioMessage } from "@/components/conversations/AudioMessage";
+import { RecordingAnimation } from "@/components/conversations/RecordingAnimation";
 import { useChatMessages, ChatMessage } from "@/hooks/useChatMessages";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { getOrCreateAnonymousToken, sanitizeMessage, storeSanitizedMessage } from "@/utils/piiUtils";
+import { getOrCreateAnonymousToken } from "@/utils/piiUtils";
 
 const ChatInterface = () => {
   const { chatbotId } = useParams();
@@ -38,11 +40,15 @@ const ChatInterface = () => {
   const [userFeedback, setUserFeedback] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [anonymousToken, setAnonymousToken] = useState<string | null>(null);
-  const [piiMappings, setPiiMappings] = useState<any[]>([]);
-  
-  const { messages, addMessage } = useChatMessages(conversationId);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [recordingInterval, setRecordingInterval] = useState<number | null>(null);
+  const [showRecordingControls, setShowRecordingControls] = useState(false);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+
+  const { messages, addMessage, updateMessage } = useChatMessages(conversationId);
   const isMobile = useIsMobile();
-  
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -51,6 +57,8 @@ const ChatInterface = () => {
   const inputContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const audioPermissionGranted = useRef<boolean>(false);
+  const audioStreamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
     let storedSessionId = localStorage.getItem(`chatbot_session_${chatbotId}`);
@@ -59,12 +67,12 @@ const ChatInterface = () => {
       localStorage.setItem(`chatbot_session_${chatbotId}`, storedSessionId);
     }
     setSessionId(storedSessionId);
-    
+
     const storedLeadId = localStorage.getItem(`chatbot_lead_${chatbotId}`);
     const storedName = localStorage.getItem(`chatbot_name_${chatbotId}`);
     const storedPhone = localStorage.getItem(`chatbot_phone_${chatbotId}`);
     const storedConversationId = localStorage.getItem(`chatbot_conversation_${chatbotId}`);
-    
+
     if (storedLeadId) {
       setLeadId(storedLeadId);
       setUserFormSubmitted(true);
@@ -72,16 +80,17 @@ const ChatInterface = () => {
     if (storedName) setUserName(storedName);
     if (storedPhone) setUserPhone(storedPhone);
     if (storedConversationId) setConversationId(storedConversationId);
-    
+
     fetchChatbotInfo();
-    
+
     if (!storedLeadId && !storedName && !storedPhone) {
       setShowUserForm(true);
     }
-    
+
     return () => {
-      if (mediaRecorderRef.current && isRecording) {
-        mediaRecorderRef.current.stop();
+      stopRecording();
+      if (audioStreamRef.current) {
+        audioStreamRef.current.getTracks().forEach(track => track.stop());
       }
     };
   }, [chatbotId]);
@@ -90,6 +99,14 @@ const ChatInterface = () => {
     scrollToBottom();
   }, [messages]);
 
+  useEffect(() => {
+    return () => {
+      if (recordingInterval) {
+        clearInterval(recordingInterval);
+      }
+    };
+  }, [recordingInterval]);
+
   const fetchChatbotInfo = async () => {
     try {
       const { data, error } = await supabase
@@ -97,14 +114,349 @@ const ChatInterface = () => {
         .select("*")
         .eq("id", chatbotId)
         .single();
-        
+
       if (error) throw error;
-      
+
       setChatbotInfo(data);
       setLoading(false);
     } catch (error) {
       console.error("Error fetching chatbot info:", error);
       setLoading(false);
+    }
+  };
+
+  const sendAudioMessage = async (audioBlob: Blob, audioDuration?: number) => {
+    if (!audioBlob) return;
+
+    setSending(true);
+
+    try {
+      const empresaId = chatbotInfo?.empresa_id;
+      if (!empresaId) {
+        throw new Error("No se pudo determinar la empresa del chatbot");
+      }
+
+      const audioUrl = URL.createObjectURL(audioBlob);
+      
+      const finalAudioDuration = audioDuration !== undefined ? audioDuration : recordingTime;
+
+      const optimisticId = uuidv4();
+      const optimisticMsg: ChatMessage = {
+        id: optimisticId,
+        contenido: "",
+        origen: "usuario",
+        created_at: new Date().toISOString(),
+        isAudio: true,
+        audioUrl: audioUrl,
+        audioDuration: finalAudioDuration
+      };
+
+      addMessage(optimisticMsg);
+      setAudioBlob(null);
+
+      const reader = new FileReader();
+      reader.readAsDataURL(audioBlob);
+      reader.onloadend = async () => {
+        const base64data = reader.result?.toString().split(',')[1];
+        if (!base64data) {
+          throw new Error("Error al convertir audio a base64");
+        }
+
+        const apiEndpoint = "https://web-production-01457.up.railway.app";
+
+        let canalId: string | null = null;
+        let canalIdentificador = "web";
+
+        try {
+          const { data: canalData, error: canalError } = await supabase
+            .from("chatbot_canales")
+            .select("canal_id")
+            .eq("chatbot_id", chatbotId)
+            .single();
+
+          if (canalError) {
+            console.warn("No se pudo obtener canal_id de chatbot_canales:", canalError);
+          } else if (canalData) {
+            canalId = canalData.canal_id;
+            console.log("Usando canal_id de chatbot_canales:", canalId);
+            
+            const { data: canalInfo, error: canalInfoError } = await supabase
+              .from("canales")
+              .select("tipo")
+              .eq("id", canalId)
+              .single();
+              
+            if (!canalInfoError && canalInfo) {
+              canalIdentificador = canalInfo.tipo || "web";
+              console.log("Usando canal_identificador:", canalIdentificador);
+            }
+          }
+        } catch (canalError) {
+          console.error("Error al obtener información del canal:", canalError);
+        }
+
+        const apiRequest = {
+          empresa_id: empresaId,
+          chatbot_id: chatbotId,
+          lead_id: leadId || null,
+          conversacion_id: conversationId || undefined,
+          canal_id: canalId,
+          canal_identificador: canalIdentificador,
+          audio_base64: base64data,
+          formato_audio: "webm",
+          idioma: "es",
+          metadata: {
+            browser: navigator.userAgent,
+            page: window.location.pathname,
+            duracion_segundos: finalAudioDuration
+          }
+        };
+
+        console.log("Enviando audio a la API (datos simplificados):", {
+          ...apiRequest,
+          audio_base64: "[base64_data]"
+        });
+
+        const response = await fetch(`${apiEndpoint}/api/v1/channels/audio`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(apiRequest)
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error("Error en la respuesta API:", response.status, errorText);
+          throw new Error(`Error al enviar audio: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        console.log("Respuesta de la API:", data);
+
+        if (data.respuesta) {
+          addMessage({
+            id: data.mensaje_id || uuidv4(),
+            contenido: data.respuesta,
+            origen: "chatbot",
+            created_at: new Date().toISOString(),
+            metadata: data.metadata || {}
+          });
+        }
+
+        if (data.conversacion_id && data.conversacion_id !== conversationId) {
+          setConversationId(data.conversacion_id);
+          localStorage.setItem(`chatbot_conversation_${chatbotId}`, data.conversacion_id);
+        }
+        
+        if (data.audio_id && data.mensaje_id) {
+          try {
+            const audioFileName = `${data.conversacion_id}/${data.mensaje_id}.webm`;
+            
+            const byteCharacters = atob(base64data);
+            const byteArrays = [];
+            for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+              const slice = byteCharacters.slice(offset, offset + 512);
+              const byteNumbers = new Array(slice.length);
+              for (let i = 0; i < slice.length; i++) {
+                byteNumbers[i] = slice.charCodeAt(i);
+              }
+              const byteArray = new Uint8Array(byteNumbers);
+              byteArrays.push(byteArray);
+            }
+            const blob = new Blob(byteArrays, {type: 'audio/webm'});
+            
+            console.log(`Subiendo audio al bucket 'mensajes-audio' con path: ${audioFileName}`);
+            
+            const { data: uploadData, error: uploadError } = await supabase.storage
+              .from('mensajes-audio')
+              .upload(audioFileName, blob, {
+                contentType: 'audio/webm',
+                cacheControl: '3600',
+                upsert: true
+              });
+              
+            if (uploadError) {
+              throw uploadError;
+            }
+            
+            console.log("Audio subido correctamente:", uploadData);
+            
+            const { data: publicUrlData } = supabase.storage
+              .from('mensajes-audio')
+              .getPublicUrl(audioFileName);
+              
+            const archivoUrl = publicUrlData?.publicUrl || '';
+            console.log("URL pública del audio:", archivoUrl);
+            
+            const audioData = {
+              id: data.audio_id,
+              mensaje_id: data.mensaje_id,
+              conversacion_id: data.conversacion_id,
+              archivo_url: archivoUrl,
+              duracion_segundos: finalAudioDuration,
+              transcripcion: data.transcripcion || '',
+              idioma_detectado: data.idioma_detectado || 'es',
+              formato: 'webm',
+              tamano_bytes: blob.size,
+              metadata: {
+                navegador: navigator.userAgent,
+                duracion: finalAudioDuration
+              }
+            };
+            
+            console.log("Guardando datos de audio en mensajes_audio:", audioData);
+            
+            const { error: audioError } = await supabase
+              .from("mensajes_audio")
+              .upsert(audioData);
+            
+            if (audioError) {
+              console.error("Error al guardar datos de audio en mensajes_audio:", audioError);
+            } else {
+              console.log("Datos de audio guardados correctamente en mensajes_audio");
+            }
+          } catch (audioDbError) {
+            console.error("Error al procesar datos de audio para la base de datos:", audioDbError);
+          }
+        }
+      };
+
+    } catch (error) {
+      console.error("Error al enviar audio:", error);
+      toast.error("No se pudo enviar el audio. Intente de nuevo.");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const startRecording = async () => {
+    try {
+      if (!audioPermissionGranted.current) {
+        const permissionGranted = await requestMicrophonePermission();
+        if (!permissionGranted) return;
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioStreamRef.current = stream;
+
+      const mimeType = 'audio/webm';
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: MediaRecorder.isTypeSupported(mimeType) ? mimeType : 'audio/wav'
+      });
+
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = event => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setShowRecordingControls(true);
+      setRecordingTime(0);
+
+      const interval = window.setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+
+      setRecordingInterval(interval);
+
+    } catch (error) {
+      console.error("Error starting recording:", error);
+      toast.error("No se pudo iniciar la grabación. Intente de nuevo.");
+    }
+  };
+
+  const stopRecordingAndSend = () => {
+    if (!isRecording || !mediaRecorderRef.current) return;
+    
+    const currentDuration = recordingTime;
+    
+    mediaRecorderRef.current.addEventListener('stop', () => {
+      const audioBlob = new Blob(audioChunksRef.current, {
+        type: mediaRecorderRef.current?.mimeType || 'audio/webm'
+      });
+      
+      sendAudioMessage(audioBlob, currentDuration);
+      
+      setShowRecordingControls(false);
+      setIsRecording(false);
+    }, { once: true });
+    
+    mediaRecorderRef.current.stop();
+    
+    if (audioStreamRef.current) {
+      audioStreamRef.current.getTracks().forEach(track => track.stop());
+    }
+    
+    if (recordingInterval) {
+      clearInterval(recordingInterval);
+      setRecordingInterval(null);
+    }
+  };
+
+  const cancelRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      
+      if (audioStreamRef.current) {
+        audioStreamRef.current.getTracks().forEach(track => track.stop());
+      }
+      
+      if (recordingInterval) {
+        clearInterval(recordingInterval);
+        setRecordingInterval(null);
+      }
+      
+      setIsRecording(false);
+    }
+    
+    setShowRecordingControls(false);
+    setAudioBlob(null);
+    audioChunksRef.current = [];
+  };
+
+  const sendRecordedAudio = () => {
+    if (isRecording) {
+      stopRecordingAndSend();
+    } else if (audioBlob) {
+      sendAudioMessage(audioBlob);
+      setShowRecordingControls(false);
+    }
+  };
+
+  const toggleRecording = () => {
+    if (isRecording) {
+      stopRecordingAndSend();
+    } else {
+      startRecording();
+    }
+  };
+
+  const renderMessageContent = (msg: ChatMessage) => {
+    if (msg.isAudio) {
+      return (
+        <AudioMessage audioUrl={msg.audioUrl || ''} duration={msg.audioDuration} />
+      );
+    }
+
+    return (
+      <ReactMarkdown className="whitespace-pre-wrap break-words text-sm font-normal">
+        {msg.contenido}
+      </ReactMarkdown>
+    );
+  };
+
+  const handleSendButtonClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    if (message.trim()) {
+      sendMessage();
+    } else if (!isRecording) {
+      toggleRecording();
     }
   };
 
@@ -115,36 +467,70 @@ const ChatInterface = () => {
     }
     
     try {
+      // Verificar si el número de teléfono ya existe en la base de datos
+      const countryCode = document.getElementById("countryCode") as HTMLSelectElement;
+      const fullPhone = (countryCode ? countryCode.value : "+57") + userPhone;
+      
+      // Buscar si ya existe un lead con ese número
+      const { data: existingPhone, error: phoneCheckError } = await supabase
+        .from("lead_datos_personales")
+        .select("lead_id")
+        .eq("telefono", fullPhone)
+        .maybeSingle();
+      
+      if (phoneCheckError) {
+        console.error("Error al verificar teléfono:", phoneCheckError);
+      }
+      
+      if (existingPhone?.lead_id) {
+        setPhoneError("Este número ya está registrado en nuestro sistema");
+        return;
+      }
+      
       localStorage.setItem(`chatbot_name_${chatbotId}`, userName);
-      localStorage.setItem(`chatbot_phone_${chatbotId}`, userPhone);
+      localStorage.setItem(`chatbot_phone_${chatbotId}`, fullPhone); // Guardamos el teléfono completo con código de país
       
       setUserFormSubmitted(true);
       setShowUserForm(false);
       
-      const leadId = await createLead();
+      const leadId = await createLead(fullPhone);
       
       if (leadId) {
-        const { getOrCreateAnonymousToken } = await import("@/utils/piiUtils");
         const token = await getOrCreateAnonymousToken(leadId);
         setAnonymousToken(token);
         console.log("Anonymous token obtained:", token);
+        
+        // Obtener el welcome_message desde chatbot_contextos
+        const { data: contextData, error: contextError } = await supabase
+          .from("chatbot_contextos")
+          .select("welcome_message")
+          .eq("chatbot_id", chatbotId)
+          .single();
+        
+        let welcomeText = `Hola ${userName}, bienvenido/a a nuestro chat. ¿En qué podemos ayudarte hoy?`;
+        
+        if (!contextError && contextData && contextData.welcome_message) {
+          welcomeText = contextData.welcome_message.replace("{{nombre}}", userName);
+        } else {
+          console.log("Usando mensaje de bienvenida por defecto, no se encontró en chatbot_contextos");
+        }
+        
+        const welcomeMessage = {
+          id: uuidv4(),
+          contenido: welcomeText,
+          origen: "chatbot",
+          created_at: new Date().toISOString()
+        };
+        
+        addMessage(welcomeMessage);
       }
-      
-      const welcomeMessage = {
-        id: uuidv4(),
-        contenido: `Hola ${userName}, bienvenido/a a nuestro chat. ¿En qué podemos ayudarte hoy?`,
-        origen: "chatbot",
-        created_at: new Date().toISOString()
-      };
-      
-      addMessage(welcomeMessage);
     } catch (error) {
       console.error("Error al iniciar chat:", error);
       toast.error("Hubo un problema al iniciar el chat. Intente de nuevo.");
     }
   };
 
-  const createLead = async () => {
+  const createLead = async (fullPhone?: string) => {
     try {
       if (!chatbotInfo) {
         throw new Error("No se pudo determinar la información del chatbot");
@@ -152,6 +538,7 @@ const ChatInterface = () => {
       
       const empresaId = chatbotInfo.empresa_id;
       const pipelineId = chatbotInfo.pipeline_id;
+      const canalId = chatbotInfo.canal_id;
       
       console.log("Creating lead for chatbot:", chatbotInfo.nombre);
       console.log("Chatbot pipeline_id:", pipelineId);
@@ -236,19 +623,14 @@ const ChatInterface = () => {
       
       const leadData = {
         empresa_id: empresaId,
-        nombre: userName,
-        telefono: userPhone,
         canal_origen: "web",
+        canal_id: canalId,
         pipeline_id: pipeline?.id || null,
         stage_id: stageId || null,
-        datos_adicionales: {
-          session_id: sessionId,
-          user_agent: navigator.userAgent,
-          page: window.location.pathname
-        }
+        estado: "nuevo"
       };
       
-      console.log("Creating lead with data:", leadData);
+      console.log("Creating lead with base data:", leadData);
       
       const { data: newLead, error: leadError } = await supabase
         .from("leads")
@@ -261,6 +643,27 @@ const ChatInterface = () => {
       console.log("Lead created:", newLead);
       
       if (newLead?.id) {
+        const datosPersonales = {
+          lead_id: newLead.id,
+          nombre: userName,
+          telefono: fullPhone || userPhone,
+          datos_adicionales: {
+            session_id: sessionId,
+            user_agent: navigator.userAgent,
+            page: window.location.pathname
+          }
+        };
+        
+        console.log("Creating lead_datos_personales:", datosPersonales);
+        
+        const { error: datosPersonalesError } = await supabase
+          .from("lead_datos_personales")
+          .insert(datosPersonales);
+          
+        if (datosPersonalesError) {
+          console.error("Error creating lead_datos_personales:", datosPersonalesError);
+        }
+        
         setLeadId(newLead.id);
         localStorage.setItem(`chatbot_lead_${chatbotId}`, newLead.id);
         return newLead.id;
@@ -270,21 +673,6 @@ const ChatInterface = () => {
     } catch (error) {
       console.error("Error creating lead:", error);
       throw error;
-    }
-  };
-
-  const submitRating = async () => {
-    if (userRating === 0) {
-      toast.error("Por favor, seleccione una calificación");
-      return;
-    }
-    
-    try {
-      toast.success("¡Gracias por tu opinión!");
-      setShowRatingDrawer(false);
-    } catch (error) {
-      console.error("Error submitting rating:", error);
-      toast.error("No se pudo enviar la calificación. Intente de nuevo.");
     }
   };
 
@@ -317,50 +705,22 @@ const ChatInterface = () => {
         }
       }
       
-      const { getOrCreateAnonymousToken, sanitizeMessage, storeSanitizedMessage } = await import("@/utils/piiUtils");
+      const apiEndpoint = "https://web-production-01457.up.railway.app";
       
-      if (!anonymousToken && leadId) {
-        const token = await getOrCreateAnonymousToken(leadId);
-        setAnonymousToken(token);
-      }
-      
-      const { sanitizedText, mappings } = sanitizeMessage(messageContent, piiMappings);
-      
-      if (mappings.length > piiMappings.length) {
-        setPiiMappings(mappings);
-      }
-      
-      const sanitizedMetadata = {
-        browser: navigator.userAgent,
-        page: window.location.pathname
+      const apiRequest = {
+        empresa_id: empresaId,
+        chatbot_id: chatbotId,
+        mensaje: messageContent,
+        session_id: sessionId,
+        lead_id: leadId || null,
+        metadata: {
+          browser: navigator.userAgent,
+          page: window.location.pathname
+        }
       };
       
-      const apiRequest = anonymousToken 
-        ? {
-            empresa_id: empresaId,
-            chatbot_id: chatbotId,
-            mensaje: sanitizedText,
-            session_id: sessionId,
-            token_anonimo: anonymousToken,
-            metadata: sanitizedMetadata
-          }
-        : {
-            empresa_id: empresaId,
-            chatbot_id: chatbotId,
-            mensaje: messageContent,
-            session_id: sessionId,
-            lead_id: leadId || undefined,
-            metadata: {
-              browser: navigator.userAgent,
-              page: window.location.pathname,
-              name: userName || undefined,
-              phone: userPhone || undefined
-            }
-          };
+      console.log("Enviando mensaje a la API (datos simplificados):", apiRequest);
       
-      console.log("Sending message to API:", apiRequest);
-      
-      const apiEndpoint = import.meta.env.VITE_API_BASE_URL || 'https://web-production-01457.up.railway.app';
       const response = await fetch(`${apiEndpoint}/api/v1/channels/web`, {
         method: 'POST',
         headers: {
@@ -370,26 +730,21 @@ const ChatInterface = () => {
       });
       
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Error en la respuesta API:", response.status, errorText);
         throw new Error(`Error al enviar mensaje: ${response.statusText}`);
       }
       
       const data = await response.json();
-      console.log("API response:", data);
+      console.log("Respuesta de la API:", data);
       
       if (data.respuesta) {
-        let displayResponse = data.respuesta;
-        
-        if (mappings.length > 0) {
-          const { restorePII } = await import("@/utils/piiUtils");
-          displayResponse = restorePII(data.respuesta, mappings);
-        }
-        
         addMessage({
-          id: uuidv4(),
-          contenido: displayResponse,
+          id: data.mensaje_id || uuidv4(),
+          contenido: data.respuesta,
           origen: "chatbot",
           created_at: new Date().toISOString(),
-          metadata: data.metadata
+          metadata: data.metadata || {}
         });
       }
       
@@ -398,30 +753,8 @@ const ChatInterface = () => {
         localStorage.setItem(`chatbot_conversation_${chatbotId}`, data.conversacion_id);
       }
       
-      if (data.lead_id && data.lead_id !== leadId) {
-        setLeadId(data.lead_id);
-        localStorage.setItem(`chatbot_lead_${chatbotId}`, data.lead_id);
-        
-        if (!anonymousToken) {
-          const token = await getOrCreateAnonymousToken(data.lead_id);
-          setAnonymousToken(token);
-        }
-      }
-      
-      if (data.token_anonimo && data.token_anonimo !== anonymousToken) {
-        setAnonymousToken(data.token_anonimo);
-      }
-      
-      if (anonymousToken && data.mensaje_id) {
-        await storeSanitizedMessage(
-          data.mensaje_id,
-          anonymousToken,
-          sanitizedText,
-          sanitizedMetadata
-        );
-      }
     } catch (error) {
-      console.error("Error sending message:", error);
+      console.error("Error al enviar mensaje:", error);
       toast.error("No se pudo enviar el mensaje. Intente de nuevo.");
     } finally {
       setSending(false);
@@ -447,46 +780,19 @@ const ChatInterface = () => {
     setShowEmojiPicker(false);
   };
 
-  const toggleRecording = async () => {
+  const requestMicrophonePermission = async (): Promise<boolean> => {
     try {
-      if (!isRecording) {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: true
-        });
-        const mediaRecorder = new MediaRecorder(stream);
-        mediaRecorderRef.current = mediaRecorder;
-        audioChunksRef.current = [];
-        mediaRecorder.ondataavailable = event => {
-          if (event.data.size > 0) {
-            audioChunksRef.current.push(event.data);
-          }
-        };
-        mediaRecorder.onstop = () => {
-          const audioBlob = new Blob(audioChunksRef.current, {
-            type: 'audio/webm'
-          });
-          const reader = new FileReader();
-          reader.readAsDataURL(audioBlob);
-          reader.onloadend = () => {
-            const base64Audio = reader.result?.toString().split(',')[1];
-            toast.info("Audio recording feature coming soon!");
-            setIsRecording(false);
-            audioChunksRef.current = [];
-          };
-          const tracks = stream.getTracks();
-          tracks.forEach(track => track.stop());
-        };
-        mediaRecorder.start();
-        setIsRecording(true);
-        toast.info("Grabando... Toca de nuevo para detener.");
-      } else {
-        if (mediaRecorderRef.current) {
-          mediaRecorderRef.current.stop();
-        }
-      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioStreamRef.current = stream;
+      audioPermissionGranted.current = true;
+      
+      stream.getTracks().forEach(track => track.stop());
+      
+      return true;
     } catch (error) {
-      console.error("Error accessing microphone:", error);
+      console.error("Error requesting microphone permission:", error);
       toast.error("No se pudo acceder al micrófono. Verifique los permisos.");
+      return false;
     }
   };
 
@@ -525,26 +831,20 @@ const ChatInterface = () => {
     </button>);
   };
 
-  const handleSendButtonClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault();
-    if (message.trim()) {
-      sendMessage();
-    } else {
-      toggleRecording();
+  const submitRating = async () => {
+    if (userRating === 0) {
+      toast.error("Por favor, seleccione una calificación");
+      return;
+    }
+    
+    try {
+      toast.success("¡Gracias por tu opinión!");
+      setShowRatingDrawer(false);
+    } catch (error) {
+      console.error("Error submitting rating:", error);
+      toast.error("No se pudo enviar la calificación. Intente de nuevo.");
     }
   };
-
-  if (loading) {
-    return <div className="flex items-center justify-center h-screen">
-        <p>Cargando chatbot...</p>
-      </div>;
-  }
-
-  if (!chatbotInfo) {
-    return <div className="flex items-center justify-center h-screen">
-        <p>Chatbot no encontrado.</p>
-      </div>;
-  }
 
   return (
     <div className="flex flex-col h-screen bg-[#0e1621] overflow-hidden" ref={containerRef}>
@@ -552,14 +852,14 @@ const ChatInterface = () => {
         <div className="flex items-center gap-3">
           <div className="avatar-border">
             <Avatar className="h-10 w-10 border-2 border-transparent text-green-500">
-              <AvatarImage src={chatbotInfo.avatar_url} />
+              <AvatarImage src={chatbotInfo?.avatar_url || ''} />
               <AvatarFallback>
                 <Bot className="h-6 w-6" />
               </AvatarFallback>
             </Avatar>
           </div>
           <div>
-            <h1 className="text-base font-medium text-white">{chatbotInfo.nombre}</h1>
+            <h1 className="text-base font-medium text-white">{chatbotInfo?.nombre || 'Chatbot'}</h1>
             <p className="text-xs text-gray-400">en línea</p>
           </div>
         </div>
@@ -598,8 +898,8 @@ const ChatInterface = () => {
         </Popover>
       </header>
 
-      <div 
-        className="flex-1 chat-background overflow-y-auto pt-16 pb-16" 
+      <div
+        className="flex-1 chat-background overflow-y-auto pt-16 pb-16"
         style={{ height: 'calc(100vh - 122px)' }}
         ref={scrollAreaRef}
       >
@@ -619,16 +919,14 @@ const ChatInterface = () => {
                 const isUser = senderType === "user";
                 const isBot = senderType === "bot";
                 const isAgent = senderType === "agent";
-                
+
                 return (
                   <div key={msg.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-3`}>
                     <div className={`
                       relative px-3 py-2 shadow-sm
                       ${isUser ? 'user-bubble' : isBot ? 'bot-bubble' : 'agent-bubble'}
                     `}>
-                      <ReactMarkdown className="whitespace-pre-wrap break-words text-sm font-normal">
-                        {msg.contenido}
-                      </ReactMarkdown>
+                      {renderMessageContent(msg)}
                       <span className="chat-timestamp">
                         {formatTime(msg.created_at)}
                         {isUser && <Check className="ml-1 h-3 w-3" />}
@@ -643,32 +941,63 @@ const ChatInterface = () => {
       </div>
 
       <div className="p-2 bg-[#020817] border-t border-[#3b82f6] fixed bottom-0 left-0 right-0 z-30">
-        <div className="whatsapp-input-container" ref={inputContainerRef}>
-          <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="whatsapp-button">
-            <Smile className="h-6 w-6" />
-          </button>
-          
-          <input 
-            ref={inputRef} 
-            type="text" 
-            value={message} 
-            onChange={handleInputChange} 
-            onKeyDown={handleKeyDown} 
-            placeholder="Mensaje" 
-            className="whatsapp-input" 
-            disabled={sending || isRecording || showUserForm} 
-          />
-          
-          <button 
-            onClick={handleSendButtonClick} 
-            className={`whatsapp-button ${message.trim() ? 'whatsapp-send-button' : ''}`} 
-            disabled={sending || showUserForm}
-          >
-            {message.trim() ? <Send className="h-5 w-5" /> : <Mic className={`h-6 w-6 ${isRecording ? 'animate-pulse' : ''}`} />}
-          </button>
-        </div>
+        {showRecordingControls ? (
+          <div className="whatsapp-input-container">
+            <RecordingAnimation
+              duration={recordingTime}
+              onCancel={cancelRecording}
+              onSend={() => {
+                stopRecordingAndSend();
+              }}
+            />
+          </div>
+        ) : (
+          <div className="whatsapp-input-container" ref={inputContainerRef}>
+            <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="whatsapp-button">
+              <Smile className="h-6 w-6" />
+            </button>
+
+            <input
+              ref={inputRef}
+              type="text"
+              value={message}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              placeholder="Mensaje"
+              className="whatsapp-input"
+              disabled={sending || isRecording || showUserForm}
+            />
+
+            <button
+              onClick={handleSendButtonClick}
+              className={`whatsapp-button ${message.trim() ? 'whatsapp-send-button' : ''} ${isRecording ? 'recording-button' : ''}`}
+              disabled={sending || showUserForm}
+            >
+              {message.trim() ? <Send className="h-5 w-5" /> :
+                (isRecording ? <Square className="h-5 w-5" /> : <Mic className="h-6 w-6" />)}
+            </button>
+          </div>
+        )}
+
+        {audioBlob && !showRecordingControls && !sending && (
+          <div className="mt-2 flex justify-end space-x-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setAudioBlob(null)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              size="sm"
+              onClick={sendRecordedAudio}
+            >
+              Enviar audio
+            </Button>
+          </div>
+        )}
       </div>
-      
+
       {showEmojiPicker && (
         <div className="absolute bottom-16 left-2 z-50">
           <EmojiPicker onEmojiSelect={handleEmojiSelect} />
@@ -677,132 +1006,143 @@ const ChatInterface = () => {
 
       {/* User Form Modal */}
       {showUserForm && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-card rounded-lg shadow-lg max-w-md w-full p-6 space-y-4 relative">
-            <div className="text-center mb-4">
-              <Avatar className="h-16 w-16 mx-auto mb-2 avatar-border">
-                <AvatarImage src={chatbotInfo.avatar_url} />
-                <AvatarFallback>
-                  <Bot className="h-8 w-8" />
-                </AvatarFallback>
-              </Avatar>
-              <h2 className="text-xl font-semibold">{chatbotInfo.nombre}</h2>
-              <p className="text-muted-foreground text-sm mt-1">
-                Para iniciar la conversación, por favor comparte tus datos:
-              </p>
-            </div>
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <label htmlFor="userName" className="text-sm font-medium">
-                  Nombre completo
-                </label>
-                <input id="userName" type="text" value={userName} onChange={e => setUserName(e.target.value)} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" placeholder="Ingresa tu nombre" />
-              </div>
-              <div className="space-y-1">
-                <label htmlFor="userPhone" className="text-sm font-medium">
-                  Número de teléfono
-                </label>
-                <input id="userPhone" type="tel" value={userPhone} onChange={e => setUserPhone(e.target.value)} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" placeholder="Ingresa tu número de teléfono" />
+        <div className="backdrop-blur-sm fixed inset-0 z-10 flex items-center justify-center bg-black/40">
+          <div className="bg-background rounded-lg p-6 w-full max-w-md shadow-lg">
+            <div className="flex justify-center mb-5">
+              <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-green-500 relative">
+                {chatbotInfo?.avatar_url ? (
+                  <img 
+                    src={chatbotInfo.avatar_url} 
+                    alt={chatbotInfo?.nombre || "Chatbot"} 
+                    className="w-full h-full object-cover" 
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-primary text-primary-foreground text-lg font-bold">
+                    {chatbotInfo?.nombre ? chatbotInfo.nombre.charAt(0).toUpperCase() : "C"}
+                  </div>
+                )}
+                <div className="absolute bottom-1 right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
               </div>
             </div>
-            <Button className="w-full mt-4" onClick={submitUserForm} disabled={!userName.trim() || !userPhone.trim()}>
-              Iniciar chat
-            </Button>
-            <p className="text-xs text-center text-muted-foreground mt-4">
-              Al continuar, aceptas nuestras políticas de privacidad y términos de uso.
-            </p>
+            
+            <h3 className="text-lg font-medium text-center mb-4">
+              Chatea con {chatbotInfo?.nombre || "nuestro asistente"}
+            </h3>
+            
+            <form onSubmit={(e) => { e.preventDefault(); submitUserForm(); }}>
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="name" className="block text-sm font-medium mb-1">
+                    Nombre completo
+                  </label>
+                  <input
+                    id="name"
+                    type="text"
+                    value={userName}
+                    onChange={(e) => setUserName(e.target.value)}
+                    className="w-full p-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+                    placeholder="Ingresa tu nombre"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor="phone" className="block text-sm font-medium mb-1">
+                    Número de teléfono
+                  </label>
+                  <div className="flex">
+                    <select
+                      id="countryCode"
+                      className="p-2 border rounded-l-md focus:outline-none focus:ring-1 focus:ring-primary mr-1"
+                      defaultValue="+57"
+                    >
+                      <option value="+57">+57 🇨🇴</option>
+                      <option value="+1">+1 🇺🇸</option>
+                      <option value="+52">+52 🇲🇽</option>
+                      <option value="+34">+34 🇪🇸</option>
+                      <option value="+51">+51 🇵🇪</option>
+                      <option value="+54">+54 🇦🇷</option>
+                      <option value="+56">+56 🇨🇱</option>
+                      <option value="+593">+593 🇪🇨</option>
+                    </select>
+                    <input
+                      id="phone"
+                      type="tel"
+                      value={userPhone}
+                      onChange={(e) => {
+                        // Permitir solo números y limitar a 10 dígitos para números colombianos
+                        const value = e.target.value.replace(/[^0-9]/g, '');
+                        setUserPhone(value.substring(0, 10));
+                        setPhoneError("");
+                      }}
+                      className="flex-1 p-2 border rounded-r-md focus:outline-none focus:ring-1 focus:ring-primary"
+                      placeholder="Celular (10 dígitos)"
+                      pattern="[0-9]{10}"
+                      maxLength={10}
+                      required
+                    />
+                  </div>
+                  {phoneError && (
+                    <p className="text-red-500 text-xs mt-1">{phoneError}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    El número debe tener 10 dígitos sin el prefijo del país
+                  </p>
+                </div>
+                
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    className="w-full py-2 px-4 bg-primary text-primary-foreground font-medium rounded-md hover:bg-primary/90 transition-colors"
+                  >
+                    Iniciar Chat
+                  </button>
+                  <p className="text-xs text-center text-muted-foreground mt-3">
+                    Al continuar, aceptas nuestra <a href="http://prometheuslabs.com.co/politicas_de_privacidad" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Política de Privacidad</a> y <a href="http://prometheuslabs.com.co/condiciones_de_servicio" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Términos de Uso</a>
+                  </p>
+                </div>
+              </div>
+            </form>
           </div>
         </div>
       )}
 
       {/* Profile Sheet */}
       <Sheet open={showProfile} onOpenChange={setShowProfile}>
-        <SheetContent side="right" className="sm:max-w-md">
-          <SheetHeader className="mb-4">
-            <SheetTitle>Mi Perfil</SheetTitle>
+        <SheetContent side="right">
+          <SheetHeader>
+            <SheetTitle>Mi perfil</SheetTitle>
           </SheetHeader>
-          <div className="flex flex-col items-center py-6">
-            <Avatar className="h-24 w-24 mb-4 avatar-border">
-              <AvatarFallback className="text-2xl">
-                {userName ? userName.charAt(0).toUpperCase() : "U"}
+          <div className="flex flex-col items-center space-y-4">
+            <Avatar className="h-20 w-20 avatar-border">
+              <AvatarImage src={chatbotInfo?.avatar_url || ''} />
+              <AvatarFallback>
+                <Bot className="h-10 w-10" />
               </AvatarFallback>
             </Avatar>
-            <h3 className="text-xl font-semibold">{userName || "Usuario"}</h3>
-            <div className="flex items-center text-muted-foreground mt-1">
-              <Phone className="h-4 w-4 mr-2" />
-              <span>{userPhone || "No disponible"}</span>
-            </div>
-          </div>
-          <Separator className="my-4" />
-          <div className="space-y-4">
-            <div>
-              <h4 className="text-sm font-medium mb-2">Datos de contacto</h4>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Nombre:</span>
-                  <span>{userName || "No disponible"}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Teléfono:</span>
-                  <span>{userPhone || "No disponible"}</span>
-                </div>
-              </div>
-            </div>
-            <Separator />
-            <div>
-              <h4 className="text-sm font-medium mb-2">Acciones</h4>
-              <div className="space-y-2">
-                <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => setShowRatingDrawer(true)}>
-                  <Star className="mr-2 h-4 w-4" />
-                  <span>Calificar chatbot</span>
-                </Button>
-              </div>
-            </div>
-            <Separator />
-            <div>
-              <h4 className="text-sm font-medium mb-2">Legal</h4>
-              <div className="space-y-2">
-                <Button variant="link" size="sm" className="w-full justify-start p-0 h-auto" asChild>
-                  <a href="#" target="_blank" rel="noopener noreferrer">
-                    <Shield className="mr-2 h-4 w-4" />
-                    <span>Políticas de privacidad</span>
-                    <ExternalLink className="ml-auto h-3 w-3" />
-                  </a>
-                </Button>
-                <Button variant="link" size="sm" className="w-full justify-start p-0 h-auto" asChild>
-                  <a href="#" target="_blank" rel="noopener noreferrer">
-                    <Info className="mr-2 h-4 w-4" />
-                    <span>Términos de uso</span>
-                    <ExternalLink className="ml-auto h-3 w-3" />
-                  </a>
-                </Button>
-              </div>
-            </div>
+            <h2 className="text-lg font-semibold">{userName || 'Usuario'}</h2>
+            <p className="text-sm text-muted-foreground">{userPhone || 'Sin número de teléfono'}</p>
           </div>
         </SheetContent>
       </Sheet>
 
       {/* Rating Drawer */}
       <Drawer open={showRatingDrawer} onOpenChange={setShowRatingDrawer}>
-        <DrawerContent className="max-w-md mx-auto">
+        <DrawerContent>
           <DrawerHeader>
-            <DrawerTitle className="text-center">Calificar chatbot</DrawerTitle>
-            <DrawerDescription className="text-center">
-              ¿Cómo calificarías tu experiencia con {chatbotInfo.nombre}?
-            </DrawerDescription>
+            <DrawerTitle>Calificar chatbot</DrawerTitle>
           </DrawerHeader>
-          <div className="flex justify-center p-4">
-            <div className="flex items-center">
-              {renderStars()}
-            </div>
-          </div>
-          <div className="p-4 pt-0">
-            <Textarea placeholder="Comentarios (opcional)" value={userFeedback} onChange={e => setUserFeedback(e.target.value)} className="min-h-[80px]" />
+          <div className="flex flex-col items-center space-y-4">
+            <p className="text-sm text-muted-foreground">¿Cómo calificarías tu experiencia?</p>
+            <div className="flex space-x-1">{renderStars()}</div>
+            <Textarea
+              placeholder="Escribe tus comentarios aquí..."
+              value={userFeedback}
+              onChange={(e) => setUserFeedback(e.target.value)}
+            />
           </div>
           <DrawerFooter>
-            <Button onClick={submitRating} disabled={userRating === 0}>
-              Enviar calificación
-            </Button>
+            <Button onClick={submitRating}>Enviar</Button>
           </DrawerFooter>
         </DrawerContent>
       </Drawer>

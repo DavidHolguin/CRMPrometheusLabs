@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -8,6 +7,11 @@ export interface ChatMessage {
   origen: string;
   created_at: string;
   metadata?: any;
+  // Propiedades para mensajes de audio
+  isAudio?: boolean;
+  audioUrl?: string;
+  audioDuration?: number;
+  audioId?: string;
 }
 
 export function useChatMessages(conversationId: string | null) {
@@ -158,8 +162,20 @@ export function useChatMessages(conversationId: string | null) {
     });
   };
 
+  // New function to update an existing message
+  const updateMessage = (messageId: string, updates: Partial<ChatMessage>) => {
+    setMessages(currentMessages => 
+      currentMessages.map(msg => 
+        msg.id === messageId 
+          ? { ...msg, ...updates }
+          : msg
+      )
+    );
+  };
+
   return {
     messages,
-    addMessage
+    addMessage,
+    updateMessage
   };
 }

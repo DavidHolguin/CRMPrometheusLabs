@@ -1,57 +1,129 @@
-
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-// Common emoji categories with a selection of popular emojis
-const emojiCategories = {
-  "😊": ["😀", "😃", "😄", "😁", "😆", "😅", "🤣", "😂", "🙂", "🙃", "😉", "😊", "😇", "🥰", "😍", "🤩", "😘", "😗", "😚", "😙"],
-  "👍": ["👍", "👎", "👌", "✌️", "🤞", "🤟", "🤘", "🤙", "👈", "👉", "👆", "👇", "☝️", "👋", "🤚", "🖐️", "✋", "🖖", "👏", "🙌"],
-  "❤️": ["❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "🤎", "💔", "❣️", "💕", "💞", "💓", "💗", "💖", "💘", "💝", "💟", "♥️"],
-  "🔥": ["🔥", "💫", "⭐", "🌟", "✨", "⚡", "💥", "💯", "💢", "💦", "💧", "🌊", "🍓", "🥝", "🍒", "🎁", "🎉", "🎊", "🎂", "🎈"]
-};
 
 interface EmojiPickerProps {
   onEmojiSelect: (emoji: string) => void;
 }
 
-export function EmojiPicker({ onEmojiSelect }: EmojiPickerProps) {
-  const [activeCategory, setActiveCategory] = useState<string>(Object.keys(emojiCategories)[0]);
+// Categorías comunes de emojis
+const commonEmojis = [
+  "😀", "😁", "😂", "🤣", "😃", "😄", "😅", "😆", "😉", "😊", 
+  "😋", "😎", "😍", "😘", "🥰", "😗", "😙", "😚", "🙂", "🤗"
+];
+
+const facesEmojis = [
+  "😀", "😃", "😄", "😁", "😆", "😅", "😂", "🤣", "🥲", "☺️",
+  "😊", "😇", "🙂", "🙃", "😉", "😌", "😍", "🥰", "😘", "😗",
+  "😙", "😚", "😋", "😛", "😝", "😜", "🤪", "🤨", "🧐", "🤓",
+  "😎", "🥸", "🤩", "🥳", "😏", "😒", "😞", "😔", "😟", "😕",
+  "🙁", "☹️", "😣", "😖", "😫", "😩", "🥺", "😢", "😭", "😤",
+  "😠", "😡", "🤬", "🤯", "😳", "🥵", "🥶", "😱", "😨", "😰"
+];
+
+const handsEmojis = [
+  "👋", "🤚", "✋", "🖖", "👌", "🤌", "🤏", "✌️", "🤞", "🤟",
+  "🤘", "🤙", "👈", "👉", "👆", "🖕", "👇", "☝️", "👍", "👎",
+  "✊", "👊", "🤛", "🤜", "👏", "🙌", "👐", "🤲", "🤝", "🙏",
+  "💪", "🦾", "🖐️", "✍️", "🤳", "💅", "🦵", "🦶", "👂", "🦻"
+];
+
+const symbolsEmojis = [
+  "❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "🤎", "❤️‍🔥",
+  "❣️", "💕", "💞", "💓", "💗", "💖", "💘", "💝", "💟", "☮️",
+  "✝️", "☪️", "🕉️", "☸️", "✡️", "🔯", "🕎", "☯️", "☦️", "🛐",
+  "⛎", "♈", "♉", "♊", "♋", "♌", "♍", "♎", "♏", "♐",
+  "♑", "♒", "♓", "🆔", "⚛️", "🉑", "☢️", "☣️", "📴", "📳"
+];
+
+export const EmojiPicker: React.FC<EmojiPickerProps> = ({ onEmojiSelect }) => {
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const handleEmojiClick = (emoji: string) => {
+    onEmojiSelect(emoji);
+  };
 
   return (
-    <Card className="w-64 border shadow-lg">
-      <CardContent className="p-3">
-        <Tabs defaultValue={activeCategory} onValueChange={setActiveCategory}>
-          <TabsList className="grid grid-cols-4 h-9 mb-2">
-            {Object.keys(emojiCategories).map((category) => (
-              <TabsTrigger key={category} value={category} className="p-0">
-                {category}
-              </TabsTrigger>
+    <div className="bg-card rounded-lg shadow-lg border border-border w-72 overflow-hidden">
+      <div className="p-2 border-b border-border">
+        <input
+          type="text"
+          placeholder="Buscar emoji..."
+          className="w-full bg-background text-sm rounded px-2 py-1.5 focus:outline-none"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value.toLowerCase())}
+        />
+      </div>
+
+      <Tabs defaultValue="recientes">
+        <TabsList className="grid grid-cols-4 h-auto p-0 bg-background">
+          <TabsTrigger value="recientes" className="py-2 px-0 text-xs data-[state=active]:bg-muted">Recientes</TabsTrigger>
+          <TabsTrigger value="caras" className="py-2 px-0 text-xs data-[state=active]:bg-muted">Caras</TabsTrigger>
+          <TabsTrigger value="gestos" className="py-2 px-0 text-xs data-[state=active]:bg-muted">Gestos</TabsTrigger>
+          <TabsTrigger value="símbolos" className="py-2 px-0 text-xs data-[state=active]:bg-muted">Símbolos</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="recientes" className="p-2 max-h-52 overflow-y-auto">
+          <div className="grid grid-cols-6 gap-2">
+            {commonEmojis.map((emoji) => (
+              <button
+                key={emoji}
+                onClick={() => handleEmojiClick(emoji)}
+                className="hover:bg-accent rounded flex items-center justify-center h-8 w-8 text-base"
+              >
+                {emoji}
+              </button>
             ))}
-          </TabsList>
-          
-          {Object.entries(emojiCategories).map(([category, emojis]) => (
-            <TabsContent key={category} value={category} className="mt-0">
-              <ScrollArea className="h-36">
-                <div className="grid grid-cols-5 gap-1">
-                  {emojis.map((emoji) => (
-                    <Button
-                      key={emoji}
-                      variant="ghost"
-                      className="h-8 w-8 p-0"
-                      onClick={() => onEmojiSelect(emoji)}
-                    >
-                      {emoji}
-                    </Button>
-                  ))}
-                </div>
-              </ScrollArea>
-            </TabsContent>
-          ))}
-        </Tabs>
-      </CardContent>
-    </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="caras" className="p-2 max-h-52 overflow-y-auto">
+          <div className="grid grid-cols-6 gap-2">
+            {facesEmojis
+              .filter(emoji => !searchTerm || emoji.includes(searchTerm))
+              .map((emoji) => (
+                <button
+                  key={emoji}
+                  onClick={() => handleEmojiClick(emoji)}
+                  className="hover:bg-accent rounded flex items-center justify-center h-8 w-8 text-base"
+                >
+                  {emoji}
+                </button>
+              ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="gestos" className="p-2 max-h-52 overflow-y-auto">
+          <div className="grid grid-cols-6 gap-2">
+            {handsEmojis
+              .filter(emoji => !searchTerm || emoji.includes(searchTerm))
+              .map((emoji) => (
+                <button
+                  key={emoji}
+                  onClick={() => handleEmojiClick(emoji)}
+                  className="hover:bg-accent rounded flex items-center justify-center h-8 w-8 text-base"
+                >
+                  {emoji}
+                </button>
+              ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="símbolos" className="p-2 max-h-52 overflow-y-auto">
+          <div className="grid grid-cols-6 gap-2">
+            {symbolsEmojis
+              .filter(emoji => !searchTerm || emoji.includes(searchTerm))
+              .map((emoji) => (
+                <button
+                  key={emoji}
+                  onClick={() => handleEmojiClick(emoji)}
+                  className="hover:bg-accent rounded flex items-center justify-center h-8 w-8 text-base"
+                >
+                  {emoji}
+                </button>
+              ))}
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
   );
-}
+};

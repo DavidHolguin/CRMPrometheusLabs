@@ -1,10 +1,10 @@
-
 /**
  * Utilities for handling PII (Personally Identifiable Information)
  * This module provides functions for anonymizing and sanitizing PII data
  */
 
 import { v4 as uuidv4 } from "uuid";
+import { supabase } from "@/integrations/supabase/client";
 
 // Regular expressions for common PII patterns
 const PII_PATTERNS = {
@@ -25,22 +25,19 @@ interface AnonymizationMapping {
  */
 export async function getOrCreateAnonymousToken(leadId: string): Promise<string | null> {
   try {
-    // Make API call to an endpoint that handles the token creation/retrieval
-    const apiEndpoint = import.meta.env.VITE_API_BASE_URL || 'https://web-production-01457.up.railway.app';
-    const response = await fetch(`${apiEndpoint}/api/v1/tokens/anonymous`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ lead_id: leadId })
-    });
+    // En lugar de hacer una solicitud fetch directa a la API externa
+    // vamos a usar el cliente de Supabase para evitar problemas de CORS
+    const { data, error } = await supabase.rpc(
+      'create_anonymous_token',
+      { p_lead_id: leadId }
+    );
     
-    if (!response.ok) {
-      throw new Error(`Error retrieving anonymous token: ${response.statusText}`);
+    if (error) {
+      console.error("Error al crear token anónimo:", error);
+      return null;
     }
     
-    const data = await response.json();
-    return data.token_anonimo;
+    return data?.token_anonimo || null;
   } catch (error) {
     console.error("Error managing anonymous token:", error);
     return null;
