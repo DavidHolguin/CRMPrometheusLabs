@@ -1,21 +1,43 @@
--- Política para permitir inserción en la tabla mensajes_audio
-CREATE POLICY "Permitir inserción de mensajes de audio" ON public.mensajes_audio
-    FOR INSERT
-    TO authenticated, anon
-    WITH CHECK (true);
+-- Políticas para la tabla mensajes_audio
+DO $$
+BEGIN
+    -- Verificar si la política ya existe
+    IF NOT EXISTS (
+        SELECT FROM pg_policies
+        WHERE tablename = 'mensajes_audio' AND policyname = 'Permitir inserción de mensajes de audio'
+    ) THEN
+        -- Política para permitir inserción en la tabla mensajes_audio
+        CREATE POLICY "Permitir inserción de mensajes de audio" ON public.mensajes_audio
+            FOR INSERT
+            TO authenticated, anon
+            WITH CHECK (true);
+    END IF;
 
--- Política para permitir selección en la tabla mensajes_audio
-CREATE POLICY "Permitir lectura de mensajes de audio" ON public.mensajes_audio
-    FOR SELECT
-    TO authenticated, anon
-    USING (true);
+    -- Verificar si la política ya existe
+    IF NOT EXISTS (
+        SELECT FROM pg_policies
+        WHERE tablename = 'mensajes_audio' AND policyname = 'Permitir lectura de mensajes de audio'
+    ) THEN
+        -- Política para permitir selección en la tabla mensajes_audio
+        CREATE POLICY "Permitir lectura de mensajes de audio" ON public.mensajes_audio
+            FOR SELECT
+            TO authenticated, anon
+            USING (true);
+    END IF;
 
--- Política para permitir actualización en la tabla mensajes_audio
-CREATE POLICY "Permitir actualización de mensajes de audio" ON public.mensajes_audio
-    FOR UPDATE
-    TO authenticated, anon
-    USING (true)
-    WITH CHECK (true);
+    -- Verificar si la política ya existe
+    IF NOT EXISTS (
+        SELECT FROM pg_policies
+        WHERE tablename = 'mensajes_audio' AND policyname = 'Permitir actualización de mensajes de audio'
+    ) THEN
+        -- Política para permitir actualización en la tabla mensajes_audio
+        CREATE POLICY "Permitir actualización de mensajes de audio" ON public.mensajes_audio
+            FOR UPDATE
+            TO authenticated, anon
+            USING (true)
+            WITH CHECK (true);
+    END IF;
+END $$;
 
 -- Habilitar RLS en la tabla mensajes_audio si no está habilitada
 ALTER TABLE public.mensajes_audio ENABLE ROW LEVEL SECURITY;

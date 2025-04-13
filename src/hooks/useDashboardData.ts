@@ -64,10 +64,10 @@ export const useDashboardStats = () => {
       if (leadIdArray.length > 0) {
         try {
           // Obtener el total de conversaciones para estos leads
+          // CORREGIDO: Eliminada la condición incorrecta sobre chatbot_id
           const { count: convsCount, error: convsError } = await supabase
             .from("conversaciones")
             .select("id", { count: "exact", head: true })
-            .eq("chatbot_id", "chatbot_id") // Aquí se necesitaría una relación entre chatbots y empresa_id
             .in("lead_id", leadIdArray);
               
           if (convsError) {

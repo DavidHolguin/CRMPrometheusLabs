@@ -633,7 +633,7 @@ const Dashboard = () => {
       const { data: metricsData, error: metricsError } = await supabase
         .from('metricas_calidad_llm')
         .select('*')
-        .eq('chatbot_id', '*')  // Todas las configuraciones
+        .eq('empresa_id', user.companyId)  // Filtramos por empresa_id en lugar de chatbot_id
         .gte('periodo_inicio', startDate.toISOString())
         .lte('periodo_fin', endDate.toISOString())
         .order('periodo_inicio', { ascending: true });
@@ -643,7 +643,8 @@ const Dashboard = () => {
       // Obtener desglose por chatbot
       const { data: chatbotMetrics, error: chatbotError } = await supabase
         .from('metricas_calidad_llm')
-        .select('chatbot_id, promedio_puntuacion, chatbots(nombre)')
+        .select('chatbot_id, promedio_puntuacion, chatbots:chatbot_id(nombre)')
+        .eq('empresa_id', user.companyId)
         .gte('periodo_inicio', startDate.toISOString())
         .lte('periodo_fin', endDate.toISOString())
         .order('promedio_puntuacion', { ascending: false });
@@ -653,10 +654,10 @@ const Dashboard = () => {
       // Obtener distribución de puntuaciones
       const { data: scoresData, error: scoresError } = await supabase
         .from('evaluaciones_respuestas')
-        .select('puntuacion, count(*)')
+        .select('puntuacion, count')
+        .eq('empresa_id', user.companyId)
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString())
-        .group('puntuacion')
         .order('puntuacion');
       
       if (scoresError) throw scoresError;
