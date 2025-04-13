@@ -217,7 +217,10 @@ const ChatInterface = () => {
           empresa_id: empresaId,
           chatbot_id: chatbotId,
           lead_id: leadId || null,
+          // Si ya tenemos un ID de conversación, siempre lo enviamos para mantener consistencia
+          // entre mensajes de texto y audios
           conversacion_id: conversationId || undefined,
+          session_id: sessionId, // Agregamos session_id para consistencia con los mensajes de texto
           canal_id: canalId,
           canal_identificador: canalIdentificador,
           audio_base64: base64data,
@@ -262,14 +265,19 @@ const ChatInterface = () => {
           });
         }
 
-        if (data.conversacion_id && data.conversacion_id !== conversationId) {
+        // Actualizar el ID de conversación solo si no teníamos uno antes
+        // o si el backend nos da uno diferente
+        if (data.conversacion_id && (!conversationId || data.conversacion_id !== conversationId)) {
+          console.log(`Actualizando ID de conversación: ${conversationId} -> ${data.conversacion_id}`);
           setConversationId(data.conversacion_id);
           localStorage.setItem(`chatbot_conversation_${chatbotId}`, data.conversacion_id);
         }
         
         if (data.audio_id && data.mensaje_id) {
           try {
-            const audioFileName = `${data.conversacion_id}/${data.mensaje_id}.webm`;
+            // Usamos el ID de conversación que ya teníamos o el que nos devolvió la API
+            const conversationIdToUse = conversationId || data.conversacion_id;
+            const audioFileName = `${conversationIdToUse}/${data.mensaje_id}.webm`;
             
             const byteCharacters = atob(base64data);
             const byteArrays = [];
@@ -310,7 +318,7 @@ const ChatInterface = () => {
             const audioData = {
               id: data.audio_id,
               mensaje_id: data.mensaje_id,
-              conversacion_id: data.conversacion_id,
+              conversacion_id: conversationIdToUse, // Usar el ID de conversación consistente
               archivo_url: archivoUrl,
               duracion_segundos: finalAudioDuration,
               transcripcion: data.transcripcion || '',
