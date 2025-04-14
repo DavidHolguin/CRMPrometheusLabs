@@ -2,14 +2,31 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Play, Pause } from 'lucide-react';
 
 interface AudioMessageProps {
-  audioUrl: string;
+  src: string;
   duration?: number;
+  transcription?: string;
+  // Compatibilidad con nueva estructura de datos
+  audio?: {
+    archivo_url?: string;
+    duracion_segundos?: number;
+    transcripcion?: string;
+  };
 }
 
-export const AudioMessage: React.FC<AudioMessageProps> = ({ audioUrl, duration: initialDuration }) => {
+export const AudioMessage: React.FC<AudioMessageProps> = ({ 
+  src, 
+  duration: initialDuration, 
+  transcription,
+  audio 
+}) => {
+  // Usar propiedades de audio si están disponibles, de lo contrario usar props directos
+  const audioSrc = audio?.archivo_url || src;
+  const audioDuration = audio?.duracion_segundos || initialDuration || 0;
+  const audioTranscription = audio?.transcripcion || transcription;
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(initialDuration || 0);
+  const [duration, setDuration] = useState(audioDuration);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const progressRef = useRef<HTMLDivElement | null>(null);
   const animationRef = useRef<number | null>(null);
@@ -17,28 +34,39 @@ export const AudioMessage: React.FC<AudioMessageProps> = ({ audioUrl, duration: 
 
   useEffect(() => {
     if (!audioRef.current) {
-      audioRef.current = new Audio(audioUrl);
+      // Asegurarnos de que tenemos una URL válida
+      const validAudioSrc = audioSrc || '';
+      if (!validAudioSrc) {
+        console.error("No se proporcionó URL de audio válida");
+        return;
+      }
+
+      audioRef.current = new Audio(validAudioSrc);
       
       audioRef.current.addEventListener('loadedmetadata', () => {
         if (audioRef.current) {
           // Aseguramos que la duración sea un número válido
-          const audioDuration = !isNaN(audioRef.current.duration) && isFinite(audioRef.current.duration) 
+          const loadedDuration = !isNaN(audioRef.current.duration) && isFinite(audioRef.current.duration) 
             ? audioRef.current.duration 
-            : initialDuration || 0;
-          setDuration(audioDuration);
+            : audioDuration;
+          setDuration(loadedDuration);
         }
       });
       
       audioRef.current.addEventListener('ended', () => {
         setIsPlaying(false);
         setCurrentTime(0);
-        cancelAnimationFrame(animationRef.current!);
+        if (animationRef.current) {
+          cancelAnimationFrame(animationRef.current);
+        }
         updateProgressBar(0);
       });
     }
     
     return () => {
-      cancelAnimationFrame(animationRef.current!);
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.src = '';
@@ -46,7 +74,7 @@ export const AudioMessage: React.FC<AudioMessageProps> = ({ audioUrl, duration: 
         audioRef.current = null;
       }
     };
-  }, [audioUrl, initialDuration]);
+  }, [audioSrc, audioDuration]);
 
   // Función para actualizar el tiempo actual durante la reproducción
   const updateTimeDisplay = () => {
@@ -56,7 +84,9 @@ export const AudioMessage: React.FC<AudioMessageProps> = ({ audioUrl, duration: 
     updateProgressBar();
     
     if (audioRef.current.ended) {
-      cancelAnimationFrame(animationRef.current!);
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
       setIsPlaying(false);
       return;
     }
@@ -69,7 +99,9 @@ export const AudioMessage: React.FC<AudioMessageProps> = ({ audioUrl, duration: 
     
     if (isPlaying) {
       audioRef.current.pause();
-      cancelAnimationFrame(animationRef.current!);
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
     } else {
       // Si el audio llegó al final, reiniciar
       if (audioRef.current.currentTime === audioRef.current.duration) {
@@ -136,6 +168,15 @@ export const AudioMessage: React.FC<AudioMessageProps> = ({ audioUrl, duration: 
     });
   };
 
+  // Si no hay URL de audio válida, mostrar un mensaje de error
+  if (!audioSrc) {
+    return (
+      <div className="text-sm text-red-500 italic">
+        El mensaje de audio no está disponible
+      </div>
+    );
+  }
+
   return (
     <div className="audio-message">
       <button 
@@ -164,6 +205,12 @@ export const AudioMessage: React.FC<AudioMessageProps> = ({ audioUrl, duration: 
           {formatTime(duration)}
         </span>
       </div>
+      
+      {audioTranscription && (
+        <div className="audio-transcription mt-2 text-sm text-gray-600">
+          <p>{audioTranscription}</p>
+        </div>
+      )}
     </div>
   );
 };

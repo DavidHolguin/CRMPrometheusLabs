@@ -1,4 +1,3 @@
-
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -14,6 +13,29 @@ export interface Message {
   remitente_id: string | null;
   metadata?: any;
   tipo_contenido?: string;
+  // Campos adicionales de la vista
+  mensaje_id?: string;
+  mensaje_fecha?: string;
+  mensaje_origen?: string;
+  mensaje_remitente_id?: string;
+  mensaje_contenido?: string;
+  mensaje_tipo?: string;
+  mensaje_metadata?: any;
+  mensaje_score_impacto?: number;
+  mensaje_leido?: boolean;
+  remitente_nombre?: string;
+  audio_url?: string;
+  audio_duracion?: number;
+  audio_transcripcion?: string;
+  // Campos para información del lead
+  lead_nombre?: string;
+  lead_apellido?: string;
+  // Campo para audio
+  audio?: {
+    archivo_url: string;
+    duracion_segundos: number;
+    transcripcion?: string;
+  };
 }
 
 export function useMessages(conversationId: string | undefined) {
@@ -126,11 +148,12 @@ export function useMessages(conversationId: string | undefined) {
       
       console.log(`Fetching messages for conversation: ${conversationId}`);
       
+      // Usar la vista para obtener mensajes con datos enriquecidos
       const { data, error } = await supabase
-        .from("mensajes")
+        .from("vista_lead_conversaciones_mensajes")
         .select("*")
         .eq("conversacion_id", conversationId)
-        .order("created_at", { ascending: true });
+        .order("mensaje_fecha", { ascending: true });
       
       if (error) {
         console.error("Error obteniendo mensajes:", error);
@@ -138,7 +161,38 @@ export function useMessages(conversationId: string | undefined) {
       }
       
       console.log(`Found ${data?.length || 0} messages for conversation ${conversationId}`);
-      return data || [];
+      
+      // Mapear los datos de la vista al formato esperado por la aplicación
+      const mappedMessages: Message[] = data?.map(item => {
+        // Crear objeto de audio si existe información de audio
+        const audioData = item.audio_url ? {
+          archivo_url: item.audio_url,
+          duracion_segundos: item.audio_duracion || 0,
+          transcripcion: item.audio_transcripcion
+        } : undefined;
+        
+        return {
+          id: item.mensaje_id,
+          conversacion_id: item.conversacion_id,
+          contenido: item.mensaje_contenido,
+          origen: item.mensaje_origen,
+          created_at: item.mensaje_fecha,
+          leido: item.mensaje_leido,
+          remitente_id: item.mensaje_remitente_id,
+          metadata: item.mensaje_metadata,
+          tipo_contenido: item.mensaje_tipo,
+          remitente_nombre: item.remitente_nombre,
+          lead_nombre: item.lead_nombre,
+          lead_apellido: item.lead_apellido,
+          // Información de audio en formato compatible con el componente
+          audio: audioData,
+          audio_url: item.audio_url,
+          audio_duracion: item.audio_duracion,
+          audio_transcripcion: item.audio_transcripcion
+        };
+      }) || [];
+      
+      return mappedMessages;
     },
     enabled: !!conversationId,
     refetchInterval: 5000, // Maintain a 5-second refresh as backup

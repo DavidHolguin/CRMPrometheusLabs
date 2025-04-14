@@ -443,3 +443,178 @@ html, body, #root {
     fill: rgb(2, 8, 23);
   }
 }
+
+/* Estilos para soporte markdown en mensajes */
+.markdown-message {
+  line-height: 1.5;
+}
+
+.markdown-message p {
+  margin-bottom: 0.5rem;
+}
+
+.markdown-message p:last-child {
+  margin-bottom: 0;
+}
+
+.markdown-message ul, 
+.markdown-message ol {
+  margin-left: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.markdown-message ul {
+  list-style-type: disc;
+}
+
+.markdown-message ol {
+  list-style-type: decimal;
+}
+
+.markdown-message h1, 
+.markdown-message h2, 
+.markdown-message h3, 
+.markdown-message h4 {
+  font-weight: 600;
+  margin-top: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.markdown-message h1 {
+  font-size: 1.5rem;
+}
+
+.markdown-message h2 {
+  font-size: 1.25rem;
+}
+
+.markdown-message h3 {
+  font-size: 1.125rem;
+}
+
+.markdown-message h4 {
+  font-size: 1rem;
+}
+
+.markdown-message code {
+  background-color: rgba(0, 0, 0, 0.2);
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 0.9em;
+}
+
+.markdown-message pre {
+  background-color: rgba(0, 0, 0, 0.2);
+  padding: 8px;
+  border-radius: 4px;
+  overflow-x: auto;
+  margin-bottom: 0.5rem;
+}
+
+.markdown-message pre code {
+  background-color: transparent;
+  padding: 0;
+}
+
+.markdown-message blockquote {
+  border-left: 3px solid rgba(255, 255, 255, 0.3);
+  padding-left: 0.75rem;
+  margin-left: 0;
+  font-style: italic;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.markdown-message a {
+  color: #3b82f6;
+  text-decoration: underline;
+}
+
+.markdown-message table {
+  border-collapse: collapse;
+  width: 100%;
+  margin-bottom: 0.5rem;
+}
+
+.markdown-message table th,
+.markdown-message table td {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 4px 8px;
+  text-align: left;
+}
+
+.markdown-message table th {
+  background-color: rgba(0, 0, 0, 0.2);
+}
+
+/* Estilos para los distintos tipos de conversaciones */
+.conversation-separator {
+  display: flex;
+  align-items: center;
+  margin: 1rem 0;
+}
+
+.conversation-separator::before,
+.conversation-separator::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.conversation-separator-text {
+  padding: 0 1rem;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+  white-space: nowrap;
+}
+
+/* Estilo para información del lead */
+.lead-info {
+  background-color: rgba(59, 130, 246, 0.1);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.lead-info-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.lead-info-title {
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.lead-info-content {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+  font-size: 0.75rem;
+}
+
+.lead-info-item {
+  display: flex;
+  align-items: center;
+}
+
+.lead-info-label {
+  color: rgba(255, 255, 255, 0.6);
+  margin-right: 0.25rem;
+}
+
+.lead-info-value {
+  font-weight: 500;
+}
+
+/* Estilo para pestañas en la cabecera */
+.conversation-tabs {
+  margin-top: 0.5rem;
+}
+
+.conversation-tab-content {
+  padding-top: 0.5rem;
+}
