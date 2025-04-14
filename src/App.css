@@ -40,3 +40,102 @@
 .read-the-docs {
   color: #888;
 }
+
+/* Estilos para el panel de mensajes en Conversations.tsx */
+.conversation-background {
+  position: relative;
+  height: 100%;
+  overflow-y: auto;
+  padding-bottom: 20px; /* Espacio adicional en la parte inferior para evitar que los mensajes queden justo en el borde */
+}
+
+/* Asegurar que el área de mensajes tenga suficiente margen para no quedar debajo del input */
+.chat-message-container {
+  padding-bottom: 20px;
+}
+
+/* Estilos para las burbujas de mensajes */
+.user-bubble {
+  background-color: #1e40af20;
+  color: #f8fafc;
+}
+
+.bot-bubble {
+  background-color: #27272a30;
+  color: #f8fafc;
+}
+
+.agent-bubble {
+  background-color: #22543d20;
+  color: #f8fafc;
+}
+
+/* Estilos para los mensajes de audio */
+.audio-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 250px;
+  margin: 4px 0;
+}
+
+.audio-play-button {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.audio-controls {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+}
+
+.audio-waveform {
+  position: relative;
+  flex: 1;
+  height: 32px;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.audio-waveform-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background-color: rgba(255, 255, 255, 0.15);
+  z-index: 1;
+}
+
+.audio-duration {
+  font-size: 12px;
+  min-width: 36px;
+  text-align: right;
+}
+
+.markdown-message p {
+  margin-bottom: 0.5rem;
+}
+
+.markdown-message p:last-child {
+  margin-bottom: 0;
+}
+
+.chat-timestamp {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 4px;
+  margin-left: auto;
+}
