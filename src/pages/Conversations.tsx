@@ -573,8 +573,8 @@ const ConversationsPage = () => {
 
             {/* Contenedor principal del contenido */}
             <div className="flex-1 flex flex-col overflow-hidden">
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 h-full">
-                <TabsContent value="mensajes" className="flex-1 h-full flex flex-col relative overflow-hidden m-0 p-0">
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col h-full">
+                <TabsContent value="mensajes" className="flex-1 flex flex-col h-full relative overflow-hidden m-0 p-0 data-[state=inactive]:hidden">
                   {/* El componente de mensajes tendrá un padding inferior para dejar espacio al input */}
                   <ChatMessages 
                     messages={processedMessages}
@@ -592,7 +592,7 @@ const ConversationsPage = () => {
                 </TabsContent>
 
                 {/* Pestaña de Comentarios - Ocupa toda la altura disponible */}
-                <TabsContent value="comentarios" className="flex-1 h-full m-0 p-0">
+                <TabsContent value="comentarios" className="flex-1 flex flex-col h-full m-0 p-0 data-[state=inactive]:hidden">
                   <LeadComments 
                     isLoading={isLoadingComments}
                     comments={leadComments}
@@ -601,7 +601,7 @@ const ConversationsPage = () => {
                 </TabsContent>
 
                 {/* Pestaña de Información del Lead - Ocupa toda la altura disponible */}
-                <TabsContent value="info" className="flex-1 h-full m-0 p-0">
+                <TabsContent value="info" className="flex-1 flex flex-col h-full m-0 p-0 data-[state=inactive]:hidden">
                   <LeadInfo 
                     selectedLead={selectedLead}
                     leadConversations={leadConversations}
