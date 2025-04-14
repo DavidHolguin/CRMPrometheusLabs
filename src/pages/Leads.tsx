@@ -1,10 +1,10 @@
-import { useState, useRef, useMemo, useEffect } from "react";
+import React, { useState, useRef, useMemo, useEffect } from "react";
 import { useLeads } from "@/hooks/useLeads";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { useLocation } from "react-router-dom";
@@ -19,12 +19,12 @@ import {
   Grid3X3,
   ListFilter,
   MoreHorizontal,
-  LineChart,
+  LineChart as LineChartIcon,
   List, 
   Mail, 
   MessageSquare, 
   Phone, 
-  PieChart,
+  PieChart as PieChartIcon,
   Search, 
   Settings,
   SlidersHorizontal,
@@ -74,6 +74,26 @@ import { LeadHistoryTab } from "@/components/pipeline/LeadHistoryTab";
 import { LeadCommentsTab } from "@/components/pipeline/LeadCommentsTab";
 import { LeadActivityChart } from "@/components/pipeline/LeadActivityChart";
 import { LeadAIEvaluation } from "@/components/pipeline/LeadAIEvaluation";
+import { 
+  BarChart, 
+  Bar, 
+  CartesianGrid, 
+  XAxis, 
+  YAxis, 
+  Tooltip as ChartTooltip, 
+  Cell, 
+  Pie, 
+  PieChart, 
+  Label, 
+  Line, 
+  LineChart,
+  ResponsiveContainer,
+  Legend,
+  Sector,
+  Area,
+  AreaChart
+} from "recharts";
+import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
 
 interface Column {
   id: string;
@@ -114,7 +134,7 @@ const LeadsPage = () => {
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [isLeadDrawerOpen, setIsLeadDrawerOpen] = useState(false);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"table" | "charts">("table");
+  const [activeTab, setActiveTab] = useState<"table" | "cards" | "kanban" | "charts">("table");
   const [filterOptions, setFilterOptions] = useState<FilterOption[]>([]);
   const [dateRange, setDateRange] = useState<{
     from: Date | undefined;
@@ -361,6 +381,20 @@ const LeadsPage = () => {
     return { origenData, etapaData, scoreData };
   }, [filteredLeads]);
 
+  const getTimelineData = () => {
+    const timelineData: { date: string; mensajes: number; interacciones: number }[] = [];
+    const today = new Date();
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(today.getDate() - i);
+      const dateString = date.toISOString().split("T")[0];
+      const mensajes = filteredLeads.reduce((acc, lead) => acc + (lead.message_count || 0), 0);
+      const interacciones = filteredLeads.reduce((acc, lead) => acc + (lead.interaction_count || 0), 0);
+      timelineData.push({ date: dateString, mensajes, interacciones });
+    }
+    return timelineData;
+  };
+
   // Función para resetear filtros
   const resetFilters = () => {
     setSearchQuery("");
@@ -380,15 +414,23 @@ const LeadsPage = () => {
           <div className="flex justify-between items-center">
             <h1 className="text-2xl font-bold">Leads</h1>
             <div className="flex items-center gap-2">
-              <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "table" | "charts")} className="mr-2">
-                <TabsList className="grid w-[200px] grid-cols-2">
+              <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "table" | "cards" | "kanban" | "charts")} className="mr-2">
+                <TabsList className="grid w-[400px] grid-cols-4">
                   <TabsTrigger value="table">
                     <List className="h-4 w-4 mr-2" />
                     Tabla
                   </TabsTrigger>
+                  <TabsTrigger value="cards">
+                    <Grid3X3 className="h-4 w-4 mr-2" />
+                    Tarjetas
+                  </TabsTrigger>
+                  <TabsTrigger value="kanban">
+                    <LineChartIcon className="h-4 w-4 mr-2" />
+                    Pipeline
+                  </TabsTrigger>
                   <TabsTrigger value="charts">
                     <BarChart3 className="h-4 w-4 mr-2" />
-                    Gráficos
+                    Análisis
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
@@ -700,267 +742,265 @@ const LeadsPage = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedLeads.map((lead) => (
-                      <>
-                        <TableRow 
-                          key={lead.id} 
-                          className={cn(
-                            "cursor-pointer hover:bg-muted/30",
-                            expandedLeadId === lead.id && "bg-muted/40 border-b-0"
+                    {paginatedLeads.map((lead) => [
+                      <TableRow 
+                        key={`lead-row-${lead.id}`}
+                        className={cn(
+                          "cursor-pointer hover:bg-muted/30",
+                          expandedLeadId === lead.id && "bg-muted/40 border-b-0"
+                        )}
+                        onClick={() => toggleRowExpand(lead.id)}
+                      >
+                        <TableCell className="p-2 text-center">
+                          {expandedLeadId === lead.id ? (
+                            <ChevronDown size={16} />
+                          ) : (
+                            <ChevronRight size={16} />
                           )}
-                          onClick={() => toggleRowExpand(lead.id)}
-                        >
-                          <TableCell className="p-2 text-center">
-                            {expandedLeadId === lead.id ? (
-                              <ChevronDown size={16} />
-                            ) : (
-                              <ChevronRight size={16} />
-                            )}
-                          </TableCell>
-                          
-                          {/* Renderizamos las celdas según las columnas visibles */}
-                          {columns.filter(col => col.visible).map(column => {
-                            const value = lead[column.accessorKey as keyof typeof lead];
-                            
-                            // Renderizado especial según el tipo de columna
-                            switch (column.accessorKey) {
-                              case "nombre":
-                                return (
-                                  <TableCell key={column.id}>
-                                    <div className="flex items-center gap-2">
-                                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-medium">
-                                        {lead.nombre ? lead.nombre.charAt(0) : "?"}
-                                        {lead.apellido ? lead.apellido.charAt(0) : ""}
-                                      </div>
-                                      <div>
-                                        <p className="font-medium">{lead.nombre} {lead.apellido}</p>
-                                        <p className="text-xs text-muted-foreground">
-                                          Creado {formatDate(lead.created_at)}
-                                        </p>
-                                      </div>
-                                    </div>
-                                  </TableCell>
-                                );
-                                
-                              case "contacto":
-                                return (
-                                  <TableCell key={column.id}>
-                                    <div className="space-y-1">
-                                      <div className="flex items-center gap-1">
-                                        <Mail size={14} className="text-muted-foreground" />
-                                        <span className="text-sm">{lead.email || "N/A"}</span>
-                                      </div>
-                                      <div className="flex items-center gap-1">
-                                        <Phone size={14} className="text-muted-foreground" />
-                                        <span className="text-sm">{lead.telefono || "N/A"}</span>
-                                      </div>
-                                    </div>
-                                  </TableCell>
-                                );
-                                
-                              case "canal_origen":
-                                return (
-                                  <TableCell key={column.id}>
-                                    {lead.canal_origen || "Desconocido"}
-                                  </TableCell>
-                                );
-                                
-                              case "score":
-                                return (
-                                  <TableCell key={column.id}>
-                                    <Badge variant="outline">{lead.score || 0}</Badge>
-                                  </TableCell>
-                                );
-                                
-                              case "stage_name":
-                                return (
-                                  <TableCell key={column.id}>
-                                    <Badge style={{ backgroundColor: lead.stage_color || "#666" }}>
-                                      {lead.stage_name || "Sin etapa"}
-                                    </Badge>
-                                  </TableCell>
-                                );
-                                
-                              case "ultima_interaccion":
-                                return (
-                                  <TableCell key={column.id}>
-                                    {formatDate(lead.ultima_interaccion)}
-                                  </TableCell>
-                                );
-                                
-                              case "created_at":
-                                return (
-                                  <TableCell key={column.id}>
-                                    {formatDate(lead.created_at)}
-                                  </TableCell>
-                                );
-                                
-                              default:
-                                return (
-                                  <TableCell key={column.id}>
-                                    {value !== undefined && value !== null ? String(value) : "N/A"}
-                                  </TableCell>
-                                );
-                            }
-                          })}
-                          
-                          <TableCell>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}>
-                                  <MoreHorizontal size={16} />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={(e) => {
-                                  e.stopPropagation();
-                                  openLeadDrawer(lead.id);
-                                }}>
-                                  <User size={14} className="mr-2" />
-                                  Ver detalles
-                                </DropdownMenuItem>
-                                <DropdownMenuItem asChild onClick={(e) => e.stopPropagation()}>
-                                  <a href={`/dashboard/conversations/${lead.id}`}>
-                                    <MessageSquare size={14} className="mr-2" />
-                                    Ver conversaciones
-                                  </a>
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
+                        </TableCell>
                         
-                        {/* Fila expandida con detalles del lead */}
-                        {expandedLeadId === lead.id && (
-                          <TableRow className="bg-muted/20">
-                            <TableCell colSpan={columns.filter(col => col.visible).length + 2} className="p-0">
-                              <div className="p-4">
-                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                                  <Card className="col-span-1">
-                                    <CardHeader className="pb-2">
-                                      <CardTitle className="text-base">Información de Contacto</CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                      <div className="space-y-2">
-                                        <div className="flex justify-between">
-                                          <span className="text-sm text-muted-foreground">Email:</span>
-                                          <span className="text-sm font-medium">{lead.email || "No disponible"}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                          <span className="text-sm text-muted-foreground">Teléfono:</span>
-                                          <span className="text-sm font-medium">{lead.telefono || "No disponible"}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                          <span className="text-sm text-muted-foreground">País:</span>
-                                          <span className="text-sm font-medium">{lead.pais || "No especificado"}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                          <span className="text-sm text-muted-foreground">Ciudad:</span>
-                                          <span className="text-sm font-medium">{lead.ciudad || "No especificado"}</span>
-                                        </div>
+                        {/* Renderizamos las celdas según las columnas visibles */}
+                        {columns.filter(col => col.visible).map(column => {
+                          const value = lead[column.accessorKey as keyof typeof lead];
+                          
+                          // Renderizado especial según el tipo de columna
+                          switch (column.accessorKey) {
+                            case "nombre":
+                              return (
+                                <TableCell key={column.id}>
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-medium">
+                                      {lead.nombre ? lead.nombre.charAt(0) : "?"}
+                                      {lead.apellido ? lead.apellido.charAt(0) : ""}
+                                    </div>
+                                    <div>
+                                      <p className="font-medium">{lead.nombre} {lead.apellido}</p>
+                                      <p className="text-xs text-muted-foreground">
+                                        Creado {formatDate(lead.created_at)}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </TableCell>
+                              );
+                              
+                            case "contacto":
+                              return (
+                                <TableCell key={column.id}>
+                                  <div className="space-y-1">
+                                    <div className="flex items-center gap-1">
+                                      <Mail size={14} className="text-muted-foreground" />
+                                      <span className="text-sm">{lead.email || "N/A"}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      <Phone size={14} className="text-muted-foreground" />
+                                      <span className="text-sm">{lead.telefono || "N/A"}</span>
+                                    </div>
+                                  </div>
+                                </TableCell>
+                              );
+                              
+                            case "canal_origen":
+                              return (
+                                <TableCell key={column.id}>
+                                  {lead.canal_origen || "Desconocido"}
+                                </TableCell>
+                              );
+                              
+                            case "score":
+                              return (
+                                <TableCell key={column.id}>
+                                  <Badge variant="outline">{lead.score || 0}</Badge>
+                                </TableCell>
+                              );
+                              
+                            case "stage_name":
+                              return (
+                                <TableCell key={column.id}>
+                                  <Badge style={{ backgroundColor: lead.stage_color || "#666" }}>
+                                    {lead.stage_name || "Sin etapa"}
+                                  </Badge>
+                                </TableCell>
+                              );
+                              
+                            case "ultima_interaccion":
+                              return (
+                                <TableCell key={column.id}>
+                                  {formatDate(lead.ultima_interaccion)}
+                                </TableCell>
+                              );
+                              
+                            case "created_at":
+                              return (
+                                <TableCell key={column.id}>
+                                  {formatDate(lead.created_at)}
+                                </TableCell>
+                              );
+                              
+                            default:
+                              return (
+                                <TableCell key={column.id}>
+                                  {value !== undefined && value !== null ? String(value) : "N/A"}
+                                </TableCell>
+                              );
+                          }
+                        })}
+                        
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}>
+                                <MoreHorizontal size={16} />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={(e) => {
+                                e.stopPropagation();
+                                openLeadDrawer(lead.id);
+                              }}>
+                                <User size={14} className="mr-2" />
+                                Ver detalles
+                              </DropdownMenuItem>
+                              <DropdownMenuItem asChild onClick={(e) => e.stopPropagation()}>
+                                <a href={`/dashboard/conversations/${lead.ultima_conversacion_id || lead.id}`}>
+                                  <MessageSquare size={14} className="mr-2" />
+                                  Ver conversaciones
+                                </a>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>,
+                      
+                      /* Fila expandida con detalles del lead */
+                      expandedLeadId === lead.id && (
+                        <TableRow key={`lead-expanded-${lead.id}`} className="bg-muted/20">
+                          <TableCell colSpan={columns.filter(col => col.visible).length + 2} className="p-0">
+                            <div className="p-4">
+                              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                                <Card className="col-span-1">
+                                  <CardHeader className="pb-2">
+                                    <CardTitle className="text-base">Información de Contacto</CardTitle>
+                                  </CardHeader>
+                                  <CardContent>
+                                    <div className="space-y-2">
+                                      <div className="flex justify-between">
+                                        <span className="text-sm text-muted-foreground">Email:</span>
+                                        <span className="text-sm font-medium">{lead.email || "No disponible"}</span>
                                       </div>
-                                    </CardContent>
-                                  </Card>
-                                  
-                                  <Card className="col-span-1">
-                                    <CardHeader className="pb-2">
-                                      <CardTitle className="text-base">Información de Pipeline</CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                      <div className="space-y-2">
-                                        <div className="flex justify-between">
-                                          <span className="text-sm text-muted-foreground">Etapa:</span>
-                                          <Badge style={{ backgroundColor: lead.stage_color || "#666" }}>
-                                            {lead.stage_name || "Sin etapa"}
-                                          </Badge>
-                                        </div>
-                                        <div className="flex justify-between">
-                                          <span className="text-sm text-muted-foreground">Score:</span>
-                                          <span className="text-sm font-medium">{lead.score || 0}/100</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                          <span className="text-sm text-muted-foreground">Origen:</span>
-                                          <span className="text-sm font-medium">{lead.canal_origen || "Desconocido"}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                          <span className="text-sm text-muted-foreground">Mensajes:</span>
-                                          <span className="text-sm font-medium">{lead.message_count || 0}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                          <span className="text-sm text-muted-foreground">Interacciones:</span>
-                                          <span className="text-sm font-medium">{lead.interaction_count || 0}</span>
-                                        </div>
+                                      <div className="flex justify-between">
+                                        <span className="text-sm text-muted-foreground">Teléfono:</span>
+                                        <span className="text-sm font-medium">{lead.telefono || "No disponible"}</span>
                                       </div>
-                                    </CardContent>
-                                  </Card>
-                                  
-                                  <Card className="col-span-1">
-                                    <CardHeader className="pb-2">
-                                      <CardTitle className="text-base">Etiquetas y Metadatos</CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                      <div className="space-y-4">
-                                        <div>
-                                          <h4 className="text-sm font-medium mb-2">Etiquetas:</h4>
-                                          <div className="flex flex-wrap gap-1">
-                                            {lead.tags && lead.tags.length > 0 ? lead.tags.map(tag => (
-                                              <Badge key={tag.id} variant="outline" style={{ borderColor: tag.color, color: tag.color }}>
-                                                {tag.nombre}
-                                              </Badge>
-                                            )) : (
-                                              <span className="text-sm text-muted-foreground">Sin etiquetas</span>
-                                            )}
-                                          </div>
-                                        </div>
-                                        
-                                        <div>
-                                          <h4 className="text-sm font-medium mb-2">Datos adicionales:</h4>
-                                          {lead.datos_adicionales && Object.keys(lead.datos_adicionales).length > 0 ? (
-                                            <div className="space-y-1">
-                                              {Object.entries(lead.datos_adicionales).map(([key, value]) => (
-                                                <div key={key} className="flex justify-between text-sm">
-                                                  <span className="text-muted-foreground">{key}:</span>
-                                                  <span>{String(value)}</span>
-                                                </div>
-                                              ))}
-                                            </div>
-                                          ) : (
-                                            <span className="text-sm text-muted-foreground">Sin datos adicionales</span>
+                                      <div className="flex justify-between">
+                                        <span className="text-sm text-muted-foreground">País:</span>
+                                        <span className="text-sm font-medium">{lead.pais || "No especificado"}</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span className="text-sm text-muted-foreground">Ciudad:</span>
+                                        <span className="text-sm font-medium">{lead.ciudad || "No especificado"}</span>
+                                      </div>
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                                
+                                <Card className="col-span-1">
+                                  <CardHeader className="pb-2">
+                                    <CardTitle className="text-base">Información de Pipeline</CardTitle>
+                                  </CardHeader>
+                                  <CardContent>
+                                    <div className="space-y-2">
+                                      <div className="flex justify-between">
+                                        <span className="text-sm text-muted-foreground">Etapa:</span>
+                                        <Badge style={{ backgroundColor: lead.stage_color || "#666" }}>
+                                          {lead.stage_name || "Sin etapa"}
+                                        </Badge>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span className="text-sm text-muted-foreground">Score:</span>
+                                        <span className="text-sm font-medium">{lead.score || 0}/100</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span className="text-sm text-muted-foreground">Origen:</span>
+                                        <span className="text-sm font-medium">{lead.canal_origen || "Desconocido"}</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span className="text-sm text-muted-foreground">Mensajes:</span>
+                                        <span className="text-sm font-medium">{lead.message_count || 0}</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span className="text-sm text-muted-foreground">Interacciones:</span>
+                                        <span className="text-sm font-medium">{lead.interaction_count || 0}</span>
+                                      </div>
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                                
+                                <Card className="col-span-1">
+                                  <CardHeader className="pb-2">
+                                    <CardTitle className="text-base">Etiquetas y Metadatos</CardTitle>
+                                  </CardHeader>
+                                  <CardContent>
+                                    <div className="space-y-4">
+                                      <div>
+                                        <h4 className="text-sm font-medium mb-2">Etiquetas:</h4>
+                                        <div className="flex flex-wrap gap-1">
+                                          {lead.tags && lead.tags.length > 0 ? lead.tags.map(tag => (
+                                            <Badge key={tag.id} variant="outline" style={{ borderColor: tag.color, color: tag.color }}>
+                                              {tag.nombre}
+                                            </Badge>
+                                          )) : (
+                                            <span className="text-sm text-muted-foreground">Sin etiquetas</span>
                                           )}
                                         </div>
                                       </div>
-                                    </CardContent>
-                                  </Card>
-                                </div>
-                                
-                                <div className="flex justify-end mt-4 gap-2">
-                                  <Button 
-                                    variant="outline" 
-                                    size="sm"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      openLeadDrawer(lead.id);
-                                    }}
-                                  >
-                                    Ver todos los detalles
-                                  </Button>
-                                  <Button 
-                                    size="sm"
-                                    asChild
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    <a href={`/dashboard/conversations/${lead.id}`}>
-                                      <MessageSquare size={14} className="mr-2" />
-                                      Ver conversaciones
-                                    </a>
-                                  </Button>
-                                </div>
+                                      
+                                      <div>
+                                        <h4 className="text-sm font-medium mb-2">Datos adicionales:</h4>
+                                        {lead.datos_adicionales && Object.keys(lead.datos_adicionales).length > 0 ? (
+                                          <div className="space-y-1">
+                                            {Object.entries(lead.datos_adicionales).map(([key, value]) => (
+                                              <div key={key} className="flex justify-between text-sm">
+                                                <span className="text-muted-foreground">{key}:</span>
+                                                <span>{String(value)}</span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        ) : (
+                                          <span className="text-sm text-muted-foreground">Sin datos adicionales</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </CardContent>
+                                </Card>
                               </div>
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </>
-                    ))}
+                              
+                              <div className="flex justify-end mt-4 gap-2">
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openLeadDrawer(lead.id);
+                                  }}
+                                >
+                                  Ver todos los detalles
+                                </Button>
+                                <Button 
+                                  size="sm"
+                                  asChild
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <a href={`/dashboard/conversations/${lead.ultima_conversacion_id || lead.id}`}>
+                                    <MessageSquare size={14} className="mr-2" />
+                                    Ver conversaciones
+                                  </a>
+                                </Button>
+                              </div>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    ].filter(Boolean))}
                   </TableBody>
                 </Table>
               </div>
@@ -1058,119 +1098,657 @@ const LeadsPage = () => {
                 </div>
               )}
             </TabsContent>
-            
+            <TabsContent value="cards" className="mt-0">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+                {paginatedLeads.map((lead) => (
+                  <Card key={lead.id} className="overflow-hidden hover:shadow-md transition-shadow duration-200 cursor-pointer">
+                    <CardContent className="p-0">
+                      <div 
+                        className="h-2" 
+                        style={{ 
+                          background: lead.stage_color || '#666',
+                          opacity: 0.8 
+                        }}
+                      />
+                      <div className="p-4">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary text-sm font-medium">
+                            {lead.nombre ? lead.nombre.charAt(0) : "?"}
+                            {lead.apellido ? lead.apellido.charAt(0) : ""}
+                          </div>
+                          <div>
+                            <h3 className="font-medium truncate">{lead.nombre} {lead.apellido}</h3>
+                            <p className="text-xs text-muted-foreground">
+                              {formatDate(lead.created_at)}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-2 mt-4 text-sm">
+                          <div className="flex items-center gap-2">
+                            <Mail size={14} className="text-muted-foreground" />
+                            <span className="truncate">{lead.email || "N/A"}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Phone size={14} className="text-muted-foreground" />
+                            <span>{lead.telefono || "N/A"}</span>
+                          </div>
+                          
+                          <div className="flex items-center gap-2">
+                            <div className="w-4 h-4 rounded-full" style={{ backgroundColor: lead.stage_color || "#666" }} />
+                            <span>{lead.stage_name || "Sin etapa"}</span>
+                          </div>
+                        </div>
+                        
+                        <div className="flex justify-between items-center mt-4">
+                          <div className="flex items-center gap-2">
+                            <Badge variant={parseInt(String(lead.score || 0)) > 50 ? "default" : "outline"}>
+                              {lead.score || 0}
+                            </Badge>
+                            <Badge variant="outline">{lead.canal_origen || "Desconocido"}</Badge>
+                          </div>
+                          
+                          <div className="flex gap-1">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8" 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openLeadDrawer(lead.id);
+                              }}
+                            >
+                              <User size={14} />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8"
+                              asChild
+                            >
+                              <a href={`/dashboard/conversations/${lead.ultima_conversacion_id || lead.id}`}>
+                                <MessageSquare size={14} />
+                              </a>
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+              
+              {/* Paginación para vista de tarjetas */}
+              {totalPages > 1 && (
+                <div className="flex justify-between items-center mt-6">
+                  <div className="text-sm text-muted-foreground">
+                    Mostrando {(currentPage - 1) * itemsPerPage + 1} a {Math.min(currentPage * itemsPerPage, sortedLeads.length)} de {sortedLeads.length} leads
+                  </div>
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious 
+                          href="#" 
+                          onClick={(e) => {
+                            e.preventDefault();
+                            if (currentPage > 1) setCurrentPage(currentPage - 1);
+                          }}
+                          className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
+                        />
+                      </PaginationItem>
+                      
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        let pageToShow: number;
+                        if (totalPages <= 5) {
+                          pageToShow = i + 1;
+                        } else if (currentPage <= 3) {
+                          if (i < 4) {
+                            pageToShow = i + 1;
+                          } else {
+                            pageToShow = totalPages;
+                          }
+                        } else if (currentPage >= totalPages - 2) {
+                          if (i === 0) {
+                            pageToShow = 1;
+                          } else {
+                            pageToShow = totalPages - (4 - i);
+                          }
+                        } else {
+                          if (i === 0) {
+                            pageToShow = 1;
+                          } else if (i === 4) {
+                            pageToShow = totalPages;
+                          } else {
+                            pageToShow = currentPage + i - 2;
+                          }
+                        }
+                        
+                        if (
+                          (pageToShow > 2 && pageToShow < currentPage - 1) || 
+                          (pageToShow > currentPage + 1 && pageToShow < totalPages - 1)
+                        ) {
+                          return (
+                            <PaginationItem key={`ellipsis-${i}`}>
+                              <span className="px-2">...</span>
+                            </PaginationItem>
+                          );
+                        }
+                        
+                        return (
+                          <PaginationItem key={pageToShow}>
+                            <PaginationLink
+                              href="#"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setCurrentPage(pageToShow);
+                              }}
+                              isActive={pageToShow === currentPage}
+                            >
+                              {pageToShow}
+                            </PaginationLink>
+                          </PaginationItem>
+                        );
+                      })}
+                      
+                      <PaginationItem>
+                        <PaginationNext 
+                          href="#" 
+                          onClick={(e) => {
+                            e.preventDefault();
+                            if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+                          }}
+                          className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              )}
+            </TabsContent>
+            <TabsContent value="kanban" className="mt-0">
+              <div className="overflow-x-auto pb-4">
+                <div className="flex gap-4 min-w-max">
+                  {/* Agrupamos los leads por etapas para una visualización Kanban */}
+                  {(() => {
+                    // Obtenemos todas las etapas únicas
+                    const stages = Array.from(new Set(sortedLeads.map(lead => lead.stage_name))).filter(Boolean);
+                    
+                    // Si no hay etapas definidas, mostramos una columna genérica
+                    if (stages.length === 0) {
+                      return (
+                        <div className="w-80 shrink-0">
+                          <div className="bg-muted/30 rounded-md p-3 mb-3">
+                            <h3 className="font-medium flex items-center justify-between">
+                              <span>Sin categorizar</span>
+                              <Badge variant="outline">{sortedLeads.length}</Badge>
+                            </h3>
+                          </div>
+                          <div className="space-y-3">
+                            {sortedLeads.map(lead => (
+                              <Card key={lead.id} className="cursor-pointer hover:shadow-sm">
+                                <CardContent className="p-3">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-medium">
+                                        {lead.nombre ? lead.nombre.charAt(0) : "?"}
+                                        {lead.apellido ? lead.apellido.charAt(0) : ""}
+                                      </div>
+                                      <div>
+                                        <p className="font-medium text-sm">{lead.nombre} {lead.apellido}</p>
+                                        <p className="text-xs text-muted-foreground">{lead.email}</p>
+                                      </div>
+                                    </div>
+                                    <Badge variant="outline">{lead.score || 0}</Badge>
+                                  </div>
+                                  
+                                  <div className="flex items-center justify-between mt-3 gap-2">
+                                    <Badge variant="outline" className="text-xs whitespace-nowrap">{lead.canal_origen || "Desconocido"}</Badge>
+                                    <div className="flex gap-1">
+                                      <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className="h-7 w-7" 
+                                        onClick={() => openLeadDrawer(lead.id)}
+                                      >
+                                        <User size={12} />
+                                      </Button>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className="h-7 w-7"
+                                        asChild
+                                      >
+                                        <a href={`/dashboard/conversations/${lead.ultima_conversacion_id || lead.id}`}>
+                                          <MessageSquare size={12} />
+                                        </a>
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    }
+                    
+                    // Ordenamos las etapas (podemos obtener el orden desde la API si está disponible)
+                    const stageColors = new Map(sortedLeads.map(lead => [lead.stage_name, lead.stage_color]));
+                    
+                    // Renderizamos una columna por cada etapa
+                    return stages.map(stageName => {
+                      const stageLeads = sortedLeads.filter(lead => lead.stage_name === stageName);
+                      const color = stageColors.get(stageName);
+                      
+                      return (
+                        <div key={stageName} className="w-80 shrink-0">
+                          <div 
+                            className="rounded-md p-3 mb-3"
+                            style={{ backgroundColor: `${color}25` }} // Color con baja opacidad
+                          >
+                            <h3 className="font-medium flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }}></div>
+                                <span>{stageName}</span>
+                              </div>
+                              <Badge variant="outline">{stageLeads.length}</Badge>
+                            </h3>
+                          </div>
+                          
+                          <div className="space-y-3 max-h-[calc(100vh-250px)] overflow-y-auto pr-1">
+                            {stageLeads.map(lead => (
+                              <Card 
+                                key={lead.id} 
+                                className="cursor-pointer hover:shadow-md transition-all duration-200"
+                                onClick={() => openLeadDrawer(lead.id)}
+                              >
+                                <CardContent className="p-3">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-medium">
+                                        {lead.nombre ? lead.nombre.charAt(0) : "?"}
+                                        {lead.apellido ? lead.apellido.charAt(0) : ""}
+                                      </div>
+                                      <div>
+                                        <p className="font-medium text-sm">{lead.nombre} {lead.apellido}</p>
+                                        <p className="text-xs text-muted-foreground truncate max-w-[120px]">{lead.email || "Sin email"}</p>
+                                      </div>
+                                    </div>
+                                    <div className="flex flex-col items-end">
+                                      <Badge variant={parseInt(String(lead.score || 0)) > 70 ? "default" : "outline"}>
+                                        {lead.score || 0}
+                                      </Badge>
+                                      <p className="text-xs text-muted-foreground mt-1">
+                                        {lead.dias_en_etapa_actual ? `${lead.dias_en_etapa_actual} días` : "Nuevo"}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="flex items-center gap-2 mt-2">
+                                    <Phone size={12} className="text-muted-foreground" />
+                                    <span className="text-xs">{lead.telefono || "No disponible"}</span>
+                                  </div>
+                                  
+                                  <div className="flex items-center justify-between mt-3">
+                                    <Badge variant="outline" className="text-xs">{lead.canal_origen || "Desconocido"}</Badge>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon" 
+                                      className="h-7 w-7"
+                                      asChild
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <a href={`/dashboard/conversations/${lead.ultima_conversacion_id || lead.id}`}>
+                                        <MessageSquare size={12} />
+                                      </a>
+                                    </Button>
+                                  </div>
+                                  
+                                  {/* Indicadores visuales */}
+                                  <div className="flex items-center gap-1 mt-2">
+                                    {lead.message_count && lead.message_count > 0 && (
+                                      <Badge variant="secondary" className="text-xs">
+                                        {lead.message_count} mensajes
+                                      </Badge>
+                                    )}
+                                    {lead.total_conversaciones && lead.total_conversaciones > 1 && (
+                                      <Badge variant="secondary" className="text-xs">
+                                        {lead.total_conversaciones} conversaciones
+                                      </Badge>
+                                    )}
+                                    {lead.agente_nombre && (
+                                      <Badge variant="outline" className="text-xs">
+                                        {lead.agente_nombre.split(' ')[0]}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            ))}
+                            
+                            {stageLeads.length === 0 && (
+                              <div className="text-center p-4 text-sm text-muted-foreground">
+                                No hay leads en esta etapa
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+              
+              <div className="mt-4 text-sm text-muted-foreground">
+                <p>Mostrando {sortedLeads.length} leads distribuidos por etapas en el pipeline.</p>
+              </div>
+            </TabsContent>
             <TabsContent value="charts" className="mt-0">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+                {/* Gráfico de barras de Leads por Origen */}
                 <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base">Leads por Origen</CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="h-[300px] flex items-center justify-center">
-                      <BarChart3 className="h-16 w-16 text-muted-foreground opacity-50" />
-                      <div className="ml-4">
-                        <p className="text-sm font-medium">Distribución por canal de origen:</p>
-                        <ul className="space-y-2 mt-3">
-                          {chartData.origenData.slice(0, 5).map((item, idx) => (
-                            <li key={idx} className="flex justify-between text-sm">
-                              <span>{item.name}:</span>
-                              <span className="font-medium">{item.value}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base">Leads por Etapa</CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="h-[300px] flex items-center justify-center">
-                      <PieChart className="h-16 w-16 text-muted-foreground opacity-50" />
-                      <div className="ml-4">
-                        <p className="text-sm font-medium">Distribución por etapa:</p>
-                        <ul className="space-y-2 mt-3">
-                          {chartData.etapaData.slice(0, 5).map((item, idx) => (
-                            <li key={idx} className="flex justify-between text-sm">
-                              <span>{item.name}:</span>
-                              <span className="font-medium">{item.value}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base">Distribución de Scores</CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="h-[300px] flex items-center justify-center">
-                      <BarChart4 className="h-16 w-16 text-muted-foreground opacity-50" />
-                      <div className="ml-4">
-                        <p className="text-sm font-medium">Distribución por puntaje:</p>
-                        <ul className="space-y-2 mt-3">
-                          {chartData.scoreData.map((item, idx) => (
-                            <li key={idx} className="flex justify-between text-sm">
-                              <span>Score {item.name}:</span>
-                              <span className="font-medium">{item.value}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card className="lg:col-span-3">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base">Resumen de Leads</CardTitle>
+                  <CardHeader>
+                    <CardTitle>Distribución por Canal</CardTitle>
+                    <CardDescription>Leads según canal de origen</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                      <div className="border rounded-lg p-4 text-center">
-                        <p className="text-muted-foreground text-sm">Total Leads</p>
-                        <p className="text-2xl font-bold mt-1">{filteredLeads.length}</p>
-                      </div>
-                      <div className="border rounded-lg p-4 text-center">
-                        <p className="text-muted-foreground text-sm">Score Promedio</p>
-                        <p className="text-2xl font-bold mt-1">
-                          {Math.round(filteredLeads.reduce((acc, lead) => acc + (lead.score || 0), 0) / (filteredLeads.length || 1))}
-                        </p>
-                      </div>
-                      <div className="border rounded-lg p-4 text-center">
-                        <p className="text-muted-foreground text-sm">Total Mensajes</p>
-                        <p className="text-2xl font-bold mt-1">
-                          {filteredLeads.reduce((acc, lead) => acc + (lead.message_count || 0), 0)}
-                        </p>
-                      </div>
-                      <div className="border rounded-lg p-4 text-center">
-                        <p className="text-muted-foreground text-sm">Interacciones</p>
-                        <p className="text-2xl font-bold mt-1">
-                          {filteredLeads.reduce((acc, lead) => acc + (lead.interaction_count || 0), 0)}
-                        </p>
-                      </div>
-                      <div className="border rounded-lg p-4 text-center">
-                        <p className="text-muted-foreground text-sm">Canales</p>
-                        <p className="text-2xl font-bold mt-1">
-                          {new Set(filteredLeads.map(lead => lead.canal_origen)).size}
-                        </p>
-                      </div>
-                      <div className="border rounded-lg p-4 text-center">
-                        <p className="text-muted-foreground text-sm">Países</p>
-                        <p className="text-2xl font-bold mt-1">
-                          {new Set(filteredLeads.map(lead => lead.pais).filter(Boolean)).size || "N/A"}
-                        </p>
-                      </div>
-                    </div>
+                    <ChartContainer 
+                      config={{
+                        origen: { label: "Leads", color: "hsl(var(--primary))" }
+                      }}
+                      className="h-[300px]"
+                    >
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart 
+                          data={chartData.origenData.sort((a, b) => b.value - a.value)} 
+                          margin={{ top: 10, right: 10, left: 10, bottom: 30 }}
+                        >
+                          <CartesianGrid vertical={false} stroke="hsl(var(--border))" />
+                          <XAxis 
+                            dataKey="name" 
+                            tickLine={false}
+                            axisLine={false}
+                            tickMargin={10}
+                            tick={{ fontSize: 12 }}
+                            tickFormatter={(value) => value.length > 10 ? `${value.substring(0, 10)}...` : value}
+                          />
+                          <YAxis 
+                            tickLine={false}
+                            axisLine={false}
+                            tickMargin={10}
+                          />
+                          <ChartTooltip
+                            cursor={{ fill: "hsl(var(--muted))", opacity: 0.15 }}
+                            content={<ChartTooltipContent />}
+                          />
+                          <Bar 
+                            dataKey="value" 
+                            name="origen" 
+                            fill="hsl(var(--primary))" 
+                            radius={[4, 4, 0, 0]}
+                            barSize={40}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </ChartContainer>
+                  </CardContent>
+                </Card>
+
+                {/* Gráfico circular de Leads por Etapa */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Distribución por Etapa</CardTitle>
+                    <CardDescription>Leads según etapa del pipeline</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ChartContainer 
+                      config={Object.fromEntries(
+                        chartData.etapaData.map((item) => [
+                          item.name.toLowerCase().replace(/\s+/g, '_'),
+                          { 
+                            label: item.name, 
+                            color: `hsl(${220 + chartData.etapaData.indexOf(item) * 30}, 70%, 60%)` 
+                          }
+                        ])
+                      )}
+                      className="h-[300px]"
+                    >
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <ChartTooltip 
+                            cursor={false}
+                            content={<ChartTooltipContent hideLabel />}
+                          />
+                          <Pie
+                            data={chartData.etapaData}
+                            dataKey="value"
+                            nameKey="name"
+                            cx="50%"
+                            cy="50%"
+                            outerRadius={120}
+                            innerRadius={70}
+                            paddingAngle={2}
+                          >
+                            {chartData.etapaData.map((entry, index) => (
+                              <Cell 
+                                key={`cell-${index}`} 
+                                fill={`hsl(${220 + index * 30}, 70%, 60%)`} 
+                              />
+                            ))}
+                            <Label
+                              content={() => {
+                                const total = chartData.etapaData.reduce((sum, item) => sum + item.value, 0);
+                                return (
+                                  <text
+                                    x="50%"
+                                    y="50%"
+                                    textAnchor="middle"
+                                    dominantBaseline="middle"
+                                  >
+                                    <tspan
+                                      x="50%"
+                                      y="50%"
+                                      className="fill-foreground text-2xl font-bold"
+                                    >
+                                      {total}
+                                    </tspan>
+                                    <tspan
+                                      x="50%"
+                                      y="50%"
+                                      dy="25"
+                                      className="fill-muted-foreground text-sm"
+                                    >
+                                      Leads totales
+                                    </tspan>
+                                  </text>
+                                );
+                              }}
+                            />
+                          </Pie>
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </ChartContainer>
+                  </CardContent>
+                </Card>
+                
+                {/* Gráfico de distribución de scores */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Distribución por Score</CardTitle>
+                    <CardDescription>Segmentación de leads por rango de puntuación</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ChartContainer 
+                      config={{
+                        score: { label: "Leads", color: "hsl(var(--primary))" }
+                      }}
+                      className="h-[300px]"
+                    >
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart 
+                          data={chartData.scoreData} 
+                          margin={{ top: 10, right: 10, left: 10, bottom: 30 }}
+                        >
+                          <CartesianGrid vertical={false} stroke="hsl(var(--border))" />
+                          <XAxis 
+                            dataKey="name" 
+                            tickLine={false}
+                            axisLine={false}
+                            tickMargin={10}
+                            tick={{ fontSize: 12 }}
+                          />
+                          <YAxis 
+                            tickLine={false}
+                            axisLine={false}
+                            tickMargin={10}
+                          />
+                          <ChartTooltip
+                            cursor={{ fill: "hsl(var(--muted))", opacity: 0.15 }}
+                            content={<ChartTooltipContent nameKey="score" />}
+                          />
+                          <Bar 
+                            dataKey="value" 
+                            name="score" 
+                            fill="hsl(var(--primary))" 
+                            radius={[4, 4, 0, 0]}
+                            barSize={40}
+                          >
+                            {chartData.scoreData.map((entry, index) => (
+                              <Cell 
+                                key={`cell-${index}`} 
+                                fill={
+                                  index <= 1 
+                                    ? "hsl(var(--destructive)/0.8)" 
+                                    : index <= 2 
+                                    ? "hsl(var(--warning)/0.8)" 
+                                    : "hsl(var(--success)/0.8)"
+                                } 
+                              />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </ChartContainer>
+                  </CardContent>
+                </Card>
+
+                {/* Gráfico de interacciones y mensajes en el tiempo */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Actividad en el Tiempo</CardTitle>
+                    <CardDescription>Mensajes e interacciones en los últimos 30 días</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ChartContainer
+                      config={{
+                        mensajes: { label: "Mensajes", color: "hsl(var(--primary))" },
+                        interacciones: { label: "Interacciones", color: "hsl(var(--secondary))" }
+                      }}
+                      className="h-[300px]"
+                    >
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart
+                          data={getTimelineData()}
+                          margin={{ top: 10, right: 10, left: 10, bottom: 30 }}
+                        >
+                          <CartesianGrid vertical={false} stroke="hsl(var(--border))" />
+                          <XAxis
+                            dataKey="date"
+                            tickLine={false}
+                            axisLine={false}
+                            tickMargin={10}
+                            tick={{ fontSize: 12 }}
+                            tickFormatter={(value) => {
+                              const date = new Date(value);
+                              return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+                            }}
+                          />
+                          <YAxis
+                            tickLine={false}
+                            axisLine={false}
+                            tickMargin={10}
+                          />
+                          <ChartTooltip
+                            content={
+                              <ChartTooltipContent 
+                                labelFormatter={(value) => {
+                                  const date = new Date(value);
+                                  return date.toLocaleDateString(undefined, { 
+                                    day: 'numeric', 
+                                    month: 'long',
+                                    year: 'numeric' 
+                                  });
+                                }}
+                              />
+                            }
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="mensajes"
+                            stroke="hsl(var(--primary))"
+                            strokeWidth={2}
+                            dot={{ r: 4 }}
+                            activeDot={{ r: 6 }}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="interacciones"
+                            stroke="hsl(var(--secondary))"
+                            strokeWidth={2}
+                            dot={{ r: 4 }}
+                            activeDot={{ r: 6 }}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </ChartContainer>
                   </CardContent>
                 </Card>
               </div>
+                
+              {/* Tarjetas de resumen */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg">Resumen de Leads</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                    <div className="border rounded-lg p-4 text-center">
+                      <p className="text-muted-foreground text-sm">Total Leads</p>
+                      <p className="text-2xl font-bold mt-1">{filteredLeads.length}</p>
+                    </div>
+                    <div className="border rounded-lg p-4 text-center">
+                      <p className="text-muted-foreground text-sm">Score Promedio</p>
+                      <p className="text-2xl font-bold mt-1">
+                        {Math.round(filteredLeads.reduce((acc, lead) => acc + (lead.score || 0), 0) / (filteredLeads.length || 1))}
+                      </p>
+                    </div>
+                    <div className="border rounded-lg p-4 text-center">
+                      <p className="text-muted-foreground text-sm">Total Mensajes</p>
+                      <p className="text-2xl font-bold mt-1">
+                        {filteredLeads.reduce((acc, lead) => acc + (lead.message_count || 0), 0)}
+                      </p>
+                    </div>
+                    <div className="border rounded-lg p-4 text-center">
+                      <p className="text-muted-foreground text-sm">Interacciones</p>
+                      <p className="text-2xl font-bold mt-1">
+                        {filteredLeads.reduce((acc, lead) => acc + (lead.interaction_count || 0), 0)}
+                      </p>
+                    </div>
+                    <div className="border rounded-lg p-4 text-center">
+                      <p className="text-muted-foreground text-sm">Canales</p>
+                      <p className="text-2xl font-bold mt-1">
+                        {new Set(filteredLeads.map(lead => lead.canal_origen)).size}
+                      </p>
+                    </div>
+                    <div className="border rounded-lg p-4 text-center">
+                      <p className="text-muted-foreground text-sm">Países</p>
+                      <p className="text-2xl font-bold mt-1">
+                        {new Set(filteredLeads.map(lead => lead.pais).filter(Boolean)).size || "N/A"}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </TabsContent>
           </Tabs>
         )}
