@@ -384,3 +384,62 @@ html, body, #root {
   min-width: 50px;
   text-align: center;
 }
+
+/* Animación de brillo para el texto CRM PROMETHEUS */
+.btn-shine {
+  position: relative;
+  color: #fff;
+  background: linear-gradient(to right, #9f9f9f 0, #fff 10%, #868686 20%);
+  background-position: 0;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shine 3s infinite linear;
+  animation-fill-mode: forwards;
+  -webkit-text-size-adjust: none;
+  font-weight: 500;
+  font-size: 12px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+@keyframes shine {
+  0% {
+    background-position: 0;
+  }
+  60% {
+    background-position: 180px;
+  }
+  100% {
+    background-position: 180px;
+  }
+}
+
+/* Animación del logo del sidebar */
+.logo-animation {
+  stroke-dasharray: 1500;
+  stroke-dashoffset: 1500;
+  animation: draw 4s ease-in-out infinite alternate;
+}
+
+@keyframes draw {
+  0% {
+    stroke-dashoffset: 1500;
+    stroke: rgba(255, 255, 255, 0.8);
+    fill: rgb(2, 8, 23);
+  }
+  50% {
+    stroke-dashoffset: 0;
+    stroke: rgba(255, 255, 255, 1);
+    fill: rgb(59, 130, 246);
+  }
+  90% {
+    stroke-dashoffset: 0;
+    stroke: rgba(255, 255, 255, 1);
+    fill: rgb(59, 130, 246, 0.8);
+  }
+  100% {
+    stroke-dashoffset: 0;
+    stroke: rgba(255, 255, 255, 0.6);
+    fill: rgb(2, 8, 23);
+  }
+}
