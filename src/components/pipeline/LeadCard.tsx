@@ -1,4 +1,3 @@
-
 import { Lead } from "@/hooks/useLeads";
 import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card";
 import { useState, useEffect } from "react";
@@ -274,7 +273,7 @@ export function LeadCard({ lead, isDragging }: LeadCardProps) {
 
       {!isMobile && (
         <Sheet open={detailsOpen} onOpenChange={setDetailsOpen}>
-          <SheetContent className="sm:max-w-md md:max-w-lg lg:max-w-xl xl:max-w-[80%] overflow-y-auto">
+          <SheetContent className="sm:max-w-md md:max-w-xl lg:max-w-3xl xl:max-w-[90%] 2xl:max-w-[90%] overflow-y-auto">
             <SheetHeader className="mb-1 pb-2 border-b">
               <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                 <div className={scoreCircleClass}>
@@ -328,13 +327,13 @@ export function LeadCard({ lead, isDragging }: LeadCardProps) {
               </div>
             </SheetHeader>
             
-            <div className="flex flex-col-reverse lg:flex-row gap-4 pt-4 pb-8">
-              <div className="lg:w-1/3 space-y-4">
+            <div className="flex flex-col-reverse lg:flex-row gap-6 pt-4 pb-8">
+              <div className="lg:w-2/4 space-y-4">
                 <h3 className="text-sm font-medium text-muted-foreground mb-2">Evaluación Inteligente</h3>
                 <LeadAIEvaluation lead={lead} />
               </div>
               
-              <div className="lg:w-2/3">
+              <div className="lg:w-3/4">
                 <Tabs defaultValue="datos" className="w-full">
                   <TabsList className="grid w-full grid-cols-3 mb-4">
                     <TabsTrigger value="datos">Datos y Progreso</TabsTrigger>

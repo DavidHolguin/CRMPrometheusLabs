@@ -101,12 +101,21 @@ const PipelineManagement = () => {
     const searchTerms = query.toLowerCase().split(' ');
     
     return searchTerms.every(term => {
-      const fullName = `${lead.nombre || ''} ${lead.apellido || ''}`.toLowerCase();
+      // Usar los nombres de la nueva estructura de tabla lead_datos_personales
+      const nombre = lead.nombre || '';
+      const apellido = lead.apellido || '';
+      const fullName = `${nombre} ${apellido}`.toLowerCase();
+      
+      // Buscar en campos relevantes
       return (
         fullName.includes(term) ||
         (lead.email && lead.email.toLowerCase().includes(term)) ||
         (lead.telefono && lead.telefono.toLowerCase().includes(term)) ||
-        (lead.canal_origen && lead.canal_origen.toLowerCase().includes(term))
+        (lead.canal_origen && lead.canal_origen.toLowerCase().includes(term)) ||
+        // Añadir campos adicionales de la vista vista_lead_completa
+        (lead.agente_nombre && lead.agente_nombre.toLowerCase().includes(term)) ||
+        (lead.pipeline_nombre && lead.pipeline_nombre.toLowerCase().includes(term)) ||
+        (lead.stage_name && lead.stage_name.toLowerCase().includes(term))
       );
     });
   }
