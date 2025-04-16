@@ -1,9 +1,9 @@
-
 import { Outlet, Navigate, useLocation } from "react-router-dom";
 import { useState } from "react";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/dashboard/AppSidebar";
 import { AppHeader } from "@/components/dashboard/AppHeader";
+import { AdminNavbar } from "@/components/layouts/AdminNavbar";
 import { useAuth } from "@/context/AuthContext";
 
 const DashboardLayout = () => {
@@ -45,6 +45,7 @@ const DashboardLayout = () => {
         
         <div className="flex flex-col flex-1 transition-all duration-300 ease-in-out ml-[70px] md:ml-[70px] max-w-[calc(100%-70px)]">
           <AppHeader toggleSidebar={toggleMobileSidebar} />
+          <AdminNavbar />
           
           <main className="flex-1 overflow-hidden">
             <Outlet />

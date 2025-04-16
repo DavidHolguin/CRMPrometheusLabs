@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -10,6 +9,7 @@ type UserWithMeta = User & {
   companyId?: string;
   name?: string;
   avatarUrl?: string;
+  role?: string; // Añadir el campo role al tipo UserWithMeta
 };
 
 type AuthContextType = {
@@ -56,7 +56,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 name: profileData?.full_name || newSession.user.email?.split('@')[0] || '',
                 onboardingCompleted: profileData?.onboarding_completed || false,
                 companyId: profileData?.empresa_id || undefined,
-                avatarUrl: profileData?.avatar_url || undefined
+                avatarUrl: profileData?.avatar_url || undefined,
+                role: profileData?.role // Incluir el rol del usuario
               });
             } catch (error) {
               console.error("Error fetching profile:", error);
@@ -85,7 +86,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             name: profileData?.full_name || currentSession.user.email?.split('@')[0] || '',
             onboardingCompleted: profileData?.onboarding_completed || false,
             companyId: profileData?.empresa_id || undefined,
-            avatarUrl: profileData?.avatar_url || undefined
+            avatarUrl: profileData?.avatar_url || undefined,
+            role: profileData?.role // Incluir el rol del usuario
           });
         }
       } catch (error) {

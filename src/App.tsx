@@ -23,6 +23,9 @@ import Canales from "./pages/Canales";
 import EntrenamientoIA from "./pages/EntrenamientoIA";
 import PerfilEmpresa from "./pages/PerfilEmpresa";
 
+// Admin pages
+import AdminAgentes from "./pages/admin/AdminAgentes";
+
 // Layout
 import DashboardLayout from "./components/layouts/DashboardLayout";
 import AuthLayout from "./components/layouts/AuthLayout";
@@ -72,6 +75,12 @@ const App = () => {
           <Route path="entrenamiento-ia" element={<EntrenamientoIA />} />
           <Route path="perfil-empresa" element={<PerfilEmpresa />} />
           <Route path="settings" element={<Dashboard />} />
+
+          {/* Admin routes */}
+          <Route path="admin/agentes" element={<AdminAgentes />} />
+          <Route path="admin/llm" element={<NotFound />} />
+          <Route path="admin/prompts" element={<NotFound />} />
+          <Route path="admin/evaluaciones" element={<NotFound />} />
         </Route>
         
         {/* Standalone Chat Interface - No Dashboard Layout */}
