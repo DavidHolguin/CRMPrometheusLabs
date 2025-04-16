@@ -293,9 +293,11 @@ export function AppSidebar({ isMobileOpen, setIsMobileOpen }: AppSidebarProps) {
               </div>
             </DropdownMenuTrigger>
             <DropdownMenuContent side={isCollapsed ? "right" : "top"} align="center" className="w-[200px]">
-              <DropdownMenuItem className="gap-2" onClick={handleLinkClick}>
-                <UserCircle size={16} />
-                <span>Perfil de empresa</span>
+              <DropdownMenuItem className="gap-2" asChild>
+                <Link to="/dashboard/perfil-empresa" onClick={handleLinkClick}>
+                  <UserCircle size={16} />
+                  <span>Perfil de empresa</span>
+                </Link>
               </DropdownMenuItem>
               <DropdownMenuItem className="gap-2" onClick={handleLinkClick}>
                 <Settings size={16} />

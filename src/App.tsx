@@ -21,6 +21,7 @@ import Leads from "./pages/Leads";
 import PipelineManagement from "./pages/PipelineManagement";
 import Canales from "./pages/Canales";
 import EntrenamientoIA from "./pages/EntrenamientoIA";
+import PerfilEmpresa from "./pages/PerfilEmpresa";
 
 // Layout
 import DashboardLayout from "./components/layouts/DashboardLayout";
@@ -69,6 +70,7 @@ const App = () => {
           <Route path="conversations/:conversationId" element={<ConversationsPage />} />
           <Route path="chatbots" element={<Chatbots />} />
           <Route path="entrenamiento-ia" element={<EntrenamientoIA />} />
+          <Route path="perfil-empresa" element={<PerfilEmpresa />} />
           <Route path="settings" element={<Dashboard />} />
         </Route>
         
