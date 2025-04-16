@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { supabaseAdmin } from "@/integrations/supabase/adminClient";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 
@@ -49,66 +50,73 @@ export function useAgentes() {
     mutationFn: async (newAgente: { 
       email: string; 
       full_name: string;
-      role: 'admin' | 'admin_empresa' | 'agente';
+      role?: 'admin' | 'admin_empresa' | 'agente';
       empresa_id?: string;
       avatar?: File | null;
     }) => {
-      // Primero registrar el usuario en Authentication
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email: newAgente.email,
-        email_confirm: true,
-        user_metadata: {
-          full_name: newAgente.full_name,
-        },
-        password: Math.random().toString(36).slice(-10), // Contraseña aleatoria temporal
-      });
+      try {
+        // Asignamos por defecto el rol 'agente' si no viene especificado
+        const role = newAgente.role || 'agente';
+        
+        // Usamos el cliente administrativo para crear el usuario
+        const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+          email: newAgente.email,
+          email_confirm: true,
+          user_metadata: {
+            full_name: newAgente.full_name,
+          },
+          password: Math.random().toString(36).slice(-10), // Contraseña aleatoria temporal
+        });
 
-      if (authError) throw authError;
+        if (authError) throw authError;
 
-      // El trigger automático creará una entrada en profiles
-      // Solo necesitamos actualizar los campos adicionales
-      const { error: updateError } = await supabase
-        .from("profiles")
-        .update({
-          role: newAgente.role,
-          empresa_id: newAgente.empresa_id || user?.companyId,
-        })
-        .eq("id", authData.user.id);
+        // Actualizamos el perfil con el rol y la empresa
+        const { error: updateError } = await supabaseAdmin
+          .from("profiles")
+          .update({
+            role: role,
+            empresa_id: newAgente.empresa_id || user?.companyId,
+          })
+          .eq("id", authData.user.id);
 
-      if (updateError) throw updateError;
+        if (updateError) throw updateError;
 
-      // Si hay avatar, subir el archivo
-      if (newAgente.avatar) {
-        setIsUploading(true);
-        try {
-          const fileExt = newAgente.avatar.name.split('.').pop();
-          const fileName = `avatar-${authData.user.id}-${Date.now()}.${fileExt}`;
-          
-          const { error: uploadError } = await supabase.storage
-            .from('avatars')
-            .upload(fileName, newAgente.avatar);
+        // Si hay avatar, subir el archivo
+        if (newAgente.avatar) {
+          setIsUploading(true);
+          try {
+            const fileExt = newAgente.avatar.name.split('.').pop();
+            const fileName = `avatar-${authData.user.id}-${Date.now()}.${fileExt}`;
             
-          if (uploadError) throw uploadError;
-          
-          const { data: { publicUrl } } = supabase.storage
-            .from('avatars')
-            .getPublicUrl(fileName);
+            const { error: uploadError } = await supabase.storage
+              .from('avatars')
+              .upload(fileName, newAgente.avatar);
+              
+            if (uploadError) throw uploadError;
             
-          // Actualizar la URL del avatar
-          const { error: updateAvatarError } = await supabase
-            .from("profiles")
-            .update({ avatar_url: publicUrl })
-            .eq("id", authData.user.id);
-            
-          if (updateAvatarError) throw updateAvatarError;
-        } catch (error) {
-          console.error("Error al subir avatar:", error);
-        } finally {
-          setIsUploading(false);
+            const { data: { publicUrl } } = supabase.storage
+              .from('avatars')
+              .getPublicUrl(fileName);
+              
+            // Actualizar la URL del avatar
+            const { error: updateAvatarError } = await supabase
+              .from("profiles")
+              .update({ avatar_url: publicUrl })
+              .eq("id", authData.user.id);
+              
+            if (updateAvatarError) throw updateAvatarError;
+          } catch (error) {
+            console.error("Error al subir avatar:", error);
+          } finally {
+            setIsUploading(false);
+          }
         }
-      }
 
-      return authData.user.id;
+        return authData.user.id;
+      } catch (error) {
+        console.error("Error detallado al crear agente:", error);
+        throw error;
+      }
     },
     onSuccess: () => {
       toast.success("Agente creado correctamente");
@@ -116,7 +124,7 @@ export function useAgentes() {
     },
     onError: (error) => {
       console.error("Error al crear agente:", error);
-      toast.error("Error al crear el agente");
+      toast.error(`Error al crear el agente: ${error.message || "Error desconocido"}`);
     }
   });
 
