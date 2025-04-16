@@ -119,6 +119,13 @@ const ConversationsPage = () => {
     conversations.forEach((conv) => {
       const leadId = conv.lead_id;
       if (!grouped[leadId]) {
+        // Información de asignación y etiquetas para los filtros
+        const leadTags = conv.lead?.tags || [];
+        const asignadoA = conv.lead?.asignado_a;
+        const agenteName = conv.lead?.agente_nombre || '';
+        const agentEmail = conv.lead?.agente_email || '';
+        const agentAvatar = conv.lead?.agente_avatar || '';
+
         grouped[leadId] = {
           lead_id: leadId,
           lead_nombre: conv.lead?.nombre || 'Usuario',
@@ -126,17 +133,32 @@ const ConversationsPage = () => {
           lead_email: conv.lead?.email,
           lead_telefono: conv.lead?.telefono,
           lead_score: conv.lead?.score,
+          // Añadimos la información completa del lead en la propiedad lead para tener acceso a todos sus datos
+          lead: {
+            ...conv.lead,
+            // Nos aseguramos que estos campos críticos para los filtros siempre existan
+            asignado_a: asignadoA || null,
+            agente_nombre: agenteName,
+            agente_email: agentEmail,
+            agente_avatar: agentAvatar,
+            tags: leadTags
+          },
           conversations: [],
           total_mensajes_sin_leer: 0,
           ultima_actualizacion: conv.ultimo_mensaje || conv.created_at,
         };
+
+        // Debug para verificar
+        if (asignadoA) {
+          console.log(`Lead ${leadId} asignado a: ${asignadoA}, nombre: ${agenteName}`);
+        }
       }
       
       grouped[leadId].conversations.push({
         id: conv.id,
         canal_id: conv.canal_id,
-        canal_nombre: canales.find(c => c.id === conv.canal_id)?.nombre,
-        canal_tipo: canales.find(c => c.id === conv.canal_id)?.tipo,
+        canal_nombre: canales.find(c => c.id === conv.canal_id)?.nombre || conv.canal_nombre,
+        canal_tipo: canales.find(c => c.id === conv.canal_id)?.tipo || conv.canal_tipo,
         canal_identificador: conv.canal_identificador,
         chatbot_id: conv.chatbot_id,
         chatbot_activo: conv.chatbot_activo || false,
