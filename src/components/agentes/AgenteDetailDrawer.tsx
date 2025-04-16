@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Agente } from "@/hooks/useAgentes";
 import { useLeads } from "@/hooks/useLeads";
+import { useAgenteStats } from "@/hooks/useAgenteStats";
 import {
   Sheet,
   SheetContent,
@@ -38,7 +39,7 @@ import {
   Legend,
   ResponsiveContainer,
   Label,
-  AreaChart, 
+  AreaChart,
   Area,
 } from "recharts";
 import {
@@ -48,6 +49,15 @@ import {
   UserCheck,
   Calendar,
   TrendingUp,
+  Loader2,
+  Clock,
+  ThumbsUp,
+  Users,
+  Check,
+  Sparkles,
+  Award,
+  BrainCircuit,
+  Timer,
 } from "lucide-react";
 import {
   Table,
@@ -65,6 +75,12 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  CircularProgressbarWithChildren,
+  buildStyles,
+} from "react-circular-progressbar";
+import "react-circular-progressbar/dist/styles.css";
 
 interface AgenteDetailDrawerProps {
   agente: Agente | null;
@@ -80,34 +96,51 @@ export function AgenteDetailDrawer({
   onEdit,
 }: AgenteDetailDrawerProps) {
   const [tab, setTab] = useState<string>("info");
-  const { data: leads, isLoading } = useLeads();
+  const { data: leads, isLoading: isLoadingLeads } = useLeads();
   const [assignedLeads, setAssignedLeads] = useState<any[]>([]);
 
-  // Datos de ejemplo para los gráficos
-  const activityData = [
-    { month: "Enero", conversaciones: 45, tickets: 20 },
-    { month: "Febrero", conversaciones: 52, tickets: 15 },
-    { month: "Marzo", conversaciones: 38, tickets: 25 },
-    { month: "Abril", conversaciones: 65, tickets: 18 },
-    { month: "Mayo", conversaciones: 72, tickets: 22 },
-    { month: "Junio", conversaciones: 58, tickets: 30 },
-  ];
+  const {
+    performanceMetrics,
+    activityData,
+    leadsStats,
+    isLoading: isLoadingStats,
+  } = useAgenteStats(agente?.id || null);
 
-  const performanceData = [
-    { name: "Tiempo resp.", value: 85 },
-    { name: "Satisfacción", value: 92 },
-    { name: "Tasa conv.", value: 65 },
-    { name: "Resolución", value: 78 },
-  ];
+  const performanceData = performanceMetrics
+    ? [
+        {
+          name: "Tiempo resp.",
+          value: 100 - Math.min(100, performanceMetrics.tiempoRespuestaPromedio * 4),
+        },
+        { name: "Satisfacción", value: performanceMetrics.satisfaccionPromedio },
+        { name: "Tasa conv.", value: performanceMetrics.tasaConversionLeads },
+        { name: "Resolución", value: performanceMetrics.tasaResolucion },
+      ]
+    : [];
+
+  const promedioRendimiento = performanceMetrics
+    ? Math.round(
+        (100 -
+          Math.min(100, performanceMetrics.tiempoRespuestaPromedio * 4) +
+          performanceMetrics.satisfaccionPromedio +
+          performanceMetrics.tasaConversionLeads +
+          performanceMetrics.tasaResolucion) /
+          4
+      )
+    : 0;
+
+  const chartActivityData =
+    activityData?.map((item) => ({
+      month: item.mes,
+      conversaciones: item.conversaciones,
+      mensajes: item.mensajesEnviados,
+    })) || [];
 
   const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"];
 
-  // Filtrar leads asignados al agente
   useEffect(() => {
     if (agente && leads) {
-      const filtered = leads.filter(
-        (lead) => lead.asignado_a === agente.id
-      );
+      const filtered = leads.filter((lead) => lead.asignado_a === agente.id);
       setAssignedLeads(filtered);
     }
   }, [agente, leads]);
@@ -133,7 +166,6 @@ export function AgenteDetailDrawer({
     }
   };
 
-  // Función para formatear fechas
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "Nunca";
     try {
@@ -149,8 +181,8 @@ export function AgenteDetailDrawer({
       label: "Conversaciones",
       color: "hsl(var(--chart-1))",
     },
-    tickets: {
-      label: "Tickets",
+    mensajes: {
+      label: "Mensajes",
       color: "hsl(var(--chart-2))",
     },
   };
@@ -302,141 +334,418 @@ export function AgenteDetailDrawer({
             </TabsContent>
 
             <TabsContent value="stats" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Rendimiento</CardTitle>
-                  <CardDescription>
-                    Métricas de desempeño del agente
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="flex justify-center">
-                  <div className="h-[300px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={performanceData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={60}
-                          outerRadius={90}
-                          fill="#8884d8"
-                          paddingAngle={5}
-                          dataKey="value"
-                          label={({ name, percent }) =>
-                            `${name} ${(percent * 100).toFixed(0)}%`
-                          }
-                        >
-                          {performanceData.map((entry, index) => (
-                            <Cell
-                              key={`cell-${index}`}
-                              fill={COLORS[index % COLORS.length]}
-                            />
-                          ))}
-                          <Label
-                            content={({ viewBox }) => {
-                              if (
-                                viewBox &&
-                                "cx" in viewBox &&
-                                "cy" in viewBox
-                              ) {
-                                return (
-                                  <text
-                                    x={viewBox.cx}
-                                    y={viewBox.cy}
-                                    textAnchor="middle"
-                                    dominantBaseline="middle"
-                                  >
-                                    <tspan
-                                      x={viewBox.cx}
-                                      y={viewBox.cy}
-                                      className="fill-foreground text-2xl font-bold"
-                                    >
-                                      80%
-                                    </tspan>
-                                    <tspan
-                                      x={viewBox.cx}
-                                      y={(viewBox.cy || 0) + 20}
-                                      className="fill-muted-foreground text-sm"
-                                    >
-                                      Promedio
-                                    </tspan>
-                                  </text>
-                                );
-                              }
-                              return null;
-                            }}
-                          />
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    </ResponsiveContainer>
+              {isLoadingStats ? (
+                <div className="space-y-6">
+                  <div className="flex justify-center items-center h-[300px]">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                   </div>
-                </CardContent>
-                <CardFooter className="flex-col gap-2 text-sm">
-                  <div className="flex items-center gap-2 font-medium leading-none">
-                    <TrendingUp className="h-4 w-4" /> Mejorando un 5% respecto
-                    al mes anterior
-                  </div>
-                </CardFooter>
-              </Card>
+                  <Card>
+                    <CardHeader>
+                      <Skeleton className="h-4 w-1/3" />
+                      <Skeleton className="h-3 w-1/2" />
+                    </CardHeader>
+                    <CardContent>
+                      <Skeleton className="h-[250px] w-full" />
+                    </CardContent>
+                  </Card>
+                </div>
+              ) : (
+                <>
+                  {/* Indicador de rendimiento principal */}
+                  <Card className="border-none shadow-md">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                      <CardTitle className="text-xl font-bold">
+                        Rendimiento General
+                      </CardTitle>
+                      <Award className="h-5 w-5 text-amber-500" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-3 gap-6">
+                        <div className="col-span-1 flex justify-center items-center">
+                          <div style={{ width: 120, height: 120 }}>
+                            <CircularProgressbarWithChildren
+                              value={promedioRendimiento}
+                              strokeWidth={8}
+                              styles={buildStyles({
+                                pathColor: `hsl(var(--primary))`,
+                                trailColor: "hsl(var(--muted))",
+                              })}
+                            >
+                              <div className="flex flex-col items-center justify-center">
+                                <span className="text-2xl font-bold">
+                                  {promedioRendimiento}%
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                  Desempeño
+                                </span>
+                              </div>
+                            </CircularProgressbarWithChildren>
+                          </div>
+                        </div>
+                        <div className="col-span-2">
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-2">
+                              {/* Indicadores detallados */}
+                              <div className="flex items-center gap-2 border rounded-lg p-2">
+                                <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
+                                  <Timer className="h-4 w-4 text-blue-600" />
+                                </div>
+                                <div>
+                                  <p className="text-xs text-muted-foreground">
+                                    Tiempo resp.
+                                  </p>
+                                  <p className="text-sm font-medium">
+                                    {performanceMetrics?.tiempoRespuestaPromedio.toFixed(
+                                      1
+                                    )}{" "}
+                                    min
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 border rounded-lg p-2">
+                                <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
+                                  <ThumbsUp className="h-4 w-4 text-green-600" />
+                                </div>
+                                <div>
+                                  <p className="text-xs text-muted-foreground">
+                                    Satisfacción
+                                  </p>
+                                  <p className="text-sm font-medium">
+                                    {performanceMetrics?.satisfaccionPromedio.toFixed(
+                                      0
+                                    )}
+                                    %
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 border rounded-lg p-2">
+                                <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center">
+                                  <Users className="h-4 w-4 text-purple-600" />
+                                </div>
+                                <div>
+                                  <p className="text-xs text-muted-foreground">
+                                    Tasa conv.
+                                  </p>
+                                  <p className="text-sm font-medium">
+                                    {performanceMetrics?.tasaConversionLeads.toFixed(
+                                      0
+                                    )}
+                                    %
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 border rounded-lg p-2">
+                                <div className="h-8 w-8 rounded-full bg-amber-100 flex items-center justify-center">
+                                  <Check className="h-4 w-4 text-amber-600" />
+                                </div>
+                                <div>
+                                  <p className="text-xs text-muted-foreground">
+                                    Resolución
+                                  </p>
+                                  <p className="text-sm font-medium">
+                                    {performanceMetrics?.tasaResolucion.toFixed(
+                                      0
+                                    )}
+                                    %
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              <TrendingUp className="h-4 w-4 inline mr-1" />
+                              {promedioRendimiento > 75
+                                ? "Excelente rendimiento"
+                                : promedioRendimiento > 50
+                                ? "Buen rendimiento"
+                                : "Necesita mejorar rendimiento"}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Actividad mensual</CardTitle>
-                  <CardDescription>Últimos 6 meses</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ChartContainer
-                    config={chartConfig}
-                    className="aspect-video h-[250px]"
-                  >
-                    <AreaChart
-                      data={activityData}
-                      margin={{
-                        top: 10,
-                        right: 10,
-                        left: 0,
-                        bottom: 0,
-                      }}
-                    >
-                      <CartesianGrid vertical={false} />
-                      <XAxis
-                        dataKey="month"
-                        tickLine={false}
-                        axisLine={false}
-                        tickMargin={8}
-                        tickFormatter={(value) => value.slice(0, 3)}
-                      />
-                      <YAxis tickLine={false} axisLine={false} />
-                      <ChartTooltip
-                        content={<ChartTooltipContent indicator="line" />}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="conversaciones"
-                        stackId="1"
-                        stroke="var(--color-conversaciones)"
-                        fill="var(--color-conversaciones)"
-                        fillOpacity={0.3}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="tickets"
-                        stackId="1"
-                        stroke="var(--color-tickets)"
-                        fill="var(--color-tickets)"
-                        fillOpacity={0.3}
-                      />
-                    </AreaChart>
-                  </ChartContainer>
-                </CardContent>
-                <CardFooter className="flex-col gap-2 text-sm">
-                  <div className="flex items-center gap-2 font-medium leading-none">
-                    <TrendingUp className="h-4 w-4" /> Incremento del 12% en
-                    conversaciones
-                  </div>
-                </CardFooter>
-              </Card>
+                  {/* Estadísticas de leads */}
+                  <Card className="border-none shadow-md">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-xl font-bold">
+                        <Users className="h-5 w-5 text-blue-500" />
+                        Gestión de Leads
+                      </CardTitle>
+                      <CardDescription>
+                        {leadsStats?.totalLeads || 0} leads asignados a este
+                        agente
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium">
+                                Leads activos
+                              </span>
+                              <span className="text-sm font-bold">
+                                {leadsStats?.leadsActivos || 0}
+                              </span>
+                            </div>
+                            <div className="w-full bg-muted rounded-full h-2">
+                              <div
+                                className="bg-blue-500 h-2 rounded-full"
+                                style={{
+                                  width: `${
+                                    leadsStats?.totalLeads
+                                      ? (leadsStats.leadsActivos /
+                                          leadsStats.totalLeads) *
+                                        100
+                                      : 0
+                                  }%`,
+                                }}
+                              ></div>
+                            </div>
+                            <div className="flex items-center justify-between pt-2">
+                              <span className="text-sm font-medium">
+                                Cerrados ganados
+                              </span>
+                              <span className="text-sm font-bold">
+                                {leadsStats?.leadsCerradosGanados || 0}
+                              </span>
+                            </div>
+                            <div className="w-full bg-muted rounded-full h-2">
+                              <div
+                                className="bg-green-500 h-2 rounded-full"
+                                style={{
+                                  width: `${
+                                    leadsStats?.totalLeads
+                                      ? (leadsStats.leadsCerradosGanados /
+                                          leadsStats.totalLeads) *
+                                        100
+                                      : 0
+                                  }%`,
+                                }}
+                              ></div>
+                            </div>
+                            <div className="flex items-center justify-between pt-2">
+                              <span className="text-sm font-medium">
+                                Cerrados perdidos
+                              </span>
+                              <span className="text-sm font-bold">
+                                {leadsStats?.leadsCerradosPerdidos || 0}
+                              </span>
+                            </div>
+                            <div className="w-full bg-muted rounded-full h-2">
+                              <div
+                                className="bg-red-500 h-2 rounded-full"
+                                style={{
+                                  width: `${
+                                    leadsStats?.totalLeads
+                                      ? (leadsStats.leadsCerradosPerdidos /
+                                          leadsStats.totalLeads) *
+                                        100
+                                      : 0
+                                  }%`,
+                                }}
+                              ></div>
+                            </div>
+                          </div>
+                        </div>
+                        <div>
+                          <div className="h-[200px] flex items-center justify-center">
+                            {leadsStats?.totalLeads ? (
+                              <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                  <Pie
+                                    data={[
+                                      {
+                                        name: "Activos",
+                                        value: leadsStats.leadsActivos,
+                                        color: "#3b82f6",
+                                      },
+                                      {
+                                        name: "Ganados",
+                                        value: leadsStats.leadsCerradosGanados,
+                                        color: "#22c55e",
+                                      },
+                                      {
+                                        name: "Perdidos",
+                                        value: leadsStats.leadsCerradosPerdidos,
+                                        color: "#ef4444",
+                                      },
+                                    ]}
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={30}
+                                    outerRadius={60}
+                                    fill="#8884d8"
+                                    paddingAngle={3}
+                                    dataKey="value"
+                                  >
+                                    {[
+                                      {
+                                        name: "Activos",
+                                        color: "#3b82f6",
+                                      },
+                                      {
+                                        name: "Ganados",
+                                        color: "#22c55e",
+                                      },
+                                      {
+                                        name: "Perdidos",
+                                        color: "#ef4444",
+                                      },
+                                    ].map((entry, index) => (
+                                      <Cell
+                                        key={`cell-${index}`}
+                                        fill={entry.color}
+                                      />
+                                    ))}
+                                  </Pie>
+                                  <Legend
+                                    verticalAlign="bottom"
+                                    height={36}
+                                    formatter={(value, entry, index) => {
+                                      return (
+                                        <span className="text-xs">{value}</span>
+                                      );
+                                    }}
+                                  />
+                                  <Tooltip />
+                                </PieChart>
+                              </ResponsiveContainer>
+                            ) : (
+                              <div className="text-center text-muted-foreground">
+                                <Users className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                                <p className="text-sm">
+                                  No hay leads asignados
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Actividad mensual mejorada */}
+                  <Card className="border-none shadow-md">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-xl font-bold">
+                        <BrainCircuit className="h-5 w-5 text-purple-500" />
+                        Actividad Mensual
+                      </CardTitle>
+                      <CardDescription>
+                        Conversaciones y mensajes en los últimos 6 meses
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <ChartContainer
+                        config={chartConfig}
+                        className="aspect-video h-[250px]"
+                      >
+                        <AreaChart
+                          data={chartActivityData}
+                          margin={{
+                            top: 10,
+                            right: 10,
+                            left: 0,
+                            bottom: 0,
+                          }}
+                        >
+                          <defs>
+                            <linearGradient
+                              id="colorConversaciones"
+                              x1="0"
+                              y1="0"
+                              x2="0"
+                              y2="1"
+                            >
+                              <stop
+                                offset="5%"
+                                stopColor="hsl(var(--primary))"
+                                stopOpacity={0.3}
+                              />
+                              <stop
+                                offset="95%"
+                                stopColor="hsl(var(--primary))"
+                                stopOpacity={0}
+                              />
+                            </linearGradient>
+                            <linearGradient
+                              id="colorMensajes"
+                              x1="0"
+                              y1="0"
+                              x2="0"
+                              y2="1"
+                            >
+                              <stop
+                                offset="5%"
+                                stopColor="hsl(var(--secondary))"
+                                stopOpacity={0.3}
+                              />
+                              <stop
+                                offset="95%"
+                                stopColor="hsl(var(--secondary))"
+                                stopOpacity={0}
+                              />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid
+                            vertical={false}
+                            strokeDasharray="3 3"
+                            stroke="hsl(var(--muted))"
+                          />
+                          <XAxis
+                            dataKey="month"
+                            tickLine={false}
+                            axisLine={false}
+                            tickMargin={8}
+                            tickFormatter={(value) => value.slice(0, 3)}
+                          />
+                          <YAxis tickLine={false} axisLine={false} />
+                          <ChartTooltip
+                            content={<ChartTooltipContent indicator="line" />}
+                          />
+                          <Area
+                            type="monotone"
+                            dataKey="conversaciones"
+                            stroke="hsl(var(--primary))"
+                            fillOpacity={1}
+                            fill="url(#colorConversaciones)"
+                          />
+                          <Area
+                            type="monotone"
+                            dataKey="mensajes"
+                            stroke="hsl(var(--secondary))"
+                            fillOpacity={1}
+                            fill="url(#colorMensajes)"
+                          />
+                        </AreaChart>
+                      </ChartContainer>
+                      <div className="mt-4 flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                          <div className="h-3 w-3 rounded-full bg-primary"></div>
+                          <span className="text-sm">Conversaciones</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="h-3 w-3 rounded-full bg-secondary"></div>
+                          <span className="text-sm">Mensajes</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Sparkles className="h-4 w-4 text-amber-500" />
+                          <span className="text-sm font-medium">
+                            {chartActivityData &&
+                              chartActivityData.length > 0 &&
+                              `Total: ${chartActivityData.reduce(
+                                (sum, item) => sum + item.conversaciones,
+                                0
+                              )} conv.`}
+                          </span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
             </TabsContent>
 
             <TabsContent value="leads" className="space-y-6">
@@ -448,7 +757,13 @@ export function AgenteDetailDrawer({
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {assignedLeads.length > 0 ? (
+                  {isLoadingLeads ? (
+                    <div className="space-y-2">
+                      {Array.from({ length: 3 }).map((_, index) => (
+                        <Skeleton key={index} className="h-10 w-full" />
+                      ))}
+                    </div>
+                  ) : assignedLeads.length > 0 ? (
                     <div className="rounded-md border">
                       <Table>
                         <TableHeader>
