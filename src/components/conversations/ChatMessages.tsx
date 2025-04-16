@@ -174,7 +174,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
   };
 
   return (
-    <ScrollArea className="flex-1 px-4  conversation-background">
+    <ScrollArea className="flex-1 p-4  conversation-background">
       <div className="space-y-4 chat-message-container">
         {(() => {
           let currentConversationId = '';

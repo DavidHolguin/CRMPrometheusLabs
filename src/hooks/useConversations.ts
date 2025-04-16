@@ -82,6 +82,39 @@ export function useConversations(chatbotId?: string) {
           }
         }
         
+        // Obtenemos también las etiquetas para cada lead
+        const { data: tagsData, error: tagsError } = await supabase
+          .from('lead_tag_relation')
+          .select(`
+            lead_id,
+            tag_id,
+            lead_tags (
+              id,
+              nombre,
+              color
+            )
+          `);
+          
+        if (tagsError) {
+          console.error('Error al obtener etiquetas de leads:', tagsError);
+          // No lanzamos error para que la app siga funcionando si no puede obtener tags
+        }
+        
+        // Agrupar etiquetas por lead_id para fácil acceso
+        const tagsByLeadId = new Map();
+        tagsData?.forEach(relation => {
+          if (!tagsByLeadId.has(relation.lead_id)) {
+            tagsByLeadId.set(relation.lead_id, []);
+          }
+          if (relation.lead_tags) {
+            tagsByLeadId.get(relation.lead_id).push({
+              id: relation.tag_id,
+              nombre: ((relation.lead_tags as unknown) as { nombre: any })?.nombre,
+              color: ((relation.lead_tags as unknown) as { color: any }).color
+            });
+          }
+        });
+        
         // Creamos un mapa de leads para fácil acceso
         const leadsMap = new Map();
         leadsData?.forEach(lead => {
@@ -99,6 +132,9 @@ export function useConversations(chatbotId?: string) {
             avatar_url: lead.agente_avatar || lead.avatar_url
           } : null;
           
+          // Obtener etiquetas para este lead
+          const tags = tagsByLeadId.get(lead.lead_id) || [];
+          
           leadsMap.set(lead.lead_id, {
             id: lead.lead_id,
             nombre: lead.nombre || 'Usuario',
@@ -112,6 +148,7 @@ export function useConversations(chatbotId?: string) {
             ultimas_interacciones: lead.ultimas_interacciones,
             intenciones_detectadas: lead.intenciones_detectadas,
             etiquetas: lead.etiquetas,
+            tags: tags, // Añadimos las etiquetas al lead
             ultima_conversacion_id: lead.ultima_conversacion_id,
             ultimo_mensaje: lead.ultimo_mensaje,
             // AÑADIDO: Información de asignación con más alternativas de campos
@@ -155,8 +192,52 @@ export function useConversations(chatbotId?: string) {
         // Transformar los datos agrupando por conversación
         const conversationsMap = new Map();
         const unreadCountsMap = new Map();
+        const messageCountsMap = new Map();
         
-        // Primero contamos mensajes no leídos por conversación
+        // Consulta adicional para obtener mensajes no leídos por conversación
+        const { data: unreadData, error: unreadError } = await supabase
+          .from('mensajes')
+          .select('conversacion_id, id, leido, origen')
+          .eq('leido', false)
+          .eq('origen', 'lead');
+          
+        if (unreadError) {
+          console.error('Error al obtener mensajes no leídos:', unreadError);
+        } else {
+          console.log(`Obtenidos ${unreadData?.length || 0} mensajes no leídos`);
+          
+          // Contar mensajes no leídos por conversación
+          unreadData?.forEach(msg => {
+            const currentCount = unreadCountsMap.get(msg.conversacion_id) || 0;
+            unreadCountsMap.set(msg.conversacion_id, currentCount + 1);
+          });
+        }
+        
+        // Consulta adicional para obtener el conteo total de mensajes por conversación
+        // Reemplazamos el método .group() que no está disponible con un enfoque manual
+        const { data: allMessagesData, error: allMessagesError } = await supabase
+          .from('mensajes')
+          .select('conversacion_id, id');
+          
+        if (allMessagesError) {
+          console.error('Error al obtener todos los mensajes:', allMessagesError);
+        } else {
+          // Agrupamos y contamos manualmente
+          const countsMap = new Map();
+          allMessagesData?.forEach(msg => {
+            const convId = msg.conversacion_id;
+            countsMap.set(convId, (countsMap.get(convId) || 0) + 1);
+          });
+          
+          // Transferir los conteos al mapa principal
+          countsMap.forEach((count, convId) => {
+            messageCountsMap.set(convId, count);
+          });
+          
+          console.log(`Calculado conteo de mensajes para ${countsMap.size} conversaciones`);
+        }
+        
+        // Primero contamos mensajes no leídos por conversación desde los datos principales
         data?.forEach(item => {
           if (!item.mensaje_leido && item.mensaje_origen === 'lead') {
             const currentCount = unreadCountsMap.get(item.conversacion_id) || 0;
@@ -210,13 +291,20 @@ export function useConversations(chatbotId?: string) {
                 nombre: nombreAgenteMensajes,
                 email: item.agente_email,
                 avatar_url: item.agente_avatar
-              } : null
+              } : null,
+              // Si no tenemos etiquetas, usar array vacío
+              tags: []
             };
             
             // Debuggear información sobre este lead específico
             if (item.lead_asignado_a) {
               console.log(`Lead ${item.lead_id} asignado a: ${leadInfo.agente_nombre || 'No se encontró el nombre'}`);
             }
+            
+            // Obtener conteo de mensajes no leídos y total de mensajes
+            const unreadCount = unreadCountsMap.get(item.conversacion_id) || 0;
+            const messageCount = messageCountsMap.get(item.conversacion_id) || 
+                                item.total_mensajes_conversacion || 0;
             
             conversationsMap.set(item.conversacion_id, {
               id: item.conversacion_id,
@@ -236,8 +324,8 @@ export function useConversations(chatbotId?: string) {
               lead: leadInfo,
               lead_nombre: item.lead_nombre || leadInfo.nombre || 'Usuario',
               lead_apellido: item.lead_apellido || leadInfo.apellido || '',
-              unread_count: unreadCountsMap.get(item.conversacion_id) || 0,
-              message_count: item.total_mensajes_conversacion || 0,
+              unread_count: unreadCount,
+              message_count: messageCount,
               canal_nombre: item.canal_nombre,
               canal_tipo: item.canal_tipo,
               minutos_desde_mensaje: item.minutos_desde_mensaje,
