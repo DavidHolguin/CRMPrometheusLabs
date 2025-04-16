@@ -53,6 +53,27 @@ export function usePipelineLeads(pipelineId: string | null) {
         return {};
       }
       
+      // Obtener todos los IDs de usuarios asignados para hacer una única consulta
+      const userIds = leadsData
+        .map(lead => lead.asignado_a)
+        .filter(id => id !== null && id !== undefined);
+      
+      // Obtener perfiles de usuarios asignados en una sola consulta
+      const userProfiles: Record<string, any> = {};
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, full_name, email, avatar_url, role")
+          .in("id", userIds);
+        
+        // Crear un mapa de perfiles por ID
+        if (profiles) {
+          profiles.forEach(profile => {
+            userProfiles[profile.id] = profile;
+          });
+        }
+      }
+      
       // Enriquecer los datos de leads con información adicional
       const enhancedLeads = await Promise.all(
         leadsData.map(async (lead) => {
@@ -101,6 +122,9 @@ export function usePipelineLeads(pipelineId: string | null) {
           // Encontrar información de la etapa
           const stageInfo = stages.find(stage => stage.id === lead.stage_id);
           
+          // Obtener información del usuario asignado
+          const assignedUser = lead.asignado_a ? userProfiles[lead.asignado_a] : null;
+          
           return {
             id: lead.id,
             nombre: datosPersonales?.nombre || "",
@@ -115,6 +139,13 @@ export function usePipelineLeads(pipelineId: string | null) {
             created_at: lead.created_at,
             updated_at: lead.updated_at,
             asignado_a: lead.asignado_a,
+            usuario_asignado: assignedUser ? {
+              id: assignedUser.id,
+              nombre: assignedUser.full_name,
+              email: assignedUser.email,
+              avatar_url: assignedUser.avatar_url,
+              role: assignedUser.role
+            } : null,
             empresa_id: lead.empresa_id,
             message_count: messageCount,
             interaction_count: conversations?.length || 0,
@@ -308,6 +339,197 @@ export function usePipelineLeads(pipelineId: string | null) {
     },
   });
 
+  // Nueva mutación para actualizar la asignación de un lead
+  const updateLeadAssignment = useMutation({
+    mutationFn: async ({ 
+      leadId, 
+      userId 
+    }: { 
+      leadId: string; 
+      userId: string | null; // null para liberar la asignación
+    }) => {
+      // Registrar el cambio en el historial
+      if (user?.id) {
+        const { data: lead } = await supabase
+          .from("leads")
+          .select("asignado_a")
+          .eq("id", leadId)
+          .single();
+        
+        if (lead?.asignado_a !== undefined) {
+          await supabase
+            .from("lead_history")
+            .insert({
+              lead_id: leadId,
+              campo: "asignado_a",
+              valor_anterior: lead.asignado_a || null,
+              valor_nuevo: userId,
+              usuario_id: user.id
+            });
+        }
+      }
+      
+      // Actualizar la asignación del lead
+      const { data, error } = await supabase
+        .from("leads")
+        .update({ 
+          asignado_a: userId,
+          ultima_interaccion: new Date().toISOString() 
+        })
+        .eq("id", leadId)
+        .select()
+        .single();
+        
+      if (error) {
+        console.error("Error actualizando asignación de lead:", error);
+        throw error;
+      }
+      
+      // Obtener información del perfil del usuario asignado si existe
+      let userProfile = null;
+      if (userId) {
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("id, full_name, email, avatar_url, role")
+          .eq("id", userId)
+          .single();
+          
+        if (profileData) {
+          userProfile = {
+            id: profileData.id,
+            nombre: profileData.full_name,
+            email: profileData.email,
+            avatar_url: profileData.avatar_url,
+            role: profileData.role
+          };
+        }
+      }
+      
+      // Devolver los datos con información del usuario asignado
+      return {...data, usuario_asignado: userProfile};
+    },
+    // Actualización optimista para una mejor experiencia de usuario
+    onMutate: async ({ leadId, userId }) => {
+      // Cancelar cualquier refetch pendiente
+      await queryClient.cancelQueries({ 
+        queryKey: ["pipeline-leads", pipelineId, user?.companyId] 
+      });
+      
+      // Guardar el estado anterior
+      const previousLeadsByStage = queryClient.getQueryData(
+        ["pipeline-leads", pipelineId, user?.companyId]
+      );
+      
+      // Si estamos asignando un usuario, necesitamos su información de perfil
+      let userProfile = null;
+      if (userId) {
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("id, full_name, email, avatar_url, role")
+          .eq("id", userId)
+          .single();
+          
+        if (profileData) {
+          userProfile = {
+            id: profileData.id,
+            nombre: profileData.full_name,
+            email: profileData.email,
+            avatar_url: profileData.avatar_url,
+            role: profileData.role
+          };
+        }
+      }
+      
+      // Actualizar optimistamente los datos en el cliente
+      queryClient.setQueryData(
+        ["pipeline-leads", pipelineId, user?.companyId],
+        (oldData: Record<string, Lead[]> = {}) => {
+          // Crear una copia profunda
+          const newData = JSON.parse(JSON.stringify(oldData));
+          
+          // Actualizar la asignación del lead en todas las etapas
+          for (const stageId in newData) {
+            const leadsInStage = newData[stageId] as Lead[];
+            const leadIndex = leadsInStage.findIndex(lead => lead.id === leadId);
+            
+            if (leadIndex !== -1) {
+              // Actualizar lead con la nueva asignación
+              newData[stageId][leadIndex].asignado_a = userId;
+              newData[stageId][leadIndex].usuario_asignado = userProfile;
+              newData[stageId][leadIndex].ultima_interaccion = new Date().toISOString();
+              break;
+            }
+          }
+          
+          return newData;
+        }
+      );
+      
+      // También actualizar la caché de leads individuales si existe
+      queryClient.setQueriesData(
+        { queryKey: ["leads"] },
+        (oldData: any) => {
+          if (!Array.isArray(oldData)) return oldData;
+          
+          return oldData.map((lead: Lead) => 
+            lead.id === leadId 
+              ? { 
+                  ...lead, 
+                  asignado_a: userId, 
+                  usuario_asignado: userProfile,
+                  ultima_interaccion: new Date().toISOString() 
+                }
+              : lead
+          );
+        }
+      );
+      
+      return { previousLeadsByStage };
+    },
+    onError: (error, variables, context) => {
+      console.error("Error en updateLeadAssignment:", error);
+      toast.error("Error al actualizar la asignación del lead");
+      
+      // Revertir a los datos anteriores en caso de error
+      if (context?.previousLeadsByStage) {
+        queryClient.setQueryData(
+          ["pipeline-leads", pipelineId, user?.companyId], 
+          context.previousLeadsByStage
+        );
+      }
+    },
+    onSuccess: (data) => {
+      // Invalidar queries para asegurar consistencia de datos
+      queryClient.invalidateQueries({ 
+        queryKey: ["pipeline-leads", pipelineId, user?.companyId],
+        refetchType: "none"
+      });
+      
+      // Invalidar también otras queries que podrían contener este lead
+      queryClient.invalidateQueries({ 
+        queryKey: ["leads"],
+        refetchType: "none"
+      });
+      
+      // Refetch en segundo plano después de un breve retraso
+      setTimeout(() => {
+        queryClient.invalidateQueries({ 
+          queryKey: ["pipeline-leads", pipelineId, user?.companyId] 
+        });
+        queryClient.invalidateQueries({ 
+          queryKey: ["leads"] 
+        });
+      }, 1000);
+      
+      // Mostrar una notificación según el resultado
+      if (data.asignado_a) {
+        toast.success(`Lead asignado a ${data.usuario_asignado?.nombre || 'un usuario'}`);
+      } else {
+        toast.info("Asignación del lead liberada");
+      }
+    },
+  });
+
   // Set up real-time subscription to leads changes
   useEffect(() => {
     if (!pipelineId || !user?.companyId) return;
@@ -340,6 +562,7 @@ export function usePipelineLeads(pipelineId: string | null) {
     error: leadsQuery.error,
     refetch: leadsQuery.refetch,
     updateLeadStage: updateLeadStage.mutate,
-    isUpdating: updateLeadStage.isPending,
+    updateLeadAssignment: updateLeadAssignment.mutate,
+    isUpdating: updateLeadStage.isPending || updateLeadAssignment.isPending,
   };
 }

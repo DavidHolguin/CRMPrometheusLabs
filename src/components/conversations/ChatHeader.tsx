@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Bot, BotOff, ChevronDown, ChevronRight, CircleDollarSign, Clock,
   FileEdit, FileSpreadsheet, Forward, Loader2, Mail, MessageCircle,
-  MessageSquare, MoreHorizontal, Phone, Star, Tag, User
+  MessageSquare, MoreHorizontal, Phone, Star, Tag, User, UserCheck, UserX
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +37,13 @@ interface ChatHeaderProps {
   stagesLoading: boolean;
   activeTab: string;
   setActiveTab: (tab: string) => void;
+  handleAssignToMe: () => void;
+  handleReleaseAssignment: () => void;
+  isAssigning: boolean;
+  isReleasing: boolean;
+  openTransferDialog: () => void;
+  currentUserId: string | undefined;
+  userProfiles?: any[];
 }
 
 const ChatHeader = ({
@@ -55,9 +62,17 @@ const ChatHeader = ({
   stages,
   stagesLoading,
   activeTab,
-  setActiveTab
+  setActiveTab,
+  handleAssignToMe,
+  handleReleaseAssignment,
+  isAssigning,
+  isReleasing,
+  openTransferDialog,
+  currentUserId,
+  userProfiles = []
 }: ChatHeaderProps) => {
   const getInitials = (name: string) => {
+    if (!name) return "?";
     return name
       .split(' ')
       .map(word => word[0])
@@ -65,6 +80,69 @@ const ChatHeader = ({
       .toUpperCase()
       .substring(0, 2);
   };
+
+  // Detectar si hay un nombre de agente incluso si no hay asignado_a
+  const hasAgentName = Boolean(
+    selectedLead?.agente_nombre || 
+    selectedLead?.usuario_asignado?.nombre || 
+    selectedLead?.profile_full_name
+  );
+
+  const isAssignedToCurrentUser = selectedLead?.asignado_a === currentUserId;
+  // Modificado: También consideramos que está asignado si hay un nombre de agente
+  const isAssignedToOtherUser = (selectedLead?.asignado_a && selectedLead.asignado_a !== currentUserId) || 
+                               (!selectedLead?.asignado_a && hasAgentName);
+  // Un lead está sin asignar solo si no tiene asignado_a Y tampoco tiene nombre de agente
+  const isUnassigned = !selectedLead?.asignado_a && !hasAgentName;
+
+  const getAssignedAgentName = () => {
+    // Si hay nombre de agente, lo usamos incluso si no hay asignado_a
+    if (selectedLead?.agente_nombre) {
+      return selectedLead.agente_nombre;
+    }
+    
+    if (!selectedLead?.asignado_a && !hasAgentName) return null;
+    
+    // Probar todos los posibles lugares donde podría estar el nombre del agente
+    if (selectedLead?.usuario_asignado?.nombre) {
+      return selectedLead.usuario_asignado.nombre;
+    }
+    
+    if (selectedLead?.profile_full_name) {
+      return selectedLead.profile_full_name;
+    }
+    
+    if (selectedLead?.profile?.full_name) {
+      return selectedLead.profile.full_name;
+    }
+    
+    // Si hay userProfiles disponibles, buscar el agente ahí
+    if (selectedLead?.asignado_a) {
+      const agentProfile = userProfiles.find(profile => profile.id === selectedLead.asignado_a);
+      if (agentProfile) {
+        return agentProfile.full_name || agentProfile.nombre;
+      }
+      
+      // Si tenemos el ID pero no el nombre, usar un texto genérico
+      return `Agente (ID: ${selectedLead.asignado_a.substring(0, 6)}...)`;
+    }
+    
+    return 'Agente asignado';
+  };
+
+  const assignedAgentName = getAssignedAgentName();
+
+  // Agregar un log para depuración
+  console.log("Información del agente asignado:", {
+    leadId: selectedLead?.id,
+    asignadoA: selectedLead?.asignado_a,
+    agenteName: assignedAgentName,
+    originalAgenteNombre: selectedLead?.agente_nombre,
+    usuarioAsignado: selectedLead?.usuario_asignado,
+    hasAgentName,
+    isAssignedToOtherUser,
+    isUnassigned
+  });
 
   return (
     <div className="p-4 border-b bg-[#020817] shadow-sm z-10">
@@ -78,11 +156,38 @@ const ChatHeader = ({
             </AvatarFallback>
           </Avatar>
           <div>
-            <h3 className="font-medium">
-              {selectedLead?.nombre 
-                ? `${selectedLead.nombre} ${selectedLead.apellido || ''}`.trim() || 'Sin nombre'
-                : 'Sin nombre'}
-            </h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-medium">
+                {selectedLead?.nombre 
+                  ? `${selectedLead.nombre} ${selectedLead.apellido || ''}`.trim() || 'Sin nombre'
+                  : 'Sin nombre'}
+              </h3>
+              {isAssignedToCurrentUser && (
+                <Badge variant="outline" className="text-xs bg-green-500/10 text-green-500 border-green-500/20">
+                  <UserCheck className="h-3 w-3 mr-1" />
+                  <span className="hidden sm:inline">Asignado a mí</span>
+                </Badge>
+              )}
+              {isAssignedToOtherUser && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge variant="outline" className="text-xs bg-orange-500/10 text-orange-500 border-orange-500/20">
+                      <User className="h-3 w-3 mr-1" />
+                      <span className="hidden sm:inline">Asignado</span>
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="text-xs">Asignado a: {assignedAgentName || 'Otro agente'}</p>
+                  </TooltipContent>
+                </Tooltip>
+              )}
+              {isUnassigned && (
+                <Badge variant="outline" className="text-xs bg-amber-500/10 text-amber-500 border-amber-500/20">
+                  <UserX className="h-3 w-3 mr-1" />
+                  <span className="hidden sm:inline">Sin asignar</span>
+                </Badge>
+              )}
+            </div>
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               {selectedLead?.email && (
                 <div className="flex items-center">
@@ -100,6 +205,12 @@ const ChatHeader = ({
                 <div className="flex items-center">
                   <Clock className="h-3 w-3 mr-1" />
                   <span>{formatDate(selectedConversation.ultimo_mensaje)}</span>
+                </div>
+              )}
+              {isAssignedToOtherUser && assignedAgentName && (
+                <div className="flex items-center">
+                  <User className="h-3 w-3 mr-1" />
+                  <span>{assignedAgentName}</span>
                 </div>
               )}
             </div>
@@ -169,6 +280,72 @@ const ChatHeader = ({
                 <div className="w-full">
                   <Popover>
                     <PopoverTrigger className="w-full flex items-center px-2 py-1.5 cursor-pointer">
+                      <User className="h-4 w-4 mr-2" />
+                      <span>Asignación de lead</span>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-56 p-2">
+                      <div className="space-y-2">
+                        <h4 className="font-medium text-sm">Asignar lead</h4>
+                        
+                        {isUnassigned && (
+                          <Button 
+                            variant="secondary"
+                            className="w-full justify-start text-sm h-8 mb-2"
+                            onClick={handleAssignToMe}
+                            disabled={isAssigning}
+                          >
+                            {isAssigning ? (
+                              <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                            ) : (
+                              <UserCheck className="h-3.5 w-3.5 mr-2" />
+                            )}
+                            Asignar a mí
+                          </Button>
+                        )}
+                        
+                        {isAssignedToCurrentUser && (
+                          <Button 
+                            variant="outline"
+                            className="w-full justify-start text-sm h-8 mb-2"
+                            onClick={handleReleaseAssignment}
+                            disabled={isReleasing}
+                          >
+                            {isReleasing ? (
+                              <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                            ) : (
+                              <UserX className="h-3.5 w-3.5 mr-2" />
+                            )}
+                            Liberar asignación
+                          </Button>
+                        )}
+                        
+                        {(isAssignedToCurrentUser) && (
+                          <Button 
+                            variant="outline"
+                            className="w-full justify-start text-sm h-8 mb-2"
+                            onClick={openTransferDialog}
+                          >
+                            <Forward className="h-3.5 w-3.5 mr-2" />
+                            Transferir lead
+                          </Button>
+                        )}
+                        
+                        {isAssignedToOtherUser && (
+                          <div className="text-xs px-2 py-1">
+                            <p className="text-muted-foreground">Este lead está asignado a:</p>
+                            <p className="font-medium text-sm mt-1">{assignedAgentName}</p>
+                          </div>
+                        )}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </DropdownMenuItem>
+              
+              <DropdownMenuItem asChild>
+                <div className="w-full">
+                  <Popover>
+                    <PopoverTrigger className="w-full flex items-center px-2 py-1.5 cursor-pointer">
                       <FileSpreadsheet className="h-4 w-4 mr-2" />
                       <span>Cambiar etapa</span>
                     </PopoverTrigger>
@@ -187,6 +364,7 @@ const ChatHeader = ({
                                 variant="ghost"
                                 className="w-full justify-start text-sm h-8"
                                 onClick={() => updateLeadStage(stage.id)}
+                                disabled={isAssignedToOtherUser}
                               >
                                 <div
                                   className="w-3 h-3 rounded-full mr-2"
@@ -220,6 +398,7 @@ const ChatHeader = ({
                               variant={score > 70 ? "default" : (score > 40 ? "secondary" : "outline")}
                               className="text-sm"
                               onClick={() => updateLeadScore(score)}
+                              disabled={isAssignedToOtherUser}
                             >
                               {score}
                             </Button>
@@ -233,7 +412,10 @@ const ChatHeader = ({
               
               <DropdownMenuSeparator />
               
-              <DropdownMenuItem className="cursor-pointer">
+              <DropdownMenuItem 
+                className="cursor-pointer"
+                disabled={isAssignedToOtherUser}
+              >
                 <CircleDollarSign className="h-4 w-4 mr-2" />
                 Añadir oportunidad
               </DropdownMenuItem>
@@ -266,7 +448,10 @@ const ChatHeader = ({
                   {leadConversations.length}
                 </Badge>
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={openTransferDialog}
+                disabled={isAssignedToOtherUser || !isAssignedToCurrentUser}
+              >
                 <Forward className="h-4 w-4 mr-2" />
                 Transferir conversación
               </DropdownMenuItem>
@@ -275,7 +460,6 @@ const ChatHeader = ({
         </div>
       </div>
       
-      {/* Pestañas para alternar entre mensajes y otros datos */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-2">
         <TabsList className="grid grid-cols-3 h-8">
           <TabsTrigger value="mensajes" className="text-xs">Mensajes</TabsTrigger>

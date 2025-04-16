@@ -384,7 +384,30 @@ const ConversationsPage = () => {
       }
       
       toast.success('Lead asignado correctamente');
-      refetchConversations();
+      
+      // Añadir un pequeño retraso antes de refrescar para dar tiempo a la BD
+      setTimeout(async () => {
+        // Forzar actualización de datos con refresco manual
+        await refetchConversations();
+        
+        // También forzar refresco directo de este lead específico para asegurar datos actualizados
+        if (selectedLeadId) {
+          const { data: updatedLeadData } = await supabase
+            .from('vista_lead_completa')
+            .select('*')
+            .eq('lead_id', selectedLeadId)
+            .single();
+          
+          // Si encontramos datos actualizados, recargar la página para forzar actualización de UI
+          if (updatedLeadData && updatedLeadData.asignado_a === user.id) {
+            console.log("Lead asignado correctamente, datos actualizados:", updatedLeadData);
+            // Opcionalmente forzar actualización si es necesario
+            if (conversationId) {
+              navigate(`/dashboard/conversations/${conversationId}?refresh=${new Date().getTime()}`);
+            }
+          }
+        }
+      }, 300);
       
     } catch (error) {
       console.error('Error assigning lead:', error);
@@ -491,6 +514,45 @@ const ConversationsPage = () => {
     }
   }, [selectedLeadId]);
 
+  // Suscripción en tiempo real para cambios en leads
+  useEffect(() => {
+    if (!user?.companyId) return;
+    
+    // Crear un canal para escuchar cambios en la tabla de leads
+    const channel = supabase
+      .channel('leads-assignment-changes')
+      .on('postgres_changes', 
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'leads',
+          filter: `asignado_a=is.not.null`
+        }, 
+        (payload) => {
+          // Recargar datos cuando un lead es asignado o reasignado
+          refetchConversations();
+        }
+      )
+      .on('postgres_changes', 
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'leads',
+          filter: `asignado_a=is.null`
+        }, 
+        (payload) => {
+          // Recargar datos cuando un lead es liberado de asignación
+          refetchConversations();
+        }
+      )
+      .subscribe();
+    
+    // Limpiar suscripción al desmontar el componente
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [refetchConversations, user?.companyId]);
+
   // Manejar el envío de mensajes
   const handleSendMessage = async (messageText: string) => {
     if (!messageText.trim() || !conversationId) return;
@@ -569,6 +631,13 @@ const ConversationsPage = () => {
               stagesLoading={stagesLoading}
               activeTab={activeTab}
               setActiveTab={setActiveTab}
+              // Nuevas props para manejar asignación de leads
+              handleAssignToMe={handleAssignToMe}
+              handleReleaseAssignment={handleReleaseAssignment}
+              isAssigning={isAssigning}
+              isReleasing={isReleasing}
+              openTransferDialog={() => setTransferDialogOpen(true)}
+              currentUserId={user?.id}
             />
 
             {/* Contenedor principal del contenido */}

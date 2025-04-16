@@ -20,6 +20,13 @@ export interface Lead {
   stage_name?: string;
   stage_color?: string;
   asignado_a?: string;
+  usuario_asignado?: {
+    id: string;
+    nombre: string;
+    email: string;
+    avatar_url?: string;
+    role?: string;
+  };
   empresa_id?: string;
   direccion?: string;
   ciudad?: string;
