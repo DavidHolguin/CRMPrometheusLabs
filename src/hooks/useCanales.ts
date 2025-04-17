@@ -218,28 +218,35 @@ export function useCanales() {
 
   // Upload de logo de canal
   const uploadCanalLogo = async (file: File, path?: string): Promise<string> => {
-    // Generar un nombre único para el archivo
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
-    const filePath = `canales/${path || fileName}`;
-    
-    const { data, error } = await supabase.storage
-      .from('public')
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: false,
-      });
+    try {
+      // Generar un nombre único para el archivo
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+      const filePath = path || fileName;
       
-    if (error) {
-      throw error;
+      // Intentar cargar el archivo en el bucket 'logos' existente
+      // Este es el bucket que ya se usa en otras partes de la aplicación
+      const { data, error } = await supabase.storage
+        .from('logos')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false,
+        });
+        
+      if (error) {
+        throw error;
+      }
+      
+      // Obtener la URL pública del archivo
+      const { data: { publicUrl } } = supabase.storage
+        .from('logos')
+        .getPublicUrl(filePath);
+        
+      return publicUrl;
+    } catch (error: any) {
+      console.error("Error al subir logo:", error);
+      throw new Error(`Error al subir logo: ${error.message}`);
     }
-    
-    // Obtener la URL pública del archivo
-    const { data: { publicUrl } } = supabase.storage
-      .from('public')
-      .getPublicUrl(filePath);
-      
-    return publicUrl;
   };
 
   // Hooks de React Query

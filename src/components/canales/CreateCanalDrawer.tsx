@@ -25,9 +25,12 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Upload, X, Loader2 } from "lucide-react";
+import { Upload, X, Loader2, Plus, Trash2 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { toast } from "sonner";
 
 const canalTipos = [
   { value: "whatsapp", label: "WhatsApp" },
@@ -39,6 +42,35 @@ const canalTipos = [
   { value: "email", label: "Email" },
   { value: "custom", label: "Personalizado" },
 ];
+
+const parametrosPredefinidos = {
+  whatsapp: [
+    { key: "phone_number_id", label: "ID de número de teléfono", type: "text", required: true },
+    { key: "access_token", label: "Token de acceso", type: "password", required: true },
+    { key: "business_account_id", label: "ID de cuenta de negocio", type: "text", required: false }
+  ],
+  messenger: [
+    { key: "page_id", label: "ID de página", type: "text", required: true },
+    { key: "access_token", label: "Token de acceso", type: "password", required: true }
+  ],
+  telegram: [
+    { key: "bot_token", label: "Token del bot", type: "password", required: true }
+  ],
+  web: [
+    { key: "embed_code", label: "Código de inserción", type: "textarea", required: false },
+    { key: "allowed_origins", label: "Orígenes permitidos", type: "text", required: false }
+  ],
+  email: [
+    { key: "smtp_server", label: "Servidor SMTP", type: "text", required: true },
+    { key: "smtp_port", label: "Puerto SMTP", type: "text", required: true },
+    { key: "smtp_user", label: "Usuario SMTP", type: "text", required: true },
+    { key: "smtp_password", label: "Contraseña SMTP", type: "password", required: true }
+  ],
+  sms: [
+    { key: "api_key", label: "Clave API", type: "password", required: true },
+    { key: "sender_id", label: "ID de remitente", type: "text", required: false }
+  ]
+};
 
 const formSchema = z.object({
   nombre: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
@@ -69,6 +101,13 @@ export default function CreateCanalDrawer({
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [svgCode, setSvgCode] = useState<string>("");
+  const [parametros, setParametros] = useState<Array<{key: string, label: string, type: string, required: boolean}>>([]);
+  const [nuevoParametro, setNuevoParametro] = useState({
+    key: '',
+    label: '',
+    type: 'text',
+    required: false
+  });
 
   const { uploadCanalLogo } = useCanales();
 
@@ -85,7 +124,6 @@ export default function CreateCanalDrawer({
     },
   });
 
-  // Actualizar formulario cuando se está editando un canal
   useEffect(() => {
     if (editingCanal) {
       form.reset({
@@ -101,17 +139,35 @@ export default function CreateCanalDrawer({
       if (editingCanal.logo_url) {
         setLogoPreview(editingCanal.logo_url);
       }
+      
+      if (editingCanal.configuracion_requerida) {
+        const params = Object.entries(editingCanal.configuracion_requerida).map(([key, config]) => ({
+          key,
+          label: config.label || key,
+          type: config.type || 'text',
+          required: config.required || false
+        }));
+        setParametros(params);
+      } else {
+        setParametros([]);
+      }
     }
   }, [editingCanal, form]);
 
-  // Manejar el cambio de archivo de logo
+  useEffect(() => {
+    const tipo = form.watch("tipo");
+    if (tipo && tipo !== 'custom' && !editingCanal) {
+      const predefinidos = parametrosPredefinidos[tipo as keyof typeof parametrosPredefinidos] || [];
+      setParametros(predefinidos);
+    }
+  }, [form.watch("tipo"), editingCanal]);
+
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     
     setLogoFile(file);
     
-    // Crear preview
     const reader = new FileReader();
     reader.onload = () => {
       setLogoPreview(reader.result as string);
@@ -119,12 +175,10 @@ export default function CreateCanalDrawer({
     reader.readAsDataURL(file);
   };
 
-  // Manejar el cambio de código SVG
   const handleSvgCodeChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const code = e.target.value;
     setSvgCode(code);
     
-    // Crear preview desde código SVG
     if (code.trim().startsWith("<svg")) {
       const blob = new Blob([code], { type: "image/svg+xml" });
       setLogoFile(new File([blob], "logo.svg", { type: "image/svg+xml" }));
@@ -132,39 +186,68 @@ export default function CreateCanalDrawer({
     }
   };
   
-  // Eliminar logo
   const handleRemoveLogo = () => {
     setLogoFile(null);
     setLogoPreview(null);
     setSvgCode("");
   };
 
-  // Manejar guardar
+  const handleAddParametro = () => {
+    if (!nuevoParametro.key.trim() || !nuevoParametro.label.trim()) {
+      toast.error("La clave y la etiqueta son requeridas");
+      return;
+    }
+    
+    if (parametros.some(p => p.key === nuevoParametro.key)) {
+      toast.error("Ya existe un parámetro con esa clave");
+      return;
+    }
+    
+    setParametros([...parametros, nuevoParametro]);
+    
+    setNuevoParametro({
+      key: '',
+      label: '',
+      type: 'text',
+      required: false
+    });
+  };
+  
+  const handleRemoveParametro = (key: string) => {
+    setParametros(parametros.filter(p => p.key !== key));
+  };
+
   const handleSubmit = async (data: z.infer<typeof formSchema>) => {
     try {
       setIsUploading(true);
       
-      // Si hay un archivo de logo para subir
       let logoUrl = null;
       if (logoFile) {
         logoUrl = await uploadCanalLogo(logoFile);
       }
       
-      // Preparar datos para guardar
+      const configuracionRequerida: Record<string, any> = {};
+      parametros.forEach(param => {
+        configuracionRequerida[param.key] = {
+          label: param.label,
+          type: param.type,
+          required: param.required
+        };
+      });
+      
       const saveData = {
         ...data,
         logo_url: logoUrl || (editingCanal && editingCanal.logo_url) || null,
         tipo: data.tipo === "custom" && data.tipo_personalizado ? data.tipo_personalizado : data.tipo,
+        configuracion_requerida: configuracionRequerida
       };
       
-      // Si estamos editando o creando
       if (editingCanal && onUpdate) {
         onUpdate(saveData);
       } else {
         onSave(saveData);
       }
       
-      // Limpiar formulario y cerrar
       resetForm();
       onOpenChange(false);
       
@@ -175,7 +258,6 @@ export default function CreateCanalDrawer({
     }
   };
 
-  // Resetear formulario
   const resetForm = () => {
     form.reset({
       nombre: "",
@@ -189,6 +271,7 @@ export default function CreateCanalDrawer({
     setLogoFile(null);
     setLogoPreview(null);
     setSvgCode("");
+    setParametros([]);
   };
 
   return (
@@ -207,12 +290,10 @@ export default function CreateCanalDrawer({
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
               <div className="grid gap-6">
-                {/* Logo y vista previa */}
                 <div className="space-y-2">
                   <Label>Logo del canal</Label>
                   <div className="flex flex-col gap-4">
                     <div className="flex gap-4 items-center">
-                      {/* Vista previa */}
                       <div 
                         className="h-16 w-16 bg-muted rounded-md flex items-center justify-center overflow-hidden border"
                         style={{ backgroundColor: form.watch("color") ? `${form.watch("color")}20` : undefined }}
@@ -223,7 +304,6 @@ export default function CreateCanalDrawer({
                             alt="Logo preview" 
                             className="h-12 w-12 object-contain"
                             onError={(e) => {
-                              // En caso de error al cargar el SVG
                               e.currentTarget.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect><circle cx="9" cy="9" r="2"></circle><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path></svg>';
                             }}
                           />
@@ -238,7 +318,6 @@ export default function CreateCanalDrawer({
                         )}
                       </div>
                       
-                      {/* Botones de acción */}
                       <div className="flex flex-col gap-2">
                         <div className="flex gap-2">
                           <Button
@@ -278,7 +357,6 @@ export default function CreateCanalDrawer({
                       </div>
                     </div>
                     
-                    {/* Área para código SVG */}
                     <div className="space-y-2">
                       <Label htmlFor="svg-code">Código SVG (opcional)</Label>
                       <Textarea
@@ -298,7 +376,6 @@ export default function CreateCanalDrawer({
                 
                 <Separator />
                 
-                {/* Información básica */}
                 <FormField
                   control={form.control}
                   name="nombre"
@@ -406,7 +483,6 @@ export default function CreateCanalDrawer({
                           maxLength={7}
                         />
                         
-                        {/* Vista previa del color */}
                         <div 
                           className="flex-1 h-10 rounded-md border"
                           style={{ 
@@ -421,6 +497,145 @@ export default function CreateCanalDrawer({
                     </FormItem>
                   )}
                 />
+
+                <Separator />
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-medium">Parámetros requeridos</h3>
+                    <Badge variant="outline" className="font-mono bg-muted/50">
+                      {parametros.length} parámetros
+                    </Badge>
+                  </div>
+                  
+                  <p className="text-sm text-muted-foreground">
+                    Define los campos que se pedirán al conectar este canal a un chatbot.
+                    Si agregas un campo como "requerido", será obligatorio completarlo.
+                  </p>
+
+                  {parametros.length > 0 ? (
+                    <div className="space-y-3 mt-2">
+                      {parametros.map(param => (
+                        <div 
+                          key={param.key} 
+                          className="flex items-center justify-between p-3 border rounded-md bg-muted/30"
+                        >
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium">{param.label}</p>
+                              {param.required && (
+                                <Badge className="text-xs">Requerido</Badge>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground font-mono mt-1">
+                              {param.key} - {param.type}
+                            </p>
+                          </div>
+                          
+                          <Button 
+                            type="button"
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => handleRemoveParametro(param.key)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center p-8 border rounded-md bg-muted/20">
+                      <p className="text-muted-foreground">
+                        No se han configurado parámetros para este canal.
+                      </p>
+                    </div>
+                  )}
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Agregar nuevo parámetro</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="param-key">Clave</Label>
+                          <Input
+                            id="param-key"
+                            placeholder="api_key"
+                            value={nuevoParametro.key}
+                            onChange={e => setNuevoParametro({...nuevoParametro, key: e.target.value})}
+                            className="font-mono"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Identificador único del parámetro
+                          </p>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="param-label">Etiqueta</Label>
+                          <Input
+                            id="param-label"
+                            placeholder="API Key"
+                            value={nuevoParametro.label}
+                            onChange={e => setNuevoParametro({...nuevoParametro, label: e.target.value})}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Nombre visible del parámetro
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="param-type">Tipo</Label>
+                          <Select
+                            value={nuevoParametro.type}
+                            onValueChange={value => setNuevoParametro({...nuevoParametro, type: value})}
+                          >
+                            <SelectTrigger id="param-type">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="text">Texto</SelectItem>
+                              <SelectItem value="password">Contraseña</SelectItem>
+                              <SelectItem value="textarea">Área de texto</SelectItem>
+                              <SelectItem value="select">Selector</SelectItem>
+                              <SelectItem value="checkbox">Casilla</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">
+                            Tipo de campo para este parámetro
+                          </p>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <Label>¿Es requerido?</Label>
+                            <Switch
+                              checked={nuevoParametro.required}
+                              onCheckedChange={checked => 
+                                setNuevoParametro({...nuevoParametro, required: checked})
+                              }
+                            />
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Si es requerido, el usuario deberá completarlo
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                    <CardFooter>
+                      <Button
+                        type="button"
+                        onClick={handleAddParametro}
+                        className="gap-2 w-full"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Agregar parámetro
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                </div>
 
                 <FormField
                   control={form.control}
