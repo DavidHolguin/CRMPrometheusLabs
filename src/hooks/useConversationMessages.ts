@@ -5,7 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 interface Mensaje {
   id: string;
   conversacion_id: string;
-  origen: string; // Cambiado para coincidir con el tipo de la base de datos
+  origen: string; // En la base de datos puede ser 'lead', 'chatbot', 'agente', etc.
   contenido: string;
   created_at: string;
   tipo_contenido?: string;
@@ -15,6 +15,7 @@ interface Mensaje {
   intencion_id?: string;
   interaction_type_id?: string;
   remitente_id?: string;
+  remitente_nombre?: string;
 }
 
 interface QAPair {
@@ -23,11 +24,13 @@ interface QAPair {
     id: string;
     content: string;
     timestamp: string;
+    sender?: string;
   };
   answer: {
     id: string;
     content: string;
     timestamp: string;
+    sender?: string;
   };
 }
 
@@ -36,6 +39,7 @@ export function useConversationMessages(conversationId: string | null) {
   const [isLoading, setIsLoading] = useState(false);
   const [messages, setMessages] = useState<Mensaje[]>([]);
   const [qaPairs, setQaPairs] = useState<QAPair[]>([]);
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
     if (!conversationId) return;
@@ -43,62 +47,120 @@ export function useConversationMessages(conversationId: string | null) {
     const fetchMessages = async () => {
       try {
         setIsLoading(true);
-        const { data, error } = await supabase
-          .from('mensajes')
+        setError(null);
+        
+        console.log(`Fetching messages for conversation: ${conversationId}`);
+        
+        // Primero intentamos obtener de vista_lead_conversaciones_mensajes para tener más contexto
+        let { data: vistaMensajes, error: vistaError } = await supabase
+          .from('vista_lead_conversaciones_mensajes')
           .select('*')
           .eq('conversacion_id', conversationId)
-          .order('created_at', { ascending: true });
-
-        if (error) {
-          console.error('Error fetching messages:', error);
-          throw error;
+          .order('mensaje_fecha', { ascending: true });
+          
+        if (vistaError) {
+          console.error('Error fetching from vista_lead_conversaciones_mensajes:', vistaError);
+          // Si falla, intentamos con la tabla mensajes directamente
+          const { data, error } = await supabase
+            .from('mensajes')
+            .select('*')
+            .eq('conversacion_id', conversationId)
+            .order('created_at', { ascending: true });
+            
+          if (error) throw error;
+          vistaMensajes = data;
         }
-
-        if (!data) {
+        
+        if (!vistaMensajes || vistaMensajes.length === 0) {
           console.log('No messages found for conversation:', conversationId);
           setMessages([]);
           setQaPairs([]);
           return;
         }
 
-        console.log('Fetched messages:', data.length);
-        setMessages(data);
+        console.log(`Found ${vistaMensajes.length} messages for conversation ${conversationId}`);
 
-        // Organizar mensajes en pares Q&A
+        // Convertir los resultados de vista_lead_conversaciones_mensajes al formato Mensaje
+        const mensajesFormateados: Mensaje[] = vistaMensajes.map(item => {
+          // Determinar si estamos usando datos de la vista o de la tabla mensajes
+          const esVista = !!item.mensaje_id;
+          
+          return {
+            id: esVista ? item.mensaje_id : item.id,
+            conversacion_id: conversationId,
+            origen: esVista ? item.mensaje_origen : item.origen,
+            contenido: esVista ? item.mensaje_contenido : item.contenido,
+            created_at: esVista ? item.mensaje_fecha : item.created_at,
+            tipo_contenido: esVista ? item.mensaje_tipo : item.tipo_contenido,
+            metadata: esVista ? item.mensaje_metadata : item.metadata,
+            score_impacto: esVista ? item.mensaje_score_impacto : item.score_impacto,
+            leido: esVista ? item.mensaje_leido : item.leido,
+            intencion_id: item.intencion_id,
+            interaction_type_id: esVista ? item.tipo_interaccion : item.interaction_type_id,
+            remitente_id: esVista ? item.mensaje_remitente_id : item.remitente_id,
+            remitente_nombre: esVista ? item.remitente_nombre : undefined
+          };
+        });
+        
+        // Guardar los mensajes formateados
+        setMessages(mensajesFormateados);
+
+        // Organizar mensajes en pares pregunta-respuesta (Q&A)
         const pairs: QAPair[] = [];
-        for (let i = 0; i < data.length - 1; i++) {
-          // Verificar si el mensaje actual es una pregunta del usuario y el siguiente es una respuesta del chatbot
-          if (data[i].origen === 'user' && data[i + 1].origen === 'chatbot') {
+        
+        // Log para depuración
+        console.log("Orígenes de mensajes encontrados:", 
+          [...new Set(mensajesFormateados.map(m => m.origen))]);
+        
+        // En la base de datos, los mensajes del usuario pueden estar etiquetados como 'lead' o 'user'
+        // y las respuestas como 'chatbot'
+        for (let i = 0; i < mensajesFormateados.length - 1; i++) {
+          const currentMsg = mensajesFormateados[i];
+          const nextMsg = mensajesFormateados[i + 1];
+          
+          // Consideramos como pregunta los mensajes que vienen de usuario/lead
+          const esOrigen_Lead = currentMsg.origen === 'lead' || currentMsg.origen === 'user';
+          // Consideramos como respuesta los mensajes que vienen de chatbot
+          const esSiguienteOrigen_Chatbot = nextMsg.origen === 'chatbot';
+          
+          if (esOrigen_Lead && esSiguienteOrigen_Chatbot) {
             pairs.push({
-              id: `${data[i].id}-${data[i + 1].id}`,
+              id: `${currentMsg.id}-${nextMsg.id}`,
               question: {
-                id: data[i].id,
-                content: data[i].contenido,
-                timestamp: data[i].created_at,
+                id: currentMsg.id,
+                content: currentMsg.contenido,
+                timestamp: currentMsg.created_at,
+                sender: currentMsg.remitente_nombre
               },
               answer: {
-                id: data[i + 1].id,
-                content: data[i + 1].contenido,
-                timestamp: data[i + 1].created_at,
+                id: nextMsg.id,
+                content: nextMsg.contenido,
+                timestamp: nextMsg.created_at,
+                sender: 'Chatbot'
               },
             });
+            
+            // Saltamos la respuesta para que no sea considerada como pregunta en la siguiente iteración
+            i++;
           }
         }
-        console.log('Created QA pairs:', pairs.length);
+        
+        console.log(`Created ${pairs.length} QA pairs from ${mensajesFormateados.length} messages`);
         setQaPairs(pairs);
-      } catch (error) {
-        console.error('Error al cargar mensajes:', error);
+        
+      } catch (err) {
+        console.error('Error al cargar mensajes:', err);
+        setError(err instanceof Error ? err : new Error('Error desconocido al cargar mensajes'));
       } finally {
         setIsLoading(false);
       }
     };
 
-    console.log('Setting up conversation messages for:', conversationId);
     fetchMessages();
 
-    // Suscribirse a nuevos mensajes
+    // Suscribirse a nuevos mensajes en tiempo real
     const channelName = `mensajes_${conversationId}_${Date.now()}`;
-    console.log('Creating realtime channel:', channelName);
+    console.log('Setting up realtime channel:', channelName);
     
     const channel = supabase
       .channel(channelName)
@@ -119,23 +181,24 @@ export function useConversationMessages(conversationId: string | null) {
           }
           
           const updatedMessages = [...current, newMessage];
-          console.log('Updated messages count:', updatedMessages.length);
           
           // Actualizar pares Q&A si es necesario
           if (newMessage.origen === 'chatbot') {
             const lastMessage = current[current.length - 1];
-            if (lastMessage?.origen === 'user') {
+            if (lastMessage?.origen === 'lead' || lastMessage?.origen === 'user') {
               setQaPairs((currentPairs) => [...currentPairs, {
                 id: `${lastMessage.id}-${newMessage.id}`,
                 question: {
                   id: lastMessage.id,
                   content: lastMessage.contenido,
                   timestamp: lastMessage.created_at,
+                  sender: lastMessage.remitente_nombre
                 },
                 answer: {
                   id: newMessage.id,
                   content: newMessage.contenido,
                   timestamp: newMessage.created_at,
+                  sender: 'Chatbot'
                 },
               }]);
             }
@@ -158,5 +221,6 @@ export function useConversationMessages(conversationId: string | null) {
     messages,
     qaPairs,
     isLoading,
+    error
   };
 }

@@ -170,13 +170,11 @@ export function useConversations(chatbotId?: string) {
           .from('vista_lead_conversaciones_mensajes')
           .select('*');
         
-        // Agrupamos por conversación para evitar duplicados
-        const conversationIds = new Set();
-        const groupedConversations = [];
-        
-        // Solo filtrar por chatbotId si se proporciona uno
-        if (chatbotId) {
-          queryBuilder = queryBuilder.eq('chatbot_id', chatbotId);
+        // Si estamos filtrando por chatbotId y es un UUID,
+        // también intentamos buscar en la columna mensaje_remitente_id
+        if (chatbotId && chatbotId.includes('-')) {
+          console.log(`Filtrando mensajes por chatbot con ID: ${chatbotId}`);
+          // No aplicamos el filtro aquí porque la columna chatbot_id no existe en la vista
         }
         
         // Ordenamos por última actualización para tener las más recientes primero
@@ -189,7 +187,6 @@ export function useConversations(chatbotId?: string) {
         
         console.log(`Obtenidas ${data?.length || 0} entradas de vista_lead_conversaciones_mensajes`);
         
-        // Transformar los datos agrupando por conversación
         const conversationsMap = new Map();
         const unreadCountsMap = new Map();
         const messageCountsMap = new Map();
@@ -214,7 +211,6 @@ export function useConversations(chatbotId?: string) {
         }
         
         // Consulta adicional para obtener el conteo total de mensajes por conversación
-        // Reemplazamos el método .group() que no está disponible con un enfoque manual
         const { data: allMessagesData, error: allMessagesError } = await supabase
           .from('mensajes')
           .select('conversacion_id, id');
@@ -222,14 +218,12 @@ export function useConversations(chatbotId?: string) {
         if (allMessagesError) {
           console.error('Error al obtener todos los mensajes:', allMessagesError);
         } else {
-          // Agrupamos y contamos manualmente
           const countsMap = new Map();
           allMessagesData?.forEach(msg => {
             const convId = msg.conversacion_id;
             countsMap.set(convId, (countsMap.get(convId) || 0) + 1);
           });
           
-          // Transferir los conteos al mapa principal
           countsMap.forEach((count, convId) => {
             messageCountsMap.set(convId, count);
           });
@@ -237,51 +231,19 @@ export function useConversations(chatbotId?: string) {
           console.log(`Calculado conteo de mensajes para ${countsMap.size} conversaciones`);
         }
         
-        // Primero contamos mensajes no leídos por conversación desde los datos principales
-        data?.forEach(item => {
-          if (!item.mensaje_leido && item.mensaje_origen === 'lead') {
-            const currentCount = unreadCountsMap.get(item.conversacion_id) || 0;
-            unreadCountsMap.set(item.conversacion_id, currentCount + 1);
-          }
-        });
-
-        // También buscamos información del agente en la vista de conversaciones
-        // por si allí viene más completa
-        if (data && data.length > 0) {
-          const itemConAsignacion = data.find(item => item.lead_asignado_a);
-          if (itemConAsignacion) {
-            console.log("Ejemplo de dato de conversación con asignación:", {
-              conversacion_id: itemConAsignacion.conversacion_id,
-              lead_id: itemConAsignacion.lead_id,
-              lead_asignado_a: itemConAsignacion.lead_asignado_a,
-              agente_nombre: itemConAsignacion.agente_nombre,
-              agente_email: itemConAsignacion.agente_email,
-              agente_avatar: itemConAsignacion.agente_avatar,
-              nombres_campos: Object.keys(itemConAsignacion).filter(key => 
-                key.includes('agent') || key.includes('asigna') || key.includes('profile')
-              )
-            });
-          }
-        }
-        
-        // Luego procesamos los datos de conversaciones
         data?.forEach(item => {
           if (!conversationsMap.has(item.conversacion_id)) {
-            // Obtenemos el lead completo del mapa
             const leadCompleto = leadsMap.get(item.lead_id);
             
-            // Buscar nombre de agente en varios campos posibles de la vista de conversaciones
             const nombreAgenteMensajes = item.agente_nombre || 
                                        item.asignado_nombre || 
                                        item.full_name_agente || 
                                        'Agente'; 
             
-            // Si no existe en el mapa de leads, usamos la información básica de la vista de mensajes
             const leadInfo = leadCompleto || {
               id: item.lead_id,
               nombre: item.lead_nombre || 'Usuario',
               apellido: item.lead_apellido || '',
-              // AÑADIDO: Información de asignación desde vista de mensajes como fallback
               asignado_a: item.lead_asignado_a || null,
               agente_nombre: nombreAgenteMensajes,
               agente_email: item.agente_email,
@@ -292,16 +254,70 @@ export function useConversations(chatbotId?: string) {
                 email: item.agente_email,
                 avatar_url: item.agente_avatar
               } : null,
-              // Si no tenemos etiquetas, usar array vacío
               tags: []
             };
             
-            // Debuggear información sobre este lead específico
             if (item.lead_asignado_a) {
               console.log(`Lead ${item.lead_id} asignado a: ${leadInfo.agente_nombre || 'No se encontró el nombre'}`);
             }
             
-            // Obtener conteo de mensajes no leídos y total de mensajes
+            const chatbotIdentifiers = [];
+            
+            if (chatbotId && item.conversacion_id) {
+              console.log(`Analizando estructura para conversación ${item.conversacion_id.substring(0, 6)}...`, {
+                tiene_chatbot_nombre: !!item.chatbot_nombre,
+                tiene_chatbot_info: !!item.chatbot_info,
+                chatbot_info_estructura: item.chatbot_info ? Object.keys(item.chatbot_info) : 'No disponible',
+                conversacion_metadata: item.conversacion_metadata ? 
+                  (item.conversacion_metadata.chatbot_id ? 'Tiene chatbot_id' : 'Sin chatbot_id') : 'No disponible',
+                mensaje_remitente_id: item.mensaje_remitente_id || 'No disponible'
+              });
+            }
+            
+            if (item.mensaje_origen === 'chatbot' && item.mensaje_remitente_id) {
+              chatbotIdentifiers.push(item.mensaje_remitente_id);
+            }
+            
+            if (item.chatbot_info && typeof item.chatbot_info === 'object') {
+              if (item.chatbot_info.id) {
+                chatbotIdentifiers.push(item.chatbot_info.id);
+              } 
+              if (item.chatbot_info.chatbot_id) {
+                chatbotIdentifiers.push(item.chatbot_info.chatbot_id);
+              }
+            }
+            
+            if (item.conversacion_metadata && item.conversacion_metadata.chatbot_id) {
+              chatbotIdentifiers.push(item.conversacion_metadata.chatbot_id);
+            }
+            
+            if (item.chatbot_nombre) {
+              chatbotIdentifiers.push(`nombre:${item.chatbot_nombre}`);
+            }
+            
+            const chatbotIdentificador = chatbotIdentifiers.length > 0 ? 
+              chatbotIdentifiers[0] : 
+              (item.mensaje_origen === 'chatbot' ? item.mensaje_remitente_id : null);
+            
+            if (chatbotId && chatbotIdentifiers.length === 0) {
+              console.log(`Advertencia: Conversación ${item.conversacion_id.substring(0, 6)} sin identificador de chatbot`);
+            }
+            
+            if (chatbotId) {
+              const tieneCoincidencia = chatbotIdentifiers.some(identifier => identifier === chatbotId);
+              
+              const esRemitenteCoincidente = 
+                chatbotId.includes('-') && 
+                item.mensaje_origen === 'chatbot' && 
+                item.mensaje_remitente_id === chatbotId;
+              
+              if (!tieneCoincidencia && !esRemitenteCoincidente) {
+                console.log(`Filtrando: chatbotId=${chatbotId}, identificadores=${chatbotIdentifiers.join(', ')}, ¿coincide alguno?`, tieneCoincidencia);
+                console.log(`Verificación por remitente: mensaje_remitente_id=${item.mensaje_remitente_id || 'no disponible'}, ¿coincide?`, esRemitenteCoincidente);
+                return;
+              }
+            }
+            
             const unreadCount = unreadCountsMap.get(item.conversacion_id) || 0;
             const messageCount = messageCountsMap.get(item.conversacion_id) || 
                                 item.total_mensajes_conversacion || 0;
@@ -313,7 +329,7 @@ export function useConversations(chatbotId?: string) {
               created_at: item.conversacion_fecha_inicio,
               canal_id: item.canal_id || '',
               estado: item.conversacion_estado,
-              chatbot_id: item.chatbot_id || '',
+              chatbot_id: chatbotIdentificador || '',
               metadata: item.conversacion_metadata,
               canal_identificador: item.canal_identificador,
               chatbot_activo: item.chatbot_activo || false,
@@ -337,7 +353,67 @@ export function useConversations(chatbotId?: string) {
         const result = Array.from(conversationsMap.values());
         console.log(`Procesadas ${result.length} conversaciones únicas`);
         
-        return result;
+        let filteredResult = result;
+        if (chatbotId) {
+          filteredResult = result.filter(conv => {
+            const matchesById = conv.chatbot_id && (
+              conv.chatbot_id === chatbotId || 
+              conv.chatbot_id.includes(chatbotId) ||
+              chatbotId.includes(conv.chatbot_id)
+            );
+            
+            const matchesByName = chatbotId.startsWith('nombre:') && 
+              conv.chatbot?.nombre === chatbotId.replace('nombre:', '');
+              
+            const matchesByNameReverse = chatbotId.includes('-') && 
+              conv.chatbot?.nombre && 
+              conv.chatbot_id && 
+              conv.chatbot_id.startsWith('nombre:');
+              
+            const matchesByLeadInfo = conv.lead?.chatbot_info && (
+              conv.lead.chatbot_info.id === chatbotId || 
+              conv.lead.chatbot_info.chatbot_id === chatbotId
+            );
+              
+            const matchesByMetadata = conv.metadata && 
+              conv.metadata.chatbot_id === chatbotId;
+              
+            return matchesById || matchesByName || matchesByNameReverse || matchesByLeadInfo || matchesByMetadata;
+          });
+          
+          console.log(`Después de filtrado adicional por chatbot: ${filteredResult.length} conversaciones`);
+        }
+        
+        if (filteredResult.length === 0 && chatbotId && chatbotId.includes('-')) {
+          console.log(`No se encontraron conversaciones con filtrado normal. Intentando consulta específica por mensaje_remitente_id=${chatbotId}`);
+          
+          try {
+            const { data: mensajesChatbotData, error: mensajesError } = await supabase
+              .from('vista_lead_conversaciones_mensajes')
+              .select('conversacion_id, lead_id')
+              .eq('mensaje_remitente_id', chatbotId)
+              .eq('mensaje_origen', 'chatbot');
+              
+            if (!mensajesError && mensajesChatbotData?.length > 0) {
+              console.log(`Encontrados ${mensajesChatbotData.length} mensajes del chatbot. Buscando conversaciones correspondientes.`);
+              
+              const conversacionesIds = [...new Set(mensajesChatbotData.map(item => item.conversacion_id))];
+              
+              filteredResult = result.filter(conv => conversacionesIds.includes(conv.id));
+              console.log(`Después de recuperar por mensaje_remitente_id: ${filteredResult.length} conversaciones`);
+            }
+          } catch (innerError) {
+            console.error('Error en consulta específica por remitente:', innerError);
+          }
+        }
+        
+        if (filteredResult.length === 0 && result.length > 0 && chatbotId) {
+          console.log(`ADVERTENCIA: No se encontraron conversaciones para el chatbot ${chatbotId}. ` + 
+            "Devolveremos todas las conversaciones no filtradas como último recurso.");
+          return result;
+        }
+        
+        return filteredResult;
       } catch (error) {
         console.error('Error procesando datos de conversaciones:', error);
         throw error;
