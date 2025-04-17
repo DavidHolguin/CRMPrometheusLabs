@@ -25,6 +25,7 @@ import PerfilEmpresa from "./pages/PerfilEmpresa";
 
 // Admin pages
 import AdminAgentes from "./pages/admin/AdminAgentes";
+import AdminLLM from "./pages/admin/AdminLLM";
 
 // Layout
 import DashboardLayout from "./components/layouts/DashboardLayout";
@@ -78,7 +79,7 @@ const App = () => {
 
           {/* Admin routes */}
           <Route path="admin/agentes" element={<AdminAgentes />} />
-          <Route path="admin/llm" element={<NotFound />} />
+          <Route path="admin/llm" element={<AdminLLM />} />
           <Route path="admin/prompts" element={<NotFound />} />
           <Route path="admin/evaluaciones" element={<NotFound />} />
         </Route>
