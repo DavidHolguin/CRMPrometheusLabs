@@ -508,7 +508,7 @@ export function EditChatbotDialog({ chatbot, open, onOpenChange, onSuccess }: Ed
                         <FormControl>
                           <Textarea 
                             placeholder="Plantilla personalizada para generar los prompts del chatbot" 
-                            className="min-h-[120px] text-base font-mono text-sm"
+                            className="min-h-[120px] font-mono text-sm"
                             {...field} 
                             value={field.value || ""}
                           />
