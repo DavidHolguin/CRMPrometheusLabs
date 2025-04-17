@@ -8,10 +8,12 @@ import EditCanalDialog from "@/components/canales/EditCanalDialog";
 import DeleteCanalDialog from "@/components/canales/DeleteCanalDialog";
 // Importación directa con ruta absoluta para evitar problemas de caché
 import CreateCanalDrawer from "../components/canales/CreateCanalDrawer";
+import CanalPreviewDrawer from "../components/canales/CanalPreviewDrawer";
 import { useChatbots } from "@/hooks/useChatbots";
+import { CanalIcon } from "@/components/canales/CanalIcon"; // Ensure this path is correct
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { LayoutGrid, List, Search, Filter, Info, Loader2, Plus, MessageSquare } from "lucide-react";
+import { LayoutGrid, List, Search, Filter, Info, Loader2, Plus, MessageSquare, Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -27,6 +29,7 @@ export default function Canales() {
   const [isCreatingCanal, setIsCreatingCanal] = useState(false);
   const [currentTab, setCurrentTab] = useState<"activos" | "disponibles">("activos");
   const [selectedCanalToEdit, setSelectedCanalToEdit] = useState<Canal | null>(null);
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
 
   const {
     useCanalesQuery,
@@ -362,68 +365,77 @@ export default function Canales() {
           {!isLoadingCanales && filteredCanales.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {filteredCanales.map(canal => (
-                <Card key={canal.id} className="overflow-hidden">
-                  <div className={`h-2 w-full`} style={{ backgroundColor: canal.color || '#e2e8f0' }} />
-                  <CardHeader className="pb-2">
+                <Card key={canal.id} className="overflow-hidden group hover:shadow-md transition-all border-muted">
+                  <div 
+                    className="h-3 w-full transition-colors" 
+                    style={{ backgroundColor: canal.color || '#e2e8f0' }} 
+                  />
+                  <CardHeader className="p-4 pb-2">
                     <div className="flex justify-between items-center">
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-3">
                         {canal.logo_url ? (
                           <div 
-                            className="h-8 w-8 bg-muted rounded-full flex items-center justify-center overflow-hidden"
-                            style={{ backgroundColor: canal.color ? `${canal.color}20` : undefined }}
+                            className="h-12 w-12 rounded-lg flex items-center justify-center overflow-hidden shadow-sm"
+                            style={{ backgroundColor: canal.color ? `${canal.color}15` : undefined }}
                           >
-                            <img src={canal.logo_url} alt={canal.nombre} className="h-6 w-6 object-contain" />
+                            <img 
+                              src={canal.logo_url} 
+                              alt={canal.nombre} 
+                              className="h-8 w-8 object-contain"
+                            />
                           </div>
                         ) : (
                           <div 
-                            className="h-8 w-8 bg-muted rounded-full flex items-center justify-center"
-                            style={{ backgroundColor: canal.color ? `${canal.color}20` : undefined }}
+                            className="h-12 w-12 rounded-lg flex items-center justify-center shadow-sm"
+                            style={{ backgroundColor: canal.color ? `${canal.color}15` : undefined }}
                           >
-                            <MessageSquare className="h-4 w-4" style={{ color: canal.color }} />
+                            <CanalIcon 
+                              tipo={canal.tipo} 
+                              size={20} 
+                              className={`opacity-90 ${canal.color ? `text-[${canal.color}]` : ""}`}
+                            />
                           </div>
                         )}
-                        <CardTitle className="text-lg font-medium">{canal.nombre}</CardTitle>
+                        <div>
+                          <CardTitle className="text-lg font-medium leading-tight">{canal.nombre}</CardTitle>
+                          <p className="text-xs text-muted-foreground mt-0.5">{canal.tipo}</p>
+                        </div>
                       </div>
-                      <Badge variant={canal.is_active ? "default" : "outline"}>
+                      <Badge 
+                        variant={canal.is_active ? "default" : "outline"}
+                        className={canal.is_active ? "bg-green-500/80 hover:bg-green-500" : "text-muted-foreground"}
+                      >
                         {canal.is_active ? "Activo" : "Inactivo"}
                       </Badge>
                     </div>
                   </CardHeader>
-                  <CardContent className="pb-3">
-                    <p className="text-sm text-muted-foreground line-clamp-2">
+                  <CardContent className="p-4 pt-1">
+                    <p className="text-sm text-muted-foreground line-clamp-2 min-h-[40px]">
                       {canal.descripcion || "Sin descripción"}
                     </p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <Badge variant="outline" className="bg-background">
-                        {canal.tipo}
-                      </Badge>
-                    </div>
                   </CardContent>
-                  <CardContent className="pt-0 flex justify-between items-center">
+                  <div className="px-4 pb-4 pt-0 flex justify-between items-center">
+                    <div className="flex flex-wrap gap-2">
+                      {/* Información técnica */}
+                      {canal.configuracion_requerida && Object.keys(canal.configuracion_requerida).length > 0 && (
+                        <Badge variant="secondary" className="bg-background text-xs">
+                          {Object.keys(canal.configuracion_requerida).length} parámetros
+                        </Badge>
+                      )}
+                    </div>
                     <Button 
-                      variant="ghost" 
+                      variant="outline" 
                       size="sm"
-                      onClick={() => setSelectedCanalToEdit(canal)}
+                      onClick={() => {
+                        setSelectedCanalToEdit(canal);
+                        setIsCreatingCanal(true);
+                      }}
+                      className="gap-1 transition-all group-hover:border-primary group-hover:text-primary"
                     >
+                      <Edit className="h-3.5 w-3.5 mr-1" />
                       Editar
                     </Button>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => {/* Implementar vista previa */}}
-                          >
-                            Vista previa
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Ver como se verá este canal</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </CardContent>
+                  </div>
                 </Card>
               ))}
             </div>
@@ -452,6 +464,20 @@ export default function Canales() {
         onSave={handleCreateCanal}
         editingCanal={selectedCanalToEdit}
         onUpdate={handleUpdateCanalInfo}
+      />
+
+      <CanalPreviewDrawer
+        canal={selectedCanalToEdit}
+        open={isPreviewMode && !!selectedCanalToEdit}
+        onOpenChange={(open) => {
+          if (!open) {
+            setIsPreviewMode(false);
+            // Pequeña pausa antes de limpiar el canal seleccionado para evitar parpadeos visuales
+            setTimeout(() => {
+              if (!isCreatingCanal) setSelectedCanalToEdit(null);
+            }, 200);
+          }
+        }}
       />
     </div>
   );
