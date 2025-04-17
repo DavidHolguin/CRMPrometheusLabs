@@ -1,4 +1,3 @@
-
 import { Outlet, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { StepIndicator } from "../onboarding/StepIndicator";
@@ -40,6 +39,12 @@ const OnboardingLayout = () => {
   if (!session) {
     console.log("OnboardingLayout - No session, redirecting to login");
     return <Navigate to="/login" replace />;
+  }
+
+  // Redirección si el usuario es un agente (los agentes nunca deben pasar por el onboarding)
+  if (user && user.role === 'agente') {
+    console.log("OnboardingLayout - User is an agent, redirecting to dashboard");
+    return <Navigate to="/dashboard" replace />;
   }
 
   // Redirect if onboarding already completed

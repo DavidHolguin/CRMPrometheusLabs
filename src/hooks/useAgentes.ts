@@ -50,32 +50,44 @@ export function useAgentes() {
     mutationFn: async (newAgente: { 
       email: string; 
       full_name: string;
+      password?: string;
       role?: 'admin' | 'admin_empresa' | 'agente';
       empresa_id?: string;
       avatar?: File | null;
     }) => {
       try {
+        if (!user?.companyId) {
+          throw new Error("No hay empresa asociada al usuario administrador");
+        }
+
         // Asignamos por defecto el rol 'agente' si no viene especificado
         const role = newAgente.role || 'agente';
         
-        // Usamos el cliente administrativo para crear el usuario
+        // Asignamos la empresa del administrador actual
+        const empresa_id = newAgente.empresa_id || user.companyId;
+        
+        // Usamos el cliente administrativo para crear el usuario con la contraseña proporcionada o generamos una
+        const password = newAgente.password || Math.random().toString(36).slice(-10);
+        
         const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
           email: newAgente.email,
           email_confirm: true,
           user_metadata: {
             full_name: newAgente.full_name,
           },
-          password: Math.random().toString(36).slice(-10), // Contraseña aleatoria temporal
+          password: password,
         });
 
         if (authError) throw authError;
 
-        // Actualizamos el perfil con el rol y la empresa
+        // Actualizamos el perfil con el rol, la empresa y marcamos el onboarding como completado
         const { error: updateError } = await supabaseAdmin
           .from("profiles")
           .update({
             role: role,
-            empresa_id: newAgente.empresa_id || user?.companyId,
+            empresa_id: empresa_id,
+            onboarding_completed: true, // Marcamos el onboarding como completado para agentes
+            onboarding_step: 'completed'
           })
           .eq("id", authData.user.id);
 

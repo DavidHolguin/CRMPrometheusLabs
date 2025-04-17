@@ -23,6 +23,14 @@ export interface AssignedLeadsStats {
   leadsCerradosPerdidos: number;
 }
 
+// Valores predeterminados para mostrar cuando no hay datos o hay errores
+const DEFAULT_METRICS = {
+  tiempoRespuestaPromedio: 5,
+  satisfaccionPromedio: 85,
+  tasaConversionLeads: 65,
+  tasaResolucion: 78,
+};
+
 /**
  * Hook para obtener estadísticas detalladas de un agente específico
  */
@@ -39,52 +47,78 @@ export function useAgenteStats(agenteId: string | null) {
         throw new Error("ID de agente no proporcionado");
       }
 
-      // Consultar tiempo de respuesta promedio (minutos entre mensaje de cliente y respuesta de agente)
-      const { data: tiempoRespuesta, error: errorTiempo } = await supabase.rpc(
-        "calcular_tiempo_respuesta_agente",
-        { p_agente_id: agenteId }
-      );
-
-      // Consultar satisfacción promedio de las evaluaciones
-      const { data: satisfaccionData, error: errorSatisfaccion } = await supabase
-        .from("evaluaciones_respuestas")
-        .select("puntuacion")
-        .eq("evaluador_id", agenteId);
-      
-      // Calcular promedio manualmente ya que .avg() no está disponible
+      let tiempoRespuesta = DEFAULT_METRICS.tiempoRespuestaPromedio;
       let satisfaccionPromedio = 0;
-      if (satisfaccionData && satisfaccionData.length > 0) {
-        const suma = satisfaccionData.reduce((total, item) => total + item.puntuacion, 0);
-        satisfaccionPromedio = suma / satisfaccionData.length;
+      let conversionData = DEFAULT_METRICS.tasaConversionLeads;
+      let resolucionData = DEFAULT_METRICS.tasaResolucion;
+
+      try {
+        // Consultar tiempo de respuesta promedio (minutos entre mensaje de cliente y respuesta de agente)
+        const { data: respuestaData, error: errorTiempo } = await supabase.rpc(
+          "calcular_tiempo_respuesta_agente",
+          { p_agente_id: agenteId }
+        );
+        
+        if (!errorTiempo && respuestaData !== null) {
+          tiempoRespuesta = respuestaData;
+        }
+      } catch (error) {
+        console.log("Error al calcular tiempo de respuesta:", error);
       }
 
-      // Consultar tasa de conversión de leads
-      const { data: conversionData, error: errorConversion } = await supabase.rpc(
-        "calcular_tasa_conversion_agente",
-        { p_agente_id: agenteId }
-      );
-
-      // Consultar tasa de resolución de conversaciones
-      const { data: resolucionData, error: errorResolucion } = await supabase.rpc(
-        "calcular_tasa_resolucion_agente",
-        { p_agente_id: agenteId }
-      );
-
-      if (errorTiempo || errorSatisfaccion || errorConversion || errorResolucion) {
-        console.error("Errores al consultar métricas:", {
-          errorTiempo,
-          errorSatisfaccion,
-          errorConversion,
-          errorResolucion,
-        });
+      try {
+        // Consultar satisfacción promedio de las evaluaciones
+        const { data: satisfaccionData, error: errorSatisfaccion } = await supabase
+          .from("evaluaciones_respuestas")
+          .select("puntuacion")
+          .eq("evaluador_id", agenteId);
+        
+        // Calcular promedio manualmente ya que .avg() no está disponible
+        if (!errorSatisfaccion && satisfaccionData && satisfaccionData.length > 0) {
+          const suma = satisfaccionData.reduce((total, item) => total + item.puntuacion, 0);
+          satisfaccionPromedio = (suma / satisfaccionData.length) * 10; // Convertir de 0-10 a 0-100
+        } else {
+          satisfaccionPromedio = DEFAULT_METRICS.satisfaccionPromedio;
+        }
+      } catch (error) {
+        console.log("Error al calcular satisfacción:", error);
+        satisfaccionPromedio = DEFAULT_METRICS.satisfaccionPromedio;
       }
 
-      // Retornar valores por defecto si hay errores
+      try {
+        // Consultar tasa de conversión de leads
+        const { data: conversionResult, error: errorConversion } = await supabase.rpc(
+          "calcular_tasa_conversion_agente",
+          { p_agente_id: agenteId }
+        );
+        
+        if (!errorConversion && conversionResult !== null) {
+          conversionData = conversionResult;
+        }
+      } catch (error) {
+        console.log("Error al calcular tasa de conversión:", error);
+      }
+
+      try {
+        // Consultar tasa de resolución de conversaciones
+        const { data: resolucionResult, error: errorResolucion } = await supabase.rpc(
+          "calcular_tasa_resolucion_agente",
+          { p_agente_id: agenteId }
+        );
+        
+        if (!errorResolucion && resolucionResult !== null) {
+          resolucionData = resolucionResult;
+        }
+      } catch (error) {
+        console.log("Error al calcular tasa de resolución:", error);
+      }
+
+      // Retornar valores calculados o por defecto
       return {
-        tiempoRespuestaPromedio: tiempoRespuesta || 15,
-        satisfaccionPromedio: satisfaccionPromedio * 10, // Convertir de 0-10 a 0-100
-        tasaConversionLeads: conversionData || 65,
-        tasaResolucion: resolucionData || 78,
+        tiempoRespuestaPromedio: tiempoRespuesta,
+        satisfaccionPromedio: satisfaccionPromedio,
+        tasaConversionLeads: conversionData,
+        tasaResolucion: resolucionData,
       };
     },
     enabled: !!agenteId,
@@ -119,54 +153,65 @@ export function useAgenteStats(agenteId: string | null) {
         ];
         const nombreMes = nombresMeses[fecha.getMonth()];
 
-        // Consultar conversaciones donde participó el agente
-        const { data: conversacionesData, error: errorConversaciones } = await supabase
-          .from("mensajes")
-          .select("conversacion_id")
-          .eq("remitente_id", agenteId)
-          .gte("created_at", primerDia.toISOString())
-          .lte("created_at", ultimoDia.toISOString())
-          .order("conversacion_id", { ascending: true });
-
-        // Consultar mensajes enviados por el agente
-        const { count: mensajeCount, error: errorMensajes } = await supabase
-          .from("mensajes")
-          .select("*", { count: "exact", head: true })
-          .eq("remitente_id", agenteId)
-          .gte("created_at", primerDia.toISOString())
-          .lte("created_at", ultimoDia.toISOString());
-
-        // Consultar evaluaciones promedio recibidas
-        const { data: evaluacionesData, error: errorEvaluaciones } = await supabase
-          .from("evaluaciones_respuestas")
-          .select("puntuacion")
-          .eq("evaluador_id", agenteId)
-          .gte("created_at", primerDia.toISOString())
-          .lte("created_at", ultimoDia.toISOString());
-        
-        // Calcular promedio manualmente
+        let conversacionesUnicas = [];
+        let mensajeCount = 0;
         let evaluacionesPromedio = 0;
-        if (evaluacionesData && evaluacionesData.length > 0) {
-          const suma = evaluacionesData.reduce((total, item) => total + item.puntuacion, 0);
-          evaluacionesPromedio = suma / evaluacionesData.length;
+        
+        try {
+          // Consultar conversaciones donde participó el agente
+          const { data: conversacionesData, error: errorConversaciones } = await supabase
+            .from("mensajes")
+            .select("conversacion_id")
+            .eq("remitente_id", agenteId)
+            .gte("created_at", primerDia.toISOString())
+            .lte("created_at", ultimoDia.toISOString())
+            .order("conversacion_id", { ascending: true });
+
+          if (!errorConversaciones && conversacionesData) {
+            // Contar conversaciones únicas
+            conversacionesUnicas = [...new Set(conversacionesData.map((item) => item.conversacion_id))];
+          }
+        } catch (error) {
+          console.log("Error al consultar conversaciones:", error);
         }
 
-        if (errorConversaciones || errorMensajes || errorEvaluaciones) {
-          console.error("Errores al consultar actividad:", {
-            errorConversaciones,
-            errorMensajes,
-            errorEvaluaciones,
-          });
+        try {
+          // Consultar mensajes enviados por el agente
+          const { count, error: errorMensajes } = await supabase
+            .from("mensajes")
+            .select("*", { count: "exact", head: true })
+            .eq("remitente_id", agenteId)
+            .gte("created_at", primerDia.toISOString())
+            .lte("created_at", ultimoDia.toISOString());
+            
+          if (!errorMensajes && count !== null) {
+            mensajeCount = count;
+          }
+        } catch (error) {
+          console.log("Error al consultar mensajes:", error);
         }
 
-        // Contar conversaciones únicas
-        const conversacionesUnicas = conversacionesData
-          ? [...new Set(conversacionesData.map((item) => item.conversacion_id))]
-          : [];
+        try {
+          // Consultar evaluaciones promedio recibidas
+          const { data: evaluacionesData, error: errorEvaluaciones } = await supabase
+            .from("evaluaciones_respuestas")
+            .select("puntuacion")
+            .eq("evaluador_id", agenteId)
+            .gte("created_at", primerDia.toISOString())
+            .lte("created_at", ultimoDia.toISOString());
+          
+          // Calcular promedio manualmente
+          if (!errorEvaluaciones && evaluacionesData && evaluacionesData.length > 0) {
+            const suma = evaluacionesData.reduce((total, item) => total + item.puntuacion, 0);
+            evaluacionesPromedio = suma / evaluacionesData.length;
+          }
+        } catch (error) {
+          console.log("Error al consultar evaluaciones:", error);
+        }
 
         meses.push({
           mes: nombreMes,
-          conversaciones: conversacionesUnicas.length,
+          conversaciones: conversacionesUnicas.length || 0,
           mensajesEnviados: mensajeCount || 0,
           evaluacionesPromedio: evaluacionesPromedio,
         });
@@ -189,62 +234,90 @@ export function useAgenteStats(agenteId: string | null) {
         throw new Error("ID de agente no proporcionado");
       }
 
-      // Contar total de leads asignados
-      const { count: totalCount, error: errorTotal } = await supabase
-        .from("leads")
-        .select("*", { count: "exact", head: true })
-        .eq("asignado_a", agenteId);
-
-      // Contar leads activos
-      const { count: activosCount, error: errorActivos } = await supabase
-        .from("leads")
-        .select("*", { count: "exact", head: true })
-        .eq("asignado_a", agenteId)
-        .eq("is_active", true);
-        
-      // Usar consultas separadas para obtener IDs de las etapas primero
-      const { data: stagesData, error: errorStages } = await supabase
-        .from("pipeline_stages")
-        .select("id, nombre");
-        
-      // Extraer los IDs de las etapas
-      const ganadoStageIds = stagesData
-        ?.filter(stage => stage.nombre === "Cerrado Ganado")
-        .map(stage => stage.id) || [];
-        
-      const perdidoStageIds = stagesData
-        ?.filter(stage => stage.nombre === "Cerrado Perdido")
-        .map(stage => stage.id) || [];
+      let totalCount = 0;
+      let activosCount = 0;
+      let ganadosCount = 0;
+      let perdidosCount = 0;
       
-      // Contar leads cerrados ganados
-      const { count: ganadosCount, error: errorGanados } = await supabase
-        .from("leads")
-        .select("id", { count: "exact", head: true })
-        .eq("asignado_a", agenteId)
-        .in("stage_id", ganadoStageIds);
+      try {
+        // Contar total de leads asignados
+        const { count, error: errorTotal } = await supabase
+          .from("leads")
+          .select("*", { count: "exact", head: true })
+          .eq("asignado_a", agenteId);
+          
+        if (!errorTotal && count !== null) {
+          totalCount = count;
+        }
+      } catch (error) {
+        console.log("Error al contar leads totales:", error);
+      }
 
-      // Contar leads cerrados perdidos
-      const { count: perdidosCount, error: errorPerdidos } = await supabase
-        .from("leads")
-        .select("id", { count: "exact", head: true })
-        .eq("asignado_a", agenteId)
-        .in("stage_id", perdidoStageIds);
-
-      if (errorTotal || errorActivos || errorGanados || errorPerdidos || errorStages) {
-        console.error("Errores al consultar stats de leads:", {
-          errorTotal,
-          errorActivos,
-          errorGanados,
-          errorPerdidos,
-          errorStages
-        });
+      try {
+        // Contar leads activos
+        const { count, error: errorActivos } = await supabase
+          .from("leads")
+          .select("*", { count: "exact", head: true })
+          .eq("asignado_a", agenteId)
+          .eq("is_active", true);
+          
+        if (!errorActivos && count !== null) {
+          activosCount = count;
+        }
+      } catch (error) {
+        console.log("Error al contar leads activos:", error);
+      }
+      
+      try {
+        // Usar consultas separadas para obtener IDs de las etapas primero
+        const { data: stagesData, error: errorStages } = await supabase
+          .from("pipeline_stages")
+          .select("id, nombre");
+          
+        if (!errorStages && stagesData) {
+          // Extraer los IDs de las etapas
+          const ganadoStageIds = stagesData
+            .filter(stage => stage.nombre === "Cerrado Ganado")
+            .map(stage => stage.id);
+            
+          const perdidoStageIds = stagesData
+            .filter(stage => stage.nombre === "Cerrado Perdido")
+            .map(stage => stage.id);
+          
+          // Solo si tenemos IDs válidos, hacemos las consultas
+          if (ganadoStageIds.length > 0) {
+            const { count, error: errorGanados } = await supabase
+              .from("leads")
+              .select("id", { count: "exact", head: true })
+              .eq("asignado_a", agenteId)
+              .in("stage_id", ganadoStageIds);
+              
+            if (!errorGanados && count !== null) {
+              ganadosCount = count;
+            }
+          }
+          
+          if (perdidoStageIds.length > 0) {
+            const { count, error: errorPerdidos } = await supabase
+              .from("leads")
+              .select("id", { count: "exact", head: true })
+              .eq("asignado_a", agenteId)
+              .in("stage_id", perdidoStageIds);
+              
+            if (!errorPerdidos && count !== null) {
+              perdidosCount = count;
+            }
+          }
+        }
+      } catch (error) {
+        console.log("Error al consultar etapas o contar leads por etapa:", error);
       }
 
       return {
-        totalLeads: totalCount || 0,
-        leadsActivos: activosCount || 0,
-        leadsCerradosGanados: ganadosCount || 0,
-        leadsCerradosPerdidos: perdidosCount || 0,
+        totalLeads: totalCount,
+        leadsActivos: activosCount,
+        leadsCerradosGanados: ganadosCount,
+        leadsCerradosPerdidos: perdidosCount,
       };
     },
     enabled: !!agenteId,

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { AgenteCard } from "@/components/agentes/AgenteCard";
 import { AgenteEditDialog } from "@/components/agentes/AgenteEditDialog";
 import { AgenteDetailDrawer } from "@/components/agentes/AgenteDetailDrawer";
@@ -47,8 +47,20 @@ import {
   Grid3x3,
   List,
   TrendingUp,
+  Copy,
+  Check,
+  Clipboard,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 
 export default function AdminAgentes() {
   const { user } = useAuth();
@@ -59,6 +71,10 @@ export default function AdminAgentes() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedAgente, setSelectedAgente] = useState<Agente | null>(null);
+  const [welcomeMessage, setWelcomeMessage] = useState("");
+  const [isWelcomeDialogOpen, setIsWelcomeDialogOpen] = useState(false);
+  const [hasCopied, setHasCopied] = useState(false);
+  const textAreaRef = useRef<HTMLTextAreaElement>(null);
 
   const filteredAgentes = useMemo(() => {
     return agentes.filter((agente) => {
@@ -138,18 +154,67 @@ export default function AdminAgentes() {
           avatar,
         });
         toast.success("Agente actualizado correctamente");
+        setIsEditDialogOpen(false);
       } else {
         // Crear nuevo agente
-        await createAgente.mutateAsync({
+        const nuevoAgente = await createAgente.mutateAsync({
           ...values,
           avatar,
         });
         toast.success("Agente creado correctamente");
+        setIsEditDialogOpen(false);
+        
+        // Generar mensaje de bienvenida
+        generateWelcomeMessage(values);
+        setIsWelcomeDialogOpen(true);
       }
-      setIsEditDialogOpen(false);
     } catch (error) {
       console.error("Error al guardar el agente:", error);
       toast.error("Error al guardar el agente");
+    }
+  };
+
+  const generateWelcomeMessage = (agente: any) => {
+    const roleName = {
+      admin: "Administrador",
+      admin_empresa: "Administrador de Empresa", 
+      agente: "Agente"
+    }[agente.role] || "Usuario";
+    
+    const message = `# ¡Bienvenido/a al equipo de Prometeo!
+
+**¡Hola ${agente.full_name}!** 🎉
+
+Nos complace darte la bienvenida a nuestra plataforma. Tu cuenta ha sido creada exitosamente y ya puedes comenzar a utilizar todas las funcionalidades que tenemos disponibles para ti.
+
+## Datos de acceso
+
+- **Correo electrónico:** ${agente.email}
+- **Contraseña:** ${agente.password}
+- **Rol:** ${roleName}
+
+## Pasos para comenzar:
+
+1. Inicia sesión en la plataforma con tus credenciales
+2. Completa tu perfil con tu información profesional
+3. Explora las funcionalidades disponibles según tu rol
+4. Si tienes alguna duda, consulta nuestra documentación o contacta a soporte
+
+¡Esperamos que tengas una excelente experiencia con nosotros!
+
+*El equipo de Prometeo*
+`;
+
+    setWelcomeMessage(message);
+  };
+
+  const copyToClipboard = () => {
+    if (textAreaRef.current) {
+      textAreaRef.current.select();
+      document.execCommand('copy');
+      setHasCopied(true);
+      toast.success("Mensaje copiado al portapapeles");
+      setTimeout(() => setHasCopied(false), 2000);
     }
   };
 
@@ -477,6 +542,55 @@ export default function AdminAgentes() {
         onOpenChange={setIsDetailOpen}
         onEdit={handleOpenEdit}
       />
+
+      {/* Diálogo de Mensaje de Bienvenida */}
+      <Dialog open={isWelcomeDialogOpen} onOpenChange={setIsWelcomeDialogOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Mensaje de Bienvenida</DialogTitle>
+            <DialogDescription>
+              Copia este mensaje para enviarlo al nuevo agente con sus credenciales de acceso.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="border rounded-md p-4 relative bg-muted/50">
+            <Textarea
+              ref={textAreaRef}
+              value={welcomeMessage}
+              readOnly
+              className="min-h-[300px] font-mono text-sm"
+            />
+            <Button
+              size="icon"
+              variant="ghost"
+              className="absolute top-2 right-2"
+              onClick={copyToClipboard}
+            >
+              {hasCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              <span className="sr-only">Copiar al portapapeles</span>
+            </Button>
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              onClick={copyToClipboard}
+              className="w-full sm:w-auto"
+            >
+              {hasCopied ? (
+                <>
+                  <Check className="mr-2 h-4 w-4" />
+                  Copiado
+                </>
+              ) : (
+                <>
+                  <Clipboard className="mr-2 h-4 w-4" />
+                  Copiar mensaje
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

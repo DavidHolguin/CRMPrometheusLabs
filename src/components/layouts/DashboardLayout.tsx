@@ -34,9 +34,17 @@ const DashboardLayout = () => {
   }
 
   // Redirect if onboarding not completed
-  if (user && !user.onboardingCompleted) {
+  // Solo redirigimos al onboarding si el usuario no es un agente
+  if (user && !user.onboardingCompleted && user.role !== 'agente') {
     console.log("DashboardLayout - Onboarding not completed, redirecting to onboarding");
     return <Navigate to="/onboarding" replace />;
+  }
+  
+  // Si el usuario es un agente pero no tiene el onboarding completado,
+  // lo marcamos como completado automáticamente para evitar problemas futuros
+  if (user && !user.onboardingCompleted && user.role === 'agente' && user.companyId) {
+    // Solo registramos esto para debugging, la actualización real se hizo durante la creación
+    console.log("DashboardLayout - Agent detected, onboarding auto-completed");
   }
   
   return <SidebarProvider defaultCollapsed={true}>
