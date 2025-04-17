@@ -94,6 +94,7 @@ import {
   AreaChart
 } from "recharts";
 import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
+import { LeadDataTab } from "@/components/pipeline/LeadDataTab";
 
 interface Column {
   id: string;
@@ -624,8 +625,8 @@ const LeadsPage = () => {
                                   from: range.from,
                                   to: range.to || range.from
                                 });
-                              }
-                            }}
+                              }}
+                            }
                             initialFocus
                           />
                         </PopoverContent>
@@ -1756,34 +1757,91 @@ const LeadsPage = () => {
       
       {/* Panel lateral con detalles completos del lead */}
       <Sheet open={isLeadDrawerOpen && !!selectedLead} onOpenChange={setIsLeadDrawerOpen}>
-        <SheetContent className="sm:max-w-md md:max-w-lg lg:max-w-xl xl:max-w-[700px] overflow-y-auto">
+        <SheetContent className="sm:max-w-md md:max-w-lg lg:max-w-xl xl:max-w-[700px] overflow-y-auto p-0">
           {selectedLead && (
-            <>
-              <SheetHeader className="mb-5">
-                <SheetTitle className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium">
-                    {selectedLead.nombre ? selectedLead.nombre.charAt(0) : "?"}
-                    {selectedLead.apellido ? selectedLead.apellido.charAt(0) : ""}
+            <div className="flex flex-col h-full">
+              {/* Header mejorado con avatar, nombre y acciones principales */}
+              <div className="bg-gradient-to-r from-primary/10 to-primary/5 p-6 pb-8 relative">
+                <div className="flex flex-col items-center sm:items-start sm:flex-row gap-4">
+                  {/* Avatar */}
+                  <div className="h-20 w-20 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xl font-medium shadow-sm border-2 border-primary/20">
+                    {selectedLead.nombre ? selectedLead.nombre.charAt(0).toUpperCase() : "?"}
+                    {selectedLead.apellido ? selectedLead.apellido.charAt(0).toUpperCase() : ""}
                   </div>
-                  <div>
-                    <span>{selectedLead.nombre} {selectedLead.apellido}</span>
-                    <SheetDescription className="mt-1">
-                      Creado {formatDate(selectedLead.created_at)} · {selectedLead.canal_origen || "Canal desconocido"}
-                    </SheetDescription>
+                  
+                  {/* Información y acciones */}
+                  <div className="flex flex-col items-center sm:items-start">
+                    <h2 className="text-xl font-semibold">
+                      {selectedLead.nombre || ''} {selectedLead.apellido || ''}
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedLead.canal_origen ? `Vía ${selectedLead.canal_origen}` : "Lead"} · Creado {formatDate(selectedLead.created_at)}
+                    </p>
+                    
+                    {/* Acciones de contacto */}
+                    <div className="flex gap-2 mt-3">
+                      {selectedLead.email && (
+                        <Button asChild variant="outline" size="sm" className="h-8 gap-1">
+                          <a href={`mailto:${selectedLead.email}`}>
+                            <Mail className="h-3.5 w-3.5" />
+                            <span className="hidden sm:inline">Correo</span>
+                          </a>
+                        </Button>
+                      )}
+                      {selectedLead.telefono && (
+                        <Button asChild variant="outline" size="sm" className="h-8 gap-1">
+                          <a href={`https://wa.me/${selectedLead.telefono.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer">
+                            <Phone className="h-3.5 w-3.5" />
+                            <span className="hidden sm:inline">WhatsApp</span>
+                          </a>
+                        </Button>
+                      )}
+                      <Button asChild variant="outline" size="sm" className="h-8 gap-1">
+                        <a href={`/dashboard/conversations/${selectedLead.ultima_conversacion_id || selectedLead.id}`}>
+                          <MessageSquare className="h-3.5 w-3.5" />
+                          <span className="hidden sm:inline">Conversaciones</span>
+                        </a>
+                      </Button>
+                    </div>
                   </div>
-                </SheetTitle>
-              </SheetHeader>
+                </div>
+                
+                {/* Score badge */}
+                <div className="absolute top-6 right-6">
+                  <div className="flex flex-col items-center gap-1">
+                    <div className={cn(
+                      "h-12 w-12 rounded-full flex items-center justify-center text-sm font-medium",
+                      selectedLead.score && selectedLead.score >= 70 ? "bg-success/20 text-success" :
+                      selectedLead.score && selectedLead.score >= 40 ? "bg-warning/20 text-warning" :
+                      "bg-destructive/20 text-destructive"
+                    )}>
+                      {selectedLead.score || 0}
+                    </div>
+                    <span className="text-xs text-muted-foreground">Score</span>
+                  </div>
+                </div>
+                
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  className="absolute top-2 right-2 h-8 w-8 rounded-full"
+                  onClick={() => setIsLeadDrawerOpen(false)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
               
-              <div className="space-y-6">
+              <div className="p-6 flex-grow">
+                {/* Tabuladores de contenido */}
                 <Tabs defaultValue="datos">
-                  <TabsList className="grid w-full grid-cols-4 mb-4">
+                  <TabsList className="grid w-full grid-cols-4 mb-6">
                     <TabsTrigger value="datos">Datos</TabsTrigger>
                     <TabsTrigger value="evaluacion">Evaluación</TabsTrigger>
                     <TabsTrigger value="historial">Historial</TabsTrigger>
                     <TabsTrigger value="comentarios">Comentarios</TabsTrigger>
                   </TabsList>
                   
-                  <TabsContent value="datos" className="space-y-4">
+                  <TabsContent value="datos" className="space-y-6">
                     <LeadPersonalDataTab lead={selectedLead} />
                     <LeadActivityChart leadId={selectedLead.id} />
                   </TabsContent>
@@ -1805,7 +1863,7 @@ const LeadsPage = () => {
                   </TabsContent>
                 </Tabs>
               </div>
-            </>
+            </div>
           )}
         </SheetContent>
       </Sheet>

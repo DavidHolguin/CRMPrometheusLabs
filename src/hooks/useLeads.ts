@@ -128,40 +128,62 @@ export function useLeads(chatbotId?: string) {
         }
         
         // Mapear los datos de la vista a la estructura de Lead que espera la UI
-        return data.map(item => ({
-          id: item.lead_id,
-          nombre: item.nombre,
-          apellido: item.apellido,
-          email: item.email,
-          telefono: item.telefono,
-          score: item.lead_score,
-          canal_origen: item.canal_origen,
-          created_at: item.fecha_creacion,
-          updated_at: item.fecha_actualizacion,
-          ultima_interaccion: item.ultima_interaccion,
-          stage_name: item.stage_nombre,
-          stage_color: item.stage_color,
-          ciudad: item.ciudad,
-          pais: item.pais,
-          direccion: item.direccion,
-          datos_adicionales: item.datos_adicionales,
-          // En caso de que etiquetas sea una cadena JSON, la convertimos a objeto
-          tags: typeof item.etiquetas === 'string' ? 
-            JSON.parse(item.etiquetas || '[]') : 
-            item.etiquetas || [],
-          // Campos adicionales de la vista
-          message_count: item.total_mensajes,
-          interaction_count: parseInt(item.ultimas_interacciones?.split(",").length || "0"),
-          agente_nombre: item.agente_nombre,
-          agente_email: item.agente_email,
-          agente_avatar: item.agente_avatar,
-          ultima_evaluacion_llm: item.ultima_evaluacion_llm,
-          pipeline_nombre: item.pipeline_nombre,
-          probabilidad_cierre: item.probabilidad_cierre,
-          dias_en_etapa_actual: item.dias_en_etapa_actual,
-          total_conversaciones: item.total_conversaciones,
-          ultima_conversacion_id: item.ultima_conversacion_id // Añadimos el ID de la última conversación
-        }));
+        return data.map(item => {
+          // Función para manejar de forma segura las etiquetas
+          const procesarEtiquetas = (etiquetas: any) => {
+            // Si es undefined o null, devolver array vacío
+            if (!etiquetas) return [];
+            
+            // Si ya es un array u objeto, devolverlo tal cual
+            if (typeof etiquetas !== 'string') return etiquetas;
+            
+            try {
+              // Intentar parsearlo como JSON
+              return JSON.parse(etiquetas);
+            } catch (e) {
+              // Si falla, significa que es un string común
+              // Convertirlo a un formato de etiqueta con un ID único basado en el contenido
+              return [{
+                id: `tag-${etiquetas.replace(/\s+/g, '-').toLowerCase()}`,
+                nombre: etiquetas,
+                color: '#6366f1' // Color por defecto para etiquetas de texto
+              }];
+            }
+          };
+
+          return {
+            id: item.lead_id,
+            nombre: item.nombre,
+            apellido: item.apellido,
+            email: item.email,
+            telefono: item.telefono,
+            score: item.lead_score,
+            canal_origen: item.canal_origen,
+            created_at: item.fecha_creacion,
+            updated_at: item.fecha_actualizacion,
+            ultima_interaccion: item.ultima_interaccion,
+            stage_name: item.stage_nombre,
+            stage_color: item.stage_color,
+            ciudad: item.ciudad,
+            pais: item.pais,
+            direccion: item.direccion,
+            datos_adicionales: item.datos_adicionales,
+            // Usando la función helper para procesar etiquetas de forma segura
+            tags: procesarEtiquetas(item.etiquetas),
+            // Campos adicionales de la vista
+            message_count: item.total_mensajes,
+            interaction_count: parseInt(item.ultimas_interacciones?.split(",").length || "0"),
+            agente_nombre: item.agente_nombre,
+            agente_email: item.agente_email,
+            agente_avatar: item.agente_avatar,
+            ultima_evaluacion_llm: item.ultima_evaluacion_llm,
+            pipeline_nombre: item.pipeline_nombre,
+            probabilidad_cierre: item.probabilidad_cierre,
+            dias_en_etapa_actual: item.dias_en_etapa_actual,
+            total_conversaciones: item.total_conversaciones,
+            ultima_conversacion_id: item.ultima_conversacion_id // Añadimos el ID de la última conversación
+          };
+        });
       } catch (error) {
         console.error('Error en useLeads:', error);
         throw error;

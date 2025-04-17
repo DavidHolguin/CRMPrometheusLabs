@@ -1,9 +1,8 @@
-
 import { Lead } from "@/hooks/useLeads";
 import { LeadScoreChart } from "./LeadScoreChart";
 import { getScoreColorClass } from "./LeadScoreUtils";
 import { Badge, badgeVariants } from "@/components/ui/badge";
-import { Info, Mail, Phone, MapPin, X } from "lucide-react";
+import { Info, Mail, Phone, MapPin, X, Plus, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LeadActivityChart } from "./LeadActivityChart";
@@ -13,6 +12,21 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { usePipelines } from "@/hooks/usePipelines";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 
 interface LeadDataTabProps {
   lead: Lead;
@@ -28,6 +42,8 @@ export function LeadDataTab({ lead, formatDate }: LeadDataTabProps) {
   const [stages, setStages] = useState<any[]>([]);
   const [tags, setTags] = useState<any[]>([]);
   const [selectedPipelineId, setSelectedPipelineId] = useState<string>(lead.pipeline_id || '');
+  const [stagesOpen, setStagesOpen] = useState(false);
+  const [tagsOpen, setTagsOpen] = useState(false);
   
   // Información básica del lead
   const contactInfo = [
@@ -114,6 +130,7 @@ export function LeadDataTab({ lead, formatDate }: LeadDataTabProps) {
         .eq('id', lead.id);
       
       toast.success('Etapa actualizada');
+      setStagesOpen(false);
     } catch (error) {
       toast.error('Error al actualizar la etapa');
       console.error(error);
@@ -189,44 +206,25 @@ export function LeadDataTab({ lead, formatDate }: LeadDataTabProps) {
     label: s.nombre,
     color: s.color
   }));
+
+  // Buscar el stage actual
+  const currentStage = stageOptions.find(s => s.value === lead.stage_id);
   
   return (
     <div className="space-y-6">
-      {/* Información básica del Lead */}
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Datos de contacto */}
-        <div className="rounded-lg border bg-card shadow-sm p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Info className="h-4 w-4 text-muted-foreground" />
-            <h3 className="font-medium">Información de contacto</h3>
-          </div>
-          
-          <div className="space-y-3">
-            {contactInfo.map((info, index) => (
-              <div key={index} className="flex items-center gap-2 text-sm">
-                <div className="text-muted-foreground">
-                  {info.icon}
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-xs text-muted-foreground">{info.label}</span>
-                  {info.href ? (
-                    <a href={info.href} className="hover:underline">{info.value}</a>
-                  ) : (
-                    <span>{info.value}</span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-          
-          {/* Pipeline selector */}
-          <div className="flex flex-col gap-1 mt-4 pt-3 border-t">
-            <span className="text-xs text-muted-foreground">Pipeline</span>
+      {/* Sección de clasificación */}
+      <div className="p-4 bg-muted/20 border rounded-lg">
+        <h3 className="text-sm font-medium mb-4">Clasificación del Lead</h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Selector de pipeline */}
+          <div>
+            <label className="text-xs text-muted-foreground block mb-1.5">Pipeline</label>
             <Select 
               value={selectedPipelineId} 
               onValueChange={handlePipelineChange}
             >
-              <SelectTrigger className="h-8 text-xs">
+              <SelectTrigger className="w-full">
                 <SelectValue placeholder="Seleccionar pipeline" />
               </SelectTrigger>
               <SelectContent>
@@ -239,62 +237,165 @@ export function LeadDataTab({ lead, formatDate }: LeadDataTabProps) {
             </Select>
           </div>
           
-          {/* Stage selector */}
-          <div className="flex flex-col gap-1 mt-4 pt-3 border-t">
-            <span className="text-xs text-muted-foreground">Etapa actual</span>
-            <Select 
-              value={lead.stage_id || ''} 
-              onValueChange={handleStageChange}
-            >
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue placeholder="Seleccionar etapa" />
-              </SelectTrigger>
-              <SelectContent>
-                {stageOptions.map((stage) => (
-                  <SelectItem key={stage.value} value={stage.value}>
+          {/* Selector de etapa con comando */}
+          <div>
+            <label className="text-xs text-muted-foreground block mb-1.5">Etapa</label>
+            <Popover open={stagesOpen} onOpenChange={setStagesOpen}>
+              <PopoverTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  role="combobox" 
+                  aria-expanded={stagesOpen}
+                  className="w-full justify-between"
+                >
+                  {currentStage ? (
                     <div className="flex items-center gap-2">
-                      <span>{stage.label}</span>
-                      {stage.color && (
+                      {currentStage.color && (
                         <div 
                           className="h-3 w-3 rounded-full" 
-                          style={{ backgroundColor: stage.color }}
+                          style={{ backgroundColor: currentStage.color }}
                         />
                       )}
+                      <span>{currentStage.label}</span>
                     </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          
-          {/* Tags */}
-          <div className="flex flex-col gap-1 mt-4 pt-3 border-t">
-            <span className="text-xs text-muted-foreground">Etiquetas</span>
-            <div className="flex flex-wrap gap-2 mt-2">
-              {tags.map((tag) => {
-                const isSelected = lead.tags?.some(t => t.id === tag.id);
-                return (
-                  <Badge 
-                    key={tag.id}
-                    variant={isSelected ? "default" : "outline"}
-                    className="cursor-pointer text-xs flex items-center gap-1 px-2 py-1"
-                    onClick={() => handleTagToggle(tag.id)}
-                    style={{
-                      borderColor: tag.color || undefined,
-                      color: isSelected ? 'white' : tag.color,
-                      backgroundColor: isSelected ? tag.color : undefined,
-                    }}
-                  >
-                    {tag.nombre}
-                    {isSelected && (
-                      <X className="h-3 w-3 ml-1 hover:text-white/80" />
+                  ) : "Seleccionar etapa"}
+                  <X
+                    className={cn(
+                      "ml-2 h-4 w-4 shrink-0 opacity-50",
+                      stagesOpen && "rotate-90"
                     )}
-                  </Badge>
-                );
-              })}
-            </div>
+                  />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[200px] p-0">
+                <Command>
+                  <CommandInput placeholder="Buscar etapa..." />
+                  <CommandList>
+                    <CommandEmpty>No se encontraron resultados</CommandEmpty>
+                    <CommandGroup>
+                      {stageOptions.map((stage) => (
+                        <CommandItem
+                          key={stage.value}
+                          value={stage.label}
+                          onSelect={() => handleStageChange(stage.value)}
+                          className="cursor-pointer"
+                        >
+                          <div className="flex items-center gap-2 w-full">
+                            {stage.color && (
+                              <div 
+                                className="h-3 w-3 rounded-full" 
+                                style={{ backgroundColor: stage.color }}
+                              />
+                            )}
+                            <span>{stage.label}</span>
+                          </div>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
+        
+        {/* Selector de etiquetas */}
+        <div className="mt-4">
+          <div className="flex justify-between items-center mb-1.5">
+            <label className="text-xs text-muted-foreground">Etiquetas</label>
+            <Popover open={tagsOpen} onOpenChange={setTagsOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-7 text-xs gap-1">
+                  <Tag className="h-3 w-3" />
+                  <span>Gestionar</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[200px] p-0">
+                <Command>
+                  <CommandInput placeholder="Buscar etiqueta..." />
+                  <CommandList>
+                    <CommandEmpty>No se encontraron resultados</CommandEmpty>
+                    <CommandGroup>
+                      {tags.map((tag) => {
+                        const isSelected = lead.tags?.some(t => t.id === tag.id);
+                        return (
+                          <CommandItem
+                            key={tag.id}
+                            value={tag.nombre}
+                            onSelect={() => handleTagToggle(tag.id)}
+                            className="cursor-pointer"
+                          >
+                            <div className="flex items-center gap-2 w-full">
+                              <div className="h-3 w-3 rounded-full" style={{ backgroundColor: tag.color }} />
+                              <span>{tag.nombre}</span>
+                              {isSelected && (
+                                <span className="ml-auto">✓</span>
+                              )}
+                            </div>
+                          </CommandItem>
+                        )
+                      })}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+          
+          <div className="flex flex-wrap gap-1.5 min-h-8 p-2 bg-background rounded-md border">
+            {lead.tags && lead.tags.length > 0 ? (
+              lead.tags.map((tag) => (
+                <Badge 
+                  key={tag.id}
+                  variant="secondary"
+                  className="text-xs flex items-center gap-1 px-2 py-1 cursor-pointer"
+                  onClick={() => handleTagToggle(tag.id)}
+                  style={{
+                    backgroundColor: `${tag.color}20`,
+                    color: tag.color,
+                    borderColor: `${tag.color}50`,
+                  }}
+                >
+                  {tag.nombre}
+                  <X className="h-3 w-3 ml-1" />
+                </Badge>
+              ))
+            ) : (
+              <span className="text-xs text-muted-foreground p-1">Sin etiquetas</span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Información básica del Lead */}
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* Datos de contacto */}
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center gap-2 mb-1">
+              <Info className="h-4 w-4 text-muted-foreground" />
+              <h3 className="font-medium">Información de contacto</h3>
+            </div>
+            
+            <div className="space-y-3">
+              {contactInfo.map((info, index) => (
+                <div key={index} className="flex items-center gap-2 text-sm">
+                  <div className="text-muted-foreground">
+                    {info.icon}
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-xs text-muted-foreground">{info.label}</span>
+                    {info.href ? (
+                      <a href={info.href} className="hover:underline">{info.value}</a>
+                    ) : (
+                      <span>{info.value}</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
         
         {/* Score chart */}
         <LeadScoreChart 
@@ -304,21 +405,11 @@ export function LeadDataTab({ lead, formatDate }: LeadDataTabProps) {
         />
       </div>
       
-      {/* Tabs para separar diferentes métricas */}
-      <Tabs defaultValue="activity" className="w-full">
-        <TabsList className="w-full grid grid-cols-2">
-          <TabsTrigger value="activity">Actividad</TabsTrigger>
-          <TabsTrigger value="personalData">Datos Personales</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="activity" className="mt-4">
-          <LeadActivityChart leadId={lead.id} />
-        </TabsContent>
-        
-        <TabsContent value="personalData" className="mt-4">
-          <LeadPersonalDataTab lead={lead} />
-        </TabsContent>
-      </Tabs>
+      {/* Datos personales */}
+      <LeadPersonalDataTab lead={lead} />
+      
+      {/* Gráfico de actividad */}
+      <LeadActivityChart leadId={lead.id} />
     </div>
   );
 }
