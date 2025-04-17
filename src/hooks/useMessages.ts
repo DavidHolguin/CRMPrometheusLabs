@@ -36,6 +36,12 @@ export interface Message {
     duracion_segundos: number;
     transcripcion?: string;
   };
+  // Campos para canal y lead
+  lead_id?: string;
+  canal_id?: string;
+  canal_identificador?: string;
+  chatbot_id?: string;
+  empresa_id?: string;
 }
 
 export function useMessages(conversationId: string | undefined) {
@@ -188,7 +194,13 @@ export function useMessages(conversationId: string | undefined) {
           audio: audioData,
           audio_url: item.audio_url,
           audio_duracion: item.audio_duracion,
-          audio_transcripcion: item.audio_transcripcion
+          audio_transcripcion: item.audio_transcripcion,
+          // Información adicional necesaria para el envío de mensajes
+          lead_id: item.lead_id,
+          canal_id: item.canal_id,
+          canal_identificador: item.canal_identificador,
+          chatbot_id: item.chatbot_id,
+          empresa_id: item.empresa_id
         };
       }) || [];
       
@@ -224,81 +236,147 @@ export function useMessages(conversationId: string | undefined) {
     },
   });
 
-  // Send message directly to Supabase instead of via API
+  // Enviar mensaje utilizando el endpoint /api/v1/agent/message
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
       if (!conversationId || !user?.id) {
         throw new Error("Falta información para enviar mensaje");
       }
+
+      // Obtener los datos necesarios para enviar al endpoint
+      const currentMessages = queryClient.getQueryData<Message[]>(["messages", conversationId]) || [];
+      const conversationData = currentMessages.length > 0 ? currentMessages[0] : null;
       
-      console.log("Enviando mensaje directamente a Supabase:", {
-        conversacion_id: conversationId,
-        remitente_id: user.id,
-        contenido: content
-      });
-      
-      // Generate a UUID for the message
-      const messageId = crypto.randomUUID();
-      
-      // Create the message directly in Supabase
-      const { data, error } = await supabase
-        .from("mensajes")
-        .insert({
-          id: messageId,
-          conversacion_id: conversationId,
-          contenido: content,
-          origen: "agente",
-          remitente_id: user.id,
-          tipo_contenido: "texto",
-          leido: true,
-          metadata: {
-            agent_name: user.name || "Agente",
-            department: "Ventas",
-            agent_id: user.id
-          }
-        })
-        .select();
-      
-      if (error) {
-        console.error("Error al enviar mensaje a Supabase:", error);
-        throw error;
+      if (!conversationData || !conversationData.lead_id) {
+        throw new Error("No se pudo obtener la información necesaria de la conversación");
       }
       
-      console.log("Mensaje enviado correctamente a Supabase:", data);
+      // Obtener datos adicionales de la conversación si no están disponibles
+      let leadId = conversationData.lead_id;
+      let canalId = conversationData.canal_id;
+      let canalIdentifier = conversationData.canal_identificador;
+      let chatbotId = conversationData.chatbot_id;
+      let empresaId = conversationData.empresa_id || user.companyId;
+      
+      // Si no tenemos algunos datos, intentar obtenerlos de la base de datos
+      if (!canalId || !canalIdentifier) {
+        const { data: convData, error: convError } = await supabase
+          .from("conversaciones")
+          .select("lead_id, canal_id, canal_identificador, chatbot_id")
+          .eq("id", conversationId)
+          .single();
+          
+        if (convError) {
+          console.error("Error obteniendo datos de conversación:", convError);
+        } else if (convData) {
+          leadId = convData.lead_id;
+          canalId = convData.canal_id;
+          canalIdentifier = convData.canal_identificador;
+          chatbotId = convData.chatbot_id;
+        }
+      }
+      
+      // Si aún no tenemos el canal_identificador, intentar obtenerlo de la tabla leads
+      if (!canalIdentifier && leadId) {
+        const { data: leadData, error: leadError } = await supabase
+          .from("leads")
+          .select("canal_id, canal_origen")
+          .eq("id", leadId)
+          .single();
+          
+        if (!leadError && leadData) {
+          canalId = leadData.canal_id;
+          canalIdentifier = leadData.canal_origen;
+        }
+      }
+
+      console.log("Enviando mensaje al endpoint:", {
+        agent_id: user.id,
+        mensaje: content,
+        conversation_id: conversationId,
+        lead_id: leadId,
+        channel_id: canalId,
+        channel_identifier: canalIdentifier,
+        chatbot_id: chatbotId,
+        empresa_id: empresaId
+      });
+      
+      // URL base del API
+      const apiEndpoint = "https://web-production-01457.up.railway.app";
+
+      // Enviar el mensaje utilizando el endpoint
+      const response = await fetch(`${apiEndpoint}/api/v1/agent/message`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          agent_id: user.id,
+          mensaje: content,
+          conversation_id: conversationId,
+          lead_id: leadId,
+          channel_id: canalId,
+          channel_identifier: canalIdentifier,
+          chatbot_id: chatbotId,
+          empresa_id: empresaId,
+          deactivate_chatbot: false, // Por defecto no desactivamos el chatbot
+          metadata: {
+            agent_name: user.name || "Agente",
+            department: "Ventas"
+          }
+        })
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Error en la respuesta API:", response.status, errorText);
+        throw new Error(`Error al enviar mensaje: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log("Respuesta del API:", data);
       
       return { 
-        mensaje_id: messageId, 
-        mensaje: content 
+        mensaje_id: data.mensaje_id, 
+        conversacion_id: data.conversacion_id,
+        mensaje: content,
+        metadata: data.metadata || {}
       };
     },
     onSuccess: (data) => {
-      console.log("Message sent successfully, response:", data);
-      // Immediately update the UI with our sent message without waiting for realtime
+      console.log("Mensaje enviado exitosamente, respuesta:", data);
+      
+      // Actualizar UI inmediatamente con nuestro mensaje enviado sin esperar al realtime
       queryClient.setQueryData(["messages", conversationId], (oldData: Message[] = []) => {
-        // Ensure we don't add a duplicate message
+        // Asegurar que no añadimos un mensaje duplicado
         if (oldData.some(msg => msg.id === data.mensaje_id)) {
           return oldData;
         }
         
         return [...oldData, {
           id: data.mensaje_id,
-          conversacion_id: conversationId,
+          conversacion_id: data.conversacion_id || conversationId,
           contenido: data.mensaje || "",
           origen: "agente",
           created_at: new Date().toISOString(),
           leido: true,
           remitente_id: user?.id,
           metadata: {
+            ...(data.metadata || {}),
             agent_name: user?.name || "Agente",
-            department: "Ventas"
+            department: "Ventas",
+            origin: "agent"
           }
         }];
       });
       
-      // Invalidate related queries to refresh data
+      // Invalidar consultas relacionadas para refrescar datos
       queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
       queryClient.invalidateQueries({ queryKey: ["conversations"] });
     },
+    onError: (error) => {
+      console.error("Error al enviar mensaje:", error);
+    }
   });
 
   return {
