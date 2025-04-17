@@ -10,7 +10,7 @@ import DeleteCanalDialog from "@/components/canales/DeleteCanalDialog";
 import CreateCanalDrawer from "../components/canales/CreateCanalDrawer";
 import CanalPreviewDrawer from "../components/canales/CanalPreviewDrawer";
 import { useChatbots } from "@/hooks/useChatbots";
-import { CanalIcon } from "@/components/canales/CanalIcon"; // Ensure this path is correct
+import { CanalIcon, getCanalColor } from "@/components/canales/CanalIcon"; // Importación corregida con getCanalColor
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { LayoutGrid, List, Search, Filter, Info, Loader2, Plus, MessageSquare, Edit } from "lucide-react";
@@ -364,80 +364,94 @@ export default function Canales() {
           {/* Vista de canales disponibles */}
           {!isLoadingCanales && filteredCanales.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filteredCanales.map(canal => (
-                <Card key={canal.id} className="overflow-hidden group hover:shadow-md transition-all border-muted">
-                  <div 
-                    className="h-3 w-full transition-colors" 
-                    style={{ backgroundColor: canal.color || '#e2e8f0' }} 
-                  />
-                  <CardHeader className="p-4 pb-2">
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center space-x-3">
-                        {canal.logo_url ? (
-                          <div 
-                            className="h-12 w-12 rounded-lg flex items-center justify-center overflow-hidden shadow-sm"
-                            style={{ backgroundColor: canal.color ? `${canal.color}15` : undefined }}
-                          >
-                            <img 
-                              src={canal.logo_url} 
-                              alt={canal.nombre} 
-                              className="h-8 w-8 object-contain"
-                            />
+              {filteredCanales.map(canal => {
+                // Obtener colores con transparencia para un estilo más profesional
+                const bgColorWithOpacity = getCanalColor(canal.tipo, canal.color, 0.125);
+                const solidColor = canal.color || getCanalColor(canal.tipo, null, 1.0).replace('rgba', 'rgb').replace(/,\s*[\d.]+\)/, ')');
+                
+                // Estilo para el badge
+                const badgeStyle = canal.is_active ? {
+                  backgroundColor: bgColorWithOpacity,
+                  color: solidColor,
+                  borderColor: solidColor
+                } : {};
+
+                return (
+                  <Card key={canal.id} className="overflow-hidden group hover:shadow-md transition-all border-muted">
+                    <div 
+                      className="h-3 w-full transition-colors" 
+                      style={{ backgroundColor: bgColorWithOpacity }} 
+                    />
+                    <CardHeader className="p-4 pb-2">
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center space-x-3">
+                          {canal.logo_url ? (
+                            <div 
+                              className="h-12 w-12 rounded-lg flex items-center justify-center overflow-hidden shadow-sm"
+                              style={{ backgroundColor: bgColorWithOpacity }}
+                            >
+                              <img 
+                                src={canal.logo_url} 
+                                alt={canal.nombre} 
+                                className="h-8 w-8 object-contain"
+                              />
+                            </div>
+                          ) : (
+                            <div 
+                              className="h-12 w-12 rounded-lg flex items-center justify-center shadow-sm"
+                              style={{ backgroundColor: bgColorWithOpacity }}
+                            >
+                              <CanalIcon 
+                                tipo={canal.tipo} 
+                                size={20}
+                                color={solidColor}
+                              />
+                            </div>
+                          )}
+                          <div>
+                            <CardTitle className="text-lg font-medium leading-tight">{canal.nombre}</CardTitle>
+                            <p className="text-xs text-muted-foreground mt-0.5">{canal.tipo}</p>
                           </div>
-                        ) : (
-                          <div 
-                            className="h-12 w-12 rounded-lg flex items-center justify-center shadow-sm"
-                            style={{ backgroundColor: canal.color ? `${canal.color}15` : undefined }}
-                          >
-                            <CanalIcon 
-                              tipo={canal.tipo} 
-                              size={20} 
-                              className={`opacity-90 ${canal.color ? `text-[${canal.color}]` : ""}`}
-                            />
-                          </div>
-                        )}
-                        <div>
-                          <CardTitle className="text-lg font-medium leading-tight">{canal.nombre}</CardTitle>
-                          <p className="text-xs text-muted-foreground mt-0.5">{canal.tipo}</p>
                         </div>
-                      </div>
-                      <Badge 
-                        variant={canal.is_active ? "default" : "outline"}
-                        className={canal.is_active ? "bg-green-500/80 hover:bg-green-500" : "text-muted-foreground"}
-                      >
-                        {canal.is_active ? "Activo" : "Inactivo"}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-4 pt-1">
-                    <p className="text-sm text-muted-foreground line-clamp-2 min-h-[40px]">
-                      {canal.descripcion || "Sin descripción"}
-                    </p>
-                  </CardContent>
-                  <div className="px-4 pb-4 pt-0 flex justify-between items-center">
-                    <div className="flex flex-wrap gap-2">
-                      {/* Información técnica */}
-                      {canal.configuracion_requerida && Object.keys(canal.configuracion_requerida).length > 0 && (
-                        <Badge variant="secondary" className="bg-background text-xs">
-                          {Object.keys(canal.configuracion_requerida).length} parámetros
+                        <Badge 
+                          variant={canal.is_active ? "default" : "outline"}
+                          className={canal.is_active ? "" : "text-muted-foreground"}
+                          style={canal.is_active ? badgeStyle : {}}
+                        >
+                          {canal.is_active ? "Activo" : "Inactivo"}
                         </Badge>
-                      )}
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-4 pt-1">
+                      <p className="text-sm text-muted-foreground line-clamp-2 min-h-[40px]">
+                        {canal.descripcion || "Sin descripción"}
+                      </p>
+                    </CardContent>
+                    <div className="px-4 pb-4 pt-0 flex justify-between items-center">
+                      <div className="flex flex-wrap gap-2">
+                        {/* Información técnica */}
+                        {canal.configuracion_requerida && Object.keys(canal.configuracion_requerida).length > 0 && (
+                          <Badge variant="secondary" className="bg-background text-xs">
+                            {Object.keys(canal.configuracion_requerida).length} parámetros
+                          </Badge>
+                        )}
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => {
+                          setSelectedCanalToEdit(canal);
+                          setIsCreatingCanal(true);
+                        }}
+                        className="gap-1 transition-all group-hover:border-primary group-hover:text-primary"
+                      >
+                        <Edit className="h-3.5 w-3.5 mr-1" />
+                        Editar
+                      </Button>
                     </div>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => {
-                        setSelectedCanalToEdit(canal);
-                        setIsCreatingCanal(true);
-                      }}
-                      className="gap-1 transition-all group-hover:border-primary group-hover:text-primary"
-                    >
-                      <Edit className="h-3.5 w-3.5 mr-1" />
-                      Editar
-                    </Button>
-                  </div>
-                </Card>
-              ))}
+                  </Card>
+                );
+              })}
             </div>
           )}
         </TabsContent>
