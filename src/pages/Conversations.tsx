@@ -8,41 +8,21 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent } from "@/components/ui/tabs";
 
 // Hooks
 import { useConversations } from "@/hooks/useConversations";
 import { useMessages } from "@/hooks/useMessages";
 import { useCanales } from "@/hooks/useCanales";
 import { usePipelines } from "@/hooks/usePipelines";
+import { Lead as LeadType } from "@/hooks/useLeads"; // Importar el tipo Lead
 
 // Componentes refactorizados
 import LeadsList from "@/components/conversations/LeadsList";
 import ChatHeader from "@/components/conversations/ChatHeader";
 import ChatMessages from "@/components/conversations/ChatMessages";
 import ChatInput from "@/components/conversations/ChatInput";
-import LeadComments from "@/components/conversations/LeadComments";
-import LeadInfo from "@/components/conversations/LeadInfo";
 import TransferDialog from "@/components/conversations/TransferDialog";
-
-// Interfaces de tipos para trabajar con los datos
-interface Lead {
-  id: string;
-  nombre?: string;
-  apellido?: string;
-  email?: string;
-  telefono?: string;
-  score?: number;
-  pipeline_id?: string;
-  stage_id?: string;
-  asignado_a?: string;
-  tags?: {
-    id: string;
-    nombre: string;
-    color: string;
-  }[];
-  ultima_interaccion?: string;
-}
+import LeadDetailSidebar from "@/components/conversations/LeadDetailSidebar";
 
 interface Mensaje {
   id: string;
@@ -82,24 +62,21 @@ const ConversationsPage = () => {
   const [isAssigning, setIsAssigning] = useState(false);
   const [isReleasing, setIsReleasing] = useState(false);
 
-  // Agregar este estado para controlar la pestaña activa
-  const [activeTab, setActiveTab] = useState<string>("mensajes");
-
   const { useCanalesQuery } = useCanales();
   const { data: canales = [] } = useCanalesQuery();
-  
+
   const { 
     pipelines,
     stages,
     isLoading: stagesLoading
   } = usePipelines();
-  
+
   const { 
     data: conversationsData = [],
     isLoading: conversationsLoading, 
     refetch: refetchConversations
   } = useConversations();
-  
+
   const { 
     data: messages = [], 
     isLoading: messagesLoading,
@@ -107,19 +84,15 @@ const ConversationsPage = () => {
     sendMessage,
   } = useMessages(conversationId);
 
-  // Agrupa conversaciones por lead
   const conversations = useMemo(() => {
     return conversationsData;
   }, [conversationsData]);
   
   const groupedConversations = useMemo(() => {
-    // Agrupar conversaciones por lead_id
     const grouped: Record<string, any> = {};
-    
     conversations.forEach((conv) => {
       const leadId = conv.lead_id;
       if (!grouped[leadId]) {
-        // Información de asignación y etiquetas para los filtros
         const leadTags = conv.lead?.tags || [];
         const asignadoA = conv.lead?.asignado_a;
         const agenteName = conv.lead?.agente_nombre || '';
@@ -133,10 +106,8 @@ const ConversationsPage = () => {
           lead_email: conv.lead?.email,
           lead_telefono: conv.lead?.telefono,
           lead_score: conv.lead?.score,
-          // Añadimos la información completa del lead en la propiedad lead para tener acceso a todos sus datos
           lead: {
             ...conv.lead,
-            // Nos aseguramos que estos campos críticos para los filtros siempre existan
             asignado_a: asignadoA || null,
             agente_nombre: agenteName,
             agente_email: agentEmail,
@@ -147,11 +118,6 @@ const ConversationsPage = () => {
           total_mensajes_sin_leer: 0,
           ultima_actualizacion: conv.ultimo_mensaje || conv.created_at,
         };
-
-        // Debug para verificar
-        if (asignadoA) {
-          console.log(`Lead ${leadId} asignado a: ${asignadoA}, nombre: ${agenteName}`);
-        }
       }
       
       grouped[leadId].conversations.push({
@@ -173,44 +139,36 @@ const ConversationsPage = () => {
       
       grouped[leadId].total_mensajes_sin_leer += (conv.unread_count || 0);
       
-      // Actualiza la fecha más reciente
       if (new Date(conv.ultimo_mensaje || conv.created_at) > new Date(grouped[leadId].ultima_actualizacion)) {
         grouped[leadId].ultima_actualizacion = conv.ultimo_mensaje || conv.created_at;
       }
     });
     
-    // Convertir a array y ordenar por última actualización
     return Object.values(grouped).sort((a, b) => 
       new Date(b.ultima_actualizacion).getTime() - new Date(a.ultima_actualizacion).getTime()
     );
   }, [conversations, canales]);
-  
+
   const selectedConversation = useMemo(() => {
     return conversations.find(conv => conv.id === conversationId);
   }, [conversations, conversationId]);
 
   const selectedLead = useMemo(() => {
-    if (selectedConversation) {
-      setSelectedLeadId(selectedConversation.lead_id);
-      return selectedConversation.lead;
-    }
     if (selectedLeadId) {
-      return conversations.find(conv => conv.lead_id === selectedLeadId)?.lead;
+      const leadData = groupedConversations.find(group => group.lead_id === selectedLeadId);
+      return leadData?.lead as LeadType | null;
     }
     return null;
-  }, [selectedConversation, conversations, selectedLeadId]);
+  }, [selectedLeadId, groupedConversations]);
 
   const leadConversations = useMemo(() => {
-    if (!selectedLead) return [];
-    return conversations
-      .filter(conv => conv.lead_id === selectedLead.id)
-      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-  }, [selectedLead, conversations]);
+    if (!selectedLeadId) return [];
+    const leadGroup = groupedConversations.find(group => group.lead_id === selectedLeadId);
+    return leadGroup?.conversations || [];
+  }, [selectedLeadId, groupedConversations]);
 
-  // Estado para actualizar mensajes según la estructura de la tabla
   const processedMessages = useMemo(() => {
     return messages.map(msg => {
-      // Si el mensaje tiene audio asociado, agregar esa información
       const audioMessage = msg.audio || 
         (msg.metadata && msg.metadata.audio_url ? {
           archivo_url: msg.metadata.audio_url,
@@ -225,7 +183,6 @@ const ConversationsPage = () => {
     });
   }, [messages]);
 
-  // Toggle chatbot function
   const toggleChatbot = async (status?: boolean) => {
     if (!conversationId) return;
     
@@ -267,7 +224,6 @@ const ConversationsPage = () => {
     
     try {
       setIsLoadingComments(true);
-      // Modificado: Obteniendo comentarios sin unir con profiles
       const { data: comments, error } = await supabase
         .from('lead_comments')
         .select('*')
@@ -278,7 +234,6 @@ const ConversationsPage = () => {
         throw error;
       }
       
-      // Si hay comentarios, obtener información de usuarios por separado
       if (comments && comments.length > 0) {
         const userIds = [...new Set(comments.map(comment => comment.usuario_id).filter(Boolean))];
         
@@ -289,7 +244,6 @@ const ConversationsPage = () => {
             .in('id', userIds);
             
           if (!usersError && users) {
-            // Combinar datos manualmente
             const commentsWithUsers = comments.map(comment => {
               const userInfo = users.find(u => u.id === comment.usuario_id);
               return {
@@ -390,7 +344,6 @@ const ConversationsPage = () => {
     }
   };
 
-  // Función para asignar el lead al agente actual
   const handleAssignToMe = async () => {
     if (!selectedLeadId || !user?.id) return;
     
@@ -407,12 +360,8 @@ const ConversationsPage = () => {
       
       toast.success('Lead asignado correctamente');
       
-      // Añadir un pequeño retraso antes de refrescar para dar tiempo a la BD
       setTimeout(async () => {
-        // Forzar actualización de datos con refresco manual
         await refetchConversations();
-        
-        // También forzar refresco directo de este lead específico para asegurar datos actualizados
         if (selectedLeadId) {
           const { data: updatedLeadData } = await supabase
             .from('vista_lead_completa')
@@ -420,10 +369,8 @@ const ConversationsPage = () => {
             .eq('lead_id', selectedLeadId)
             .single();
           
-          // Si encontramos datos actualizados, recargar la página para forzar actualización de UI
           if (updatedLeadData && updatedLeadData.asignado_a === user.id) {
             console.log("Lead asignado correctamente, datos actualizados:", updatedLeadData);
-            // Opcionalmente forzar actualización si es necesario
             if (conversationId) {
               navigate(`/dashboard/conversations/${conversationId}?refresh=${new Date().getTime()}`);
             }
@@ -439,7 +386,6 @@ const ConversationsPage = () => {
     }
   };
 
-  // Función para liberar la asignación del lead
   const handleReleaseAssignment = async () => {
     if (!selectedLeadId) return;
     
@@ -465,7 +411,6 @@ const ConversationsPage = () => {
     }
   };
 
-  // Función para transferir el lead a otro agente
   const handleTransferLead = async () => {
     if (!selectedLeadId || !selectedAgentId) return;
     
@@ -492,7 +437,6 @@ const ConversationsPage = () => {
     }
   };
 
-  // Cargar lista de agentes para transferencia
   useEffect(() => {
     const fetchAgents = async () => {
       if (!user?.companyId || !transferDialogOpen) return;
@@ -522,25 +466,21 @@ const ConversationsPage = () => {
     }
   }, [transferDialogOpen, user?.companyId, user?.id]);
 
-  // Marcar mensajes como leídos cuando se carga una conversación
   useEffect(() => {
     if (conversationId) {
       markAsRead(conversationId);
     }
   }, [conversationId, markAsRead]);
 
-  // Cargar comentarios del lead
   useEffect(() => {
     if (selectedLeadId) {
       fetchLeadComments(selectedLeadId);
     }
   }, [selectedLeadId]);
 
-  // Suscripción en tiempo real para cambios en leads
   useEffect(() => {
     if (!user?.companyId) return;
     
-    // Crear un canal para escuchar cambios en la tabla de leads
     const channel = supabase
       .channel('leads-assignment-changes')
       .on('postgres_changes', 
@@ -551,7 +491,6 @@ const ConversationsPage = () => {
           filter: `asignado_a=is.not.null`
         }, 
         (payload) => {
-          // Recargar datos cuando un lead es asignado o reasignado
           refetchConversations();
         }
       )
@@ -563,19 +502,16 @@ const ConversationsPage = () => {
           filter: `asignado_a=is.null`
         }, 
         (payload) => {
-          // Recargar datos cuando un lead es liberado de asignación
           refetchConversations();
         }
       )
       .subscribe();
     
-    // Limpiar suscripción al desmontar el componente
     return () => {
       supabase.removeChannel(channel);
     };
   }, [refetchConversations, user?.companyId]);
 
-  // Manejar el envío de mensajes
   const handleSendMessage = async (messageText: string) => {
     if (!messageText.trim() || !conversationId) return;
     
@@ -588,7 +524,6 @@ const ConversationsPage = () => {
     }
   };
 
-  // Función para formatear fechas en un formato legible
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const today = new Date();
@@ -604,14 +539,12 @@ const ConversationsPage = () => {
     }
   };
 
-  // Obtener el nombre del canal según su ID
   const getChannelName = (canalId: string | null) => {
     if (!canalId) return "N/A";
     const canal = canales.find(c => c.id === canalId);
     return canal ? canal.nombre : "N/A";
   };
 
-  // Verificar si el usuario tiene una empresa asociada
   if (!user?.companyId) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -621,156 +554,129 @@ const ConversationsPage = () => {
   }
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] overflow-hidden bg-background">
-      {/* Panel lateral de conversaciones */}
+    <div className="flex h-[calc(100vh-4rem)] overflow-hidden bg-background text-foreground">
       <LeadsList 
         isLoading={conversationsLoading}
         groupedConversations={groupedConversations}
         selectedLeadId={selectedLeadId} 
-        setSelectedLeadId={setSelectedLeadId}
+        setSelectedLeadId={(leadId) => {
+          setSelectedLeadId(leadId);
+          const leadGroup = groupedConversations.find(g => g.lead_id === leadId);
+          if (leadGroup && leadGroup.conversations.length > 0) {
+            const firstConv = leadGroup.conversations.sort((a:any, b:any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+            if (firstConv && firstConv.id !== conversationId) {
+              navigate(`/dashboard/conversations/${firstConv.id}`);
+            }
+          } else if (!conversationId && leadId) {
+             navigate(`/dashboard/conversations`);
+          }
+        }}
         canales={canales}
       />
 
-      {/* Panel principal de mensajes */}
-      <div className="flex-1 flex flex-col h-full">
-        {conversationId ? (
-          <>
-            {/* Cabecera con información del lead */}
+      <main className="flex-1 flex flex-col h-full border-l border-r border-border">
+        {conversationId && selectedConversation ? (
+            <>
             <ChatHeader 
               selectedLead={selectedLead}
               selectedConversation={selectedConversation}
               toggleChatbot={toggleChatbot}
               toggleChatbotLoading={toggleChatbotLoading}
-              commentDialogOpen={commentDialogOpen}
-              setCommentDialogOpen={setCommentDialogOpen}
-              leadConversations={leadConversations}
               formatDate={formatDate}
-              leadComments={leadComments}
-              navigate={navigate}
-              updateLeadStage={updateLeadStage}
-              updateLeadScore={updateLeadScore}
-              stages={stages}
-              stagesLoading={stagesLoading}
-              activeTab={activeTab}
-              setActiveTab={setActiveTab}
-              // Nuevas props para manejar asignación de leads
-              handleAssignToMe={handleAssignToMe}
-              handleReleaseAssignment={handleReleaseAssignment}
-              isAssigning={isAssigning}
-              isReleasing={isReleasing}
-              openTransferDialog={() => setTransferDialogOpen(true)}
-              currentUserId={user?.id}
             />
 
-            {/* Contenedor principal del contenido */}
-            <div className="flex-1 flex flex-col overflow-hidden">
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col h-full">
-                <TabsContent value="mensajes" className="flex-1 flex flex-col h-full relative overflow-hidden m-0 p-0 data-[state=inactive]:hidden">
-                  {/* El componente de mensajes tendrá un padding inferior para dejar espacio al input */}
-                  <ChatMessages 
-                    messages={processedMessages}
-                    isLoading={messagesLoading}
-                    leadConversations={leadConversations}
-                    selectedLead={selectedLead}
-                    getChannelName={getChannelName}
-                  />
-
-                  {/* Input del chat, posicionado de forma sticky en la parte inferior */}
-                  <ChatInput 
-                    onSendMessage={handleSendMessage} 
-                    disabled={!conversationId}
-                  />
-                </TabsContent>
-
-                {/* Pestaña de Comentarios - Ocupa toda la altura disponible */}
-                <TabsContent value="comentarios" className="flex-1 flex flex-col h-full m-0 p-0 data-[state=inactive]:hidden">
-                  <LeadComments 
-                    isLoading={isLoadingComments}
-                    comments={leadComments}
-                    onAddComment={() => setCommentDialogOpen(true)}
-                  />
-                </TabsContent>
-
-                {/* Pestaña de Información del Lead - Ocupa toda la altura disponible */}
-                <TabsContent value="info" className="flex-1 flex flex-col h-full m-0 p-0 data-[state=inactive]:hidden">
-                  <LeadInfo 
-                    selectedLead={selectedLead}
-                    leadConversations={leadConversations}
-                    user={user}
-                    isAssigning={isAssigning}
-                    isReleasing={isReleasing}
-                    handleAssignToMe={handleAssignToMe}
-                    handleReleaseAssignment={handleReleaseAssignment}
-                    openTransferDialog={() => setTransferDialogOpen(true)}
-                  />
-                </TabsContent>
-              </Tabs>
-            </div>
-
-            {/* Diálogo para añadir comentarios */}
-            <Dialog open={commentDialogOpen} onOpenChange={setCommentDialogOpen}>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Añadir comentario</DialogTitle>
-                  <DialogDescription>
-                    Agrega un comentario sobre este lead para el equipo de ventas.
-                  </DialogDescription>
-                </DialogHeader>
-                <Textarea
-                  placeholder="Escribe tu comentario aquí..."
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  className="min-h-[100px]"
-                />
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="private-comment"
-                    checked={isPrivateComment}
-                    onChange={(e) => setIsPrivateComment(e.target.checked)}
-                    className="rounded"
-                  />
-                  <label htmlFor="private-comment" className="text-sm">Comentario privado</label>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setCommentDialogOpen(false)}>
-                    Cancelar
-                  </Button>
-                  <Button onClick={addLeadComment} disabled={submitCommentLoading || !newComment.trim()}>
-                    {submitCommentLoading ? (
-                      <>
-                        <span className="animate-spin mr-2">⏳</span>
-                        Guardando
-                      </>
-                    ) : 'Guardar comentario'}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-
-            {/* Diálogo de transferencia de lead */}
-            <TransferDialog
-              open={transferDialogOpen}
-              onOpenChange={setTransferDialogOpen}
-              agents={agents}
-              selectedAgentId={selectedAgentId}
-              setSelectedAgentId={setSelectedAgentId}
-              isTransferring={isTransferring}
-              handleTransfer={handleTransferLead}
+            <ChatMessages 
+              messages={processedMessages}
+              isLoading={messagesLoading}
+              leadConversations={leadConversations}
+              selectedLead={selectedLead}
+              getChannelName={getChannelName}
             />
-          </>
+
+            <ChatInput 
+              onSendMessage={handleSendMessage} 
+              disabled={!conversationId}
+            />
+            </>
         ) : (
-          <div className="h-full flex items-center justify-center bg-card/5">
+          <div className="h-full flex items-center justify-center bg-muted/30">
             <div className="text-center max-w-md mx-auto p-8">
               <MessageSquare className="h-16 w-16 text-muted-foreground mx-auto mb-6 opacity-20" />
               <h3 className="text-xl font-medium mb-2">Mensajes</h3>
               <p className="text-muted-foreground mb-6">
-                Selecciona una conversación de la lista para comenzar a chatear con tus leads.
+                {selectedLeadId 
+                  ? "Selecciona o inicia una conversación para este lead."
+                  : "Selecciona un lead de la lista para ver sus conversaciones."
+                }
               </p>
             </div>
           </div>
         )}
-      </div>
+      </main>
+
+      <LeadDetailSidebar
+        selectedLead={selectedLead}
+        leadComments={leadComments}
+        isLoadingComments={isLoadingComments}
+        onAddComment={() => setCommentDialogOpen(true)}
+        user={user}
+        isAssigning={isAssigning}
+        isReleasing={isReleasing}
+        handleAssignToMe={handleAssignToMe}
+        handleReleaseAssignment={handleReleaseAssignment}
+        openTransferDialog={() => setTransferDialogOpen(true)}
+        leadConversations={leadConversations}
+      />
+
+      <Dialog open={commentDialogOpen} onOpenChange={setCommentDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Añadir comentario</DialogTitle>
+            <DialogDescription>
+              Agrega un comentario sobre este lead para el equipo de ventas.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            placeholder="Escribe tu comentario aquí..."
+            value={newComment}
+            onChange={(e) => setNewComment(e.target.value)}
+            className="min-h-[100px]"
+          />
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="private-comment"
+              checked={isPrivateComment}
+              onChange={(e) => setIsPrivateComment(e.target.checked)}
+              className="rounded"
+            />
+            <label htmlFor="private-comment" className="text-sm">Comentario privado</label>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCommentDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={addLeadComment} disabled={submitCommentLoading || !newComment.trim()}>
+              {submitCommentLoading ? (
+                <>
+                  <span className="animate-spin mr-2">⏳</span>
+                  Guardando
+                </>
+              ) : 'Guardar comentario'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <TransferDialog
+        open={transferDialogOpen}
+        onOpenChange={setTransferDialogOpen}
+        agents={agents}
+        selectedAgentId={selectedAgentId}
+        setSelectedAgentId={setSelectedAgentId}
+        isTransferring={isTransferring}
+        handleTransfer={handleTransferLead}
+      />
     </div>
   );
 };
