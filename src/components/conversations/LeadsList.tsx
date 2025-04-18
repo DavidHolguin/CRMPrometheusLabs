@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { CanalIcon } from "@/components/canales/CanalIcon";
+import { LeadCardModern } from "./LeadCardModern";
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -594,124 +595,41 @@ const LeadsList = ({
         ) : (
           <div className="py-2">
             {processedConversations.map((group) => {
-              const leadName = `${group.lead_nombre || ''} ${group.lead_apellido || ''}`.trim() || 'Sin nombre';
-              const hasUnread = group.total_mensajes_sin_leer > 0;
-              const latestConversation = group.conversations[0];
+              // Obtener la temperatura del lead basada en el score
+              const getLeadTemperature = (score: number | undefined) => {
+                if (!score) return undefined;
+                if (score >= 70) return 'Hot';
+                if (score >= 40) return 'Warm';
+                return 'Cold';
+              };
+              
+              // Prepara los datos del lead para el nuevo componente
+              const leadData = {
+                lead_id: group.lead_id,
+                lead_nombre: group.lead_nombre,
+                lead_apellido: group.lead_apellido,
+                lead_score: group.lead_score,
+                ultima_actualizacion: group.ultima_actualizacion,
+                total_mensajes_sin_leer: group.total_mensajes_sin_leer,
+                ultimo_mensaje: group.ultimo_mensaje,
+                temperatura: getLeadTemperature(group.lead_score),
+                conversations: group.conversations,
+                lead: group.lead
+              };
               
               return (
-                <div key={group.lead_id} className="mb-1">
-                  <div
-                    className={`
-                      p-3 cursor-pointer hover:bg-muted transition-colors
-                      ${selectedLeadId === group.lead_id ? 'bg-muted' : ''}
-                      ${hasUnread ? 'border-l-4 border-primary' : ''}
-                    `}
-                    onClick={() => {
-                      setSelectedLeadId(group.lead_id);
-                      if (group.conversations.length > 0) {
-                        navigate(`/dashboard/conversations/${group.conversations[0].id}`);
-                      }
-                    }}
-                  >
-                    <div className="flex items-start space-x-3">
-                      <Avatar className="h-10 w-10 flex-shrink-0">
-                        <AvatarFallback className="bg-primary/10 text-primary">
-                          {getInitials(leadName)}
-                        </AvatarFallback>
-                      </Avatar>
-                      
-                      <div className="flex-1 min-w-0">
-                        <div className="flex justify-between">
-                          <h3 className="font-medium text-sm truncate">
-                            {leadName}
-                            {hasUnread && (
-                              <Badge variant="default" className="ml-2 text-xs">
-                                {group.total_mensajes_sin_leer}
-                              </Badge>
-                            )}
-                          </h3>
-                          <span className="text-xs text-muted-foreground whitespace-nowrap">
-                            {formatDate(group.ultima_actualizacion)}
-                          </span>
-                        </div>
-                        
-                        <div className="mt-1 flex flex-wrap gap-2">
-                          <div className="flex items-center text-xs text-muted-foreground">
-                            <CanalIcon 
-                              tipo={getChannelType(latestConversation?.canal_id || null)} 
-                              size={12} 
-                              className="mr-1" 
-                            />
-                            <span className="truncate max-w-[90px]">
-                              {getChannelName(latestConversation?.canal_id || null)}
-                            </span>
-                          </div>
-                          
-                          <div className="flex items-center text-xs text-muted-foreground">
-                            <MessageSquare className="h-3 w-3 mr-1" />
-                            <span>{group.conversations.reduce((acc: number, conv: any) => acc + (conv.message_count || 0), 0)}</span>
-                          </div>
-                          
-                          {group.lead_score !== undefined && (
-                            <div className="flex items-center text-xs">
-                              <Badge 
-                                variant={group.lead_score > 70 ? "default" : 
-                                      (group.lead_score > 40 ? "secondary" : "outline")}
-                                className="px-1.5 py-0 h-4"
-                              >
-                                {group.lead_score || 0}
-                              </Badge>
-                            </div>
-                          )}
-                        </div>
-                        
-                        {group.lead?.asignado_a && (
-                          <div className="mt-1 text-xs flex items-center text-muted-foreground">
-                            <UserCheck className="h-3 w-3 mr-1" />
-                            <span className="truncate">{
-                              group.lead?.asignado_a === user?.id ? 
-                                'Asignado a ti' : 
-                                group.lead?.agente_nombre ? 
-                                  `Asignado a ${group.lead.agente_nombre}` : 
-                                  'Asignado'
-                            }</span>
-                          </div>
-                        )}
-                        
-                        {/* Mostrar etiquetas si tiene */}
-                        {group.lead?.tags && group.lead.tags.length > 0 && (
-                          <div className="mt-1 flex flex-wrap gap-1">
-                            {group.lead.tags.slice(0, 2).map((tag: any) => (
-                              <Badge 
-                                key={tag.id}
-                                variant="outline" 
-                                className="text-xs px-1 py-0 h-4"
-                                style={{ 
-                                  backgroundColor: `${tag.color}20`, 
-                                  color: tag.color,
-                                  borderColor: `${tag.color}50`
-                                }}
-                              >
-                                {tag.nombre}
-                              </Badge>
-                            ))}
-                            {group.lead.tags.length > 2 && (
-                              <Badge variant="outline" className="text-xs px-1 py-0 h-4">
-                                +{group.lead.tags.length - 2}
-                              </Badge>
-                            )}
-                          </div>
-                        )}
-                        
-                        {group.conversations.length > 1 && (
-                          <div className="mt-1 text-xs text-muted-foreground">
-                            {group.conversations.length} conversaciones
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <LeadCardModern 
+                  key={group.lead_id}
+                  lead={leadData}
+                  canales={canales}
+                  isSelected={selectedLeadId === group.lead_id}
+                  onClick={() => {
+                    setSelectedLeadId(group.lead_id);
+                    if (group.conversations.length > 0) {
+                      navigate(`/dashboard/conversations/${group.conversations[0].id}`);
+                    }
+                  }}
+                />
               );
             })}
           </div>
