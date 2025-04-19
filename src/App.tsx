@@ -22,6 +22,7 @@ import PipelineManagement from "./pages/PipelineManagement";
 import Canales from "./pages/Canales";
 import EntrenamientoIA from "./pages/EntrenamientoIA";
 import PerfilEmpresa from "./pages/PerfilEmpresa";
+import ChatbotConfig from "./pages/ChatbotConfig";
 
 // Admin pages
 import AdminAgentes from "./pages/admin/AdminAgentes";
@@ -74,6 +75,7 @@ const App = () => {
           <Route path="conversations" element={<ConversationsPage />} />
           <Route path="conversations/:conversationId" element={<ConversationsPage />} />
           <Route path="chatbots" element={<Chatbots />} />
+          <Route path="chatbots/:chatbotId/settings" element={<ChatbotConfig />} />
           <Route path="entrenamiento-ia" element={<EntrenamientoIA />} />
           <Route path="perfil-empresa" element={<PerfilEmpresa />} />
           <Route path="settings" element={<Dashboard />} />

@@ -1,10 +1,9 @@
-
 import { useState, useEffect } from "react";
 import { Chatbot } from "@/hooks/useChatbots";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { MoreHorizontal, Edit, Trash2, MessageSquare, Bot, Copy, Share2, Globe, Mail, Instagram, Facebook, ArrowUpRight, ArrowDownRight } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { MoreHorizontal, Edit, Trash2, MessageSquare, Bot, Copy, Share2, Globe, Mail, Instagram, Facebook, ArrowUpRight, ArrowDownRight, Settings } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -12,6 +11,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { EditChatbotModal } from "./EditChatbotModal";
+import { useNavigate } from "react-router-dom";
 
 interface ChatbotListProps {
   chatbots: Chatbot[];
@@ -33,6 +33,7 @@ export function ChatbotList({ chatbots, onDelete, onEdit, onLiveView }: ChatbotL
   const [isDeleting, setIsDeleting] = useState(false);
   const [chatbotStats, setChatbotStats] = useState<Record<string, ChatbotStats>>({});
   const [isLoadingStats, setIsLoadingStats] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (chatbots.length > 0) {
@@ -330,6 +331,15 @@ export function ChatbotList({ chatbots, onDelete, onEdit, onLiveView }: ChatbotL
                             <Edit size={14} />
                             Editar
                           </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem 
+                            onClick={() => navigate(`/chatbots/${chatbot.id}/settings`)}
+                            className="gap-2 text-sm"
+                          >
+                            <Settings size={14} />
+                            Configuración avanzada
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
                           <DropdownMenuItem 
                             onClick={() => setDeletingChatbot(chatbot)}
                             className="text-destructive gap-2 text-sm"
