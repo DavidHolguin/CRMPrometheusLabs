@@ -1,4 +1,3 @@
-
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -15,6 +14,8 @@ export interface Chatbot {
   instrucciones: string | null;
   created_at: string;
   updated_at: string;
+  llm_configuracion_id: string | null;
+  pipeline_id: string | null;
   contexto?: {
     generalContext?: string | null;
     welcomeMessage?: string | null;
@@ -39,7 +40,7 @@ export interface ChatbotContext {
   communication_tone: string | null;
   main_purpose: string | null;
   special_instructions: string | null;
-  prompt_template: string | null;
+  promt_templete: string | null;  // Corregido de prompt_template a promt_templete
   key_points: any[] | null;
   qa_examples: any[] | null;
   created_at: string;
@@ -69,7 +70,7 @@ export function useChatbots() {
             communication_tone,
             main_purpose,
             special_instructions,
-            prompt_template,
+            promt_templete,
             key_points,
             qa_examples
           )
@@ -136,7 +137,7 @@ export function useChatbots() {
           communicationTone: contextoItems[0]?.communication_tone || null,
           personality: contextoItems[0]?.personality || null,
           specialInstructions: contextoItems[0]?.special_instructions || null,
-          promptTemplate: contextoItems[0]?.prompt_template || null,
+          promptTemplate: contextoItems[0]?.promt_templete || null,  // Corregido de prompt_template a promt_templete
           keyPoints,
           qaExamples
         } : null;
@@ -175,7 +176,7 @@ export function useChatbot(id: string | undefined) {
             communication_tone,
             main_purpose,
             special_instructions,
-            prompt_template,
+            promt_templete,
             key_points,
             qa_examples
           )
@@ -240,7 +241,7 @@ export function useChatbot(id: string | undefined) {
         communicationTone: contextoItems[0]?.communication_tone || null,
         personality: contextoItems[0]?.personality || null,
         specialInstructions: contextoItems[0]?.special_instructions || null,
-        promptTemplate: contextoItems[0]?.prompt_template || null,
+        promptTemplate: contextoItems[0]?.promt_templete || null,  // Corregido de prompt_template a promt_templete
         keyPoints,
         qaExamples
       } : null;

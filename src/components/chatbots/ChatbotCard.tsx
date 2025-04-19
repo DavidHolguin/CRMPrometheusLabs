@@ -1,17 +1,17 @@
-
 import { useState, useEffect } from "react";
 import { Chatbot } from "@/hooks/useChatbots";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { MoreHorizontal, Edit, Trash2, MessageSquare, Bot, Copy, Share2, Globe, Mail, Instagram, Facebook, ArrowUpRight, ArrowDownRight } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { MoreHorizontal, Edit, Trash2, MessageSquare, Bot, Copy, Share2, Globe, Mail, Instagram, Facebook, ArrowUpRight, ArrowDownRight, Settings } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { EditChatbotModal } from "./EditChatbotModal";
+import { useNavigate } from "react-router-dom";
 
 interface ChatbotCardProps {
   chatbot: Chatbot;
@@ -35,6 +35,7 @@ export function ChatbotCard({ chatbot, onDelete, onEdit, onLiveView }: ChatbotCa
   const [isDeleting, setIsDeleting] = useState(false);
   const [stats, setStats] = useState<ChatbotStats | null>(null);
   const [isLoadingStats, setIsLoadingStats] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchChatbotStats();
@@ -217,6 +218,14 @@ export function ChatbotCard({ chatbot, onDelete, onEdit, onLiveView }: ChatbotCa
               <DropdownMenuItem onClick={shareChatbot} className="gap-2 text-sm">
                 <Share2 size={14} />
                 Compartir enlace
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                onClick={() => navigate(`/chatbots/${chatbot.id}/settings`)}
+                className="gap-2 text-sm"
+              >
+                <Settings size={14} />
+                Configuración avanzada
               </DropdownMenuItem>
               <DropdownMenuItem 
                 onClick={() => setIsDeleteDialogOpen(true)}
