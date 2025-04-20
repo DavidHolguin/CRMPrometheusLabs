@@ -78,7 +78,6 @@ import { ChatbotSelector } from "../../components/prompts/ChatbotSelector";
 // Tipos
 interface PromptTemplate {
   id: string;
-  empresa_id: string;
   nombre: string;
   descripcion: string;
   tipo_template: string;
@@ -90,22 +89,20 @@ interface PromptTemplate {
   updated_at: string;
 }
 
-interface ChatbotMapping {
+interface ChatbotContexto {
   id: string;
   chatbot_id: string;
-  prompt_template_id: string;
+  promt_templete: number; // Nota: este nombre tiene un error ortográfico en la BD
+  tipo: string;
+  contenido: string;
   orden: number;
-  parametros: Record<string, any>;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
 }
 
 // Hook personalizado para los Prompt Templates
 const usePromptTemplates = () => {
   const { user } = useAuth();
   const [templates, setTemplates] = useState<PromptTemplate[]>([]);
-  const [chatbotMappings, setChatbotMappings] = useState<ChatbotMapping[]>([]);
+  const [chatbotContextos, setChatbotContextos] = useState<ChatbotContexto[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -129,37 +126,28 @@ const usePromptTemplates = () => {
     }
   };
 
-  // Obtener asignaciones de chatbot
-  const fetchChatbotMappings = async () => {
+  // Obtener contextos de chatbot que tienen prompts asignados
+  const fetchChatbotContextos = async () => {
     try {
       const { data, error } = await supabase
-        .from('chatbot_prompt_mapping')
-        .select('*');
+        .from('chatbot_contextos')
+        .select('*')
+        .not('promt_templete', 'is', null);
 
       if (error) throw error;
-      setChatbotMappings(data || []);
+      setChatbotContextos(data || []);
     } catch (err: any) {
-      console.error('Error al cargar asignaciones:', err);
+      console.error('Error al cargar contextos de chatbot:', err);
     }
   };
 
   // Crear template
   const createTemplate = async (template: Omit<PromptTemplate, 'id' | 'created_at' | 'updated_at'>) => {
     try {
-      // Asegurarse de que empresa_id esté establecido
-      if (!user?.companyId) {
-        throw new Error('No hay ID de empresa asociada al usuario actual');
-      }
-
-      // El empresa_id debe ser un UUID, así que lo usamos directamente como string
-      const templateWithEmpresaId = {
-        ...template,
-        empresa_id: user.companyId // Ya es un UUID, no intentamos convertirlo
-      };
-
+      // Ya no necesitamos empresa_id
       const { data, error } = await supabase
         .from('prompt_templates')
-        .insert([templateWithEmpresaId])
+        .insert([template])
         .select()
         .single();
 
@@ -176,11 +164,6 @@ const usePromptTemplates = () => {
   // Actualizar template
   const updateTemplate = async (id: string, updates: Partial<PromptTemplate>) => {
     try {
-      // Asegurarse de que empresa_id esté establecido si se está actualizando
-      if (updates.empresa_id === undefined && user?.companyId) {
-        updates.empresa_id = user.companyId; // Ya es un UUID, no intentamos convertirlo
-      }
-
       const { data, error } = await supabase
         .from('prompt_templates')
         .update(updates)
@@ -218,17 +201,47 @@ const usePromptTemplates = () => {
   };
 
   // Asignar template a chatbot
-  const assignTemplateToChatbot = async (mapping: Omit<ChatbotMapping, 'id' | 'created_at' | 'updated_at'>) => {
+  const assignTemplateToChatbot = async (chatbotId: string, templateId: number, tipo: string = 'prompt') => {
     try {
-      const { data, error } = await supabase
-        .from('chatbot_prompt_mapping')
-        .insert([mapping])
-        .select();
+      // Verificamos si ya existe un registro con ese tipo para el chatbot
+      const { data: existingContextos } = await supabase
+        .from('chatbot_contextos')
+        .select('*')
+        .eq('chatbot_id', chatbotId)
+        .eq('tipo', tipo);
+      
+      if (existingContextos && existingContextos.length > 0) {
+        // Si existe, actualizamos el promt_templete
+        const { data, error } = await supabase
+          .from('chatbot_contextos')
+          .update({ promt_templete: templateId })
+          .eq('id', existingContextos[0].id)
+          .select();
 
-      if (error) throw error;
-      setChatbotMappings(prev => [...prev, ...data]);
+        if (error) throw error;
+        setChatbotContextos(prev => prev.map(ctx => 
+          ctx.id === existingContextos[0].id 
+            ? { ...ctx, promt_templete: templateId } 
+            : ctx
+        ));
+      } else {
+        // Si no existe, creamos un nuevo registro
+        const { data, error } = await supabase
+          .from('chatbot_contextos')
+          .insert([{
+            chatbot_id: chatbotId,
+            promt_templete: templateId,
+            tipo: tipo,
+            contenido: '',
+            orden: 1
+          }])
+          .select();
+
+        if (error) throw error;
+        if (data) setChatbotContextos(prev => [...prev, ...data]);
+      }
+      
       toast.success('Plantilla asignada al chatbot correctamente');
-      return data;
     } catch (err: any) {
       toast.error('Error al asignar la plantilla');
       throw err;
@@ -236,15 +249,15 @@ const usePromptTemplates = () => {
   };
 
   // Desasignar template de chatbot
-  const unassignTemplateFromChatbot = async (mappingId: string) => {
+  const unassignTemplateFromChatbot = async (contextoId: string) => {
     try {
       const { error } = await supabase
-        .from('chatbot_prompt_mapping')
-        .delete()
-        .eq('id', mappingId);
+        .from('chatbot_contextos')
+        .update({ promt_templete: null })
+        .eq('id', contextoId);
 
       if (error) throw error;
-      setChatbotMappings(prev => prev.filter(mapping => mapping.id !== mappingId));
+      setChatbotContextos(prev => prev.filter(ctx => ctx.id !== contextoId));
       toast.success('Asignación eliminada correctamente');
     } catch (err: any) {
       toast.error('Error al eliminar la asignación');
@@ -255,12 +268,12 @@ const usePromptTemplates = () => {
   // Cargar datos al iniciar
   useEffect(() => {
     fetchTemplates();
-    fetchChatbotMappings();
+    fetchChatbotContextos();
   }, [user?.id]);
 
   return {
     templates,
-    chatbotMappings,
+    chatbotContextos, 
     isLoading,
     error,
     createTemplate,
@@ -269,7 +282,7 @@ const usePromptTemplates = () => {
     assignTemplateToChatbot,
     unassignTemplateFromChatbot,
     refreshTemplates: fetchTemplates,
-    refreshMappings: fetchChatbotMappings,
+    refreshContextos: fetchChatbotContextos,
   };
 };
 
@@ -277,7 +290,7 @@ const usePromptTemplates = () => {
 export default function AdminPrompts() {
   const {
     templates,
-    chatbotMappings,
+    chatbotContextos,
     isLoading,
     createTemplate,
     updateTemplate,
@@ -293,7 +306,7 @@ export default function AdminPrompts() {
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<PromptTemplate | null>(null);
   const [isChatbotSelectorOpen, setIsChatbotSelectorOpen] = useState(false);
-  const [templateForChatbot, setTemplateForChatbot] = useState<string | null>(null);
+  const [templateForChatbot, setTemplateForChatbot] = useState<number | null>(null);
 
   // Filtrar templates según búsqueda y tipo seleccionado
   const filteredTemplates = useMemo(() => {
@@ -301,11 +314,11 @@ export default function AdminPrompts() {
       const matchesQuery =
         searchQuery === "" ||
         template.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        template.descripcion.toLowerCase().includes(searchQuery.toLowerCase());
+        template.descripcion?.toLowerCase().includes(searchQuery.toLowerCase());
       
       const matchesType =
         selectedType === "all" ||
-        template.tipo_template.toLowerCase() === selectedType.toLowerCase();
+        template.tipo_template?.toLowerCase() === selectedType.toLowerCase();
 
       return matchesQuery && matchesType;
     });
@@ -321,6 +334,12 @@ export default function AdminPrompts() {
     });
     return Array.from(types);
   }, [templates]);
+
+  // Obtener el número de chatbots con plantillas asignadas
+  const chatbotsWithTemplates = useMemo(() => {
+    const chatbotIds = new Set(chatbotContextos.map(ctx => ctx.chatbot_id));
+    return chatbotIds.size;
+  }, [chatbotContextos]);
 
   // Gestionar apertura/cierre del editor
   const handleEditorClose = () => {
@@ -365,22 +384,17 @@ export default function AdminPrompts() {
 
   // Abrir selector de chatbot
   const handleOpenChatbotSelector = (templateId: string) => {
-    setTemplateForChatbot(templateId);
+    // Convertir templateId a número ya que promt_templete es de tipo number
+    setTemplateForChatbot(Number(templateId));
     setIsChatbotSelectorOpen(true);
   };
 
   // Asignar template a chatbot
-  const handleAssignToChatbot = async (chatbotId: string, parametros: Record<string, any> = {}) => {
+  const handleAssignToChatbot = async (chatbotId: string, tipo: string = "prompt") => {
     if (!templateForChatbot) return;
     
     try {
-      await assignTemplateToChatbot({
-        chatbot_id: chatbotId,
-        prompt_template_id: templateForChatbot,
-        orden: 1,
-        parametros,
-        is_active: true
-      });
+      await assignTemplateToChatbot(chatbotId, templateForChatbot, tipo);
       setIsChatbotSelectorOpen(false);
     } catch (error) {
       console.error("Error al asignar template a chatbot:", error);
@@ -389,6 +403,7 @@ export default function AdminPrompts() {
 
   return (
     <div className="container py-6 space-y-6">
+      {/* Encabezado de página con título y botón de nueva plantilla */}
       <div className="flex flex-col space-y-2 md:flex-row md:items-center md:justify-between md:space-y-0">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Plantillas de Prompts</h2>
@@ -396,21 +411,28 @@ export default function AdminPrompts() {
             Crea y gestiona plantillas de prompt estratégicas para tus chatbots
           </p>
         </div>
-        <Button onClick={() => handleOpenEditor()}>
+        <Button onClick={() => handleOpenEditor()} className="relative overflow-hidden group">
+          <div className="absolute inset-0 w-3 bg-gradient-to-r from-primary/80 via-primary/0 to-transparent transition-all duration-300 -translate-x-full group-hover:translate-x-[500%]"></div>
           <PlusCircle className="mr-2 h-4 w-4" />
           Nueva plantilla
         </Button>
       </div>
 
+      {/* Tarjetas de estadísticas */}
       <div className="grid gap-6 md:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <Card className="overflow-hidden border border-border/40 shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-muted/20">
             <CardTitle className="text-sm font-medium">
               Total de plantillas
             </CardTitle>
-            <FileCode2 className="h-4 w-4 text-muted-foreground" />
+            <div className="relative">
+              <div className="absolute -inset-1 rounded-xl bg-gradient-to-r from-primary/30 to-primary/20 opacity-70 blur-sm"></div>
+              <div className="relative flex h-8 w-8 items-center justify-center rounded-xl bg-background">
+                <FileCode2 className="h-4 w-4 text-primary" />
+              </div>
+            </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-4">
             <div className="text-2xl font-bold">{templates.length}</div>
             <p className="text-xs text-muted-foreground mt-1">
               {templates.filter(t => t.is_active).length} activas ·{" "}
@@ -419,17 +441,23 @@ export default function AdminPrompts() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
+        <Card className="overflow-hidden border border-border/40 shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-muted/20">
             <CardTitle className="text-sm font-medium">
               Tipos de plantillas
             </CardTitle>
+            <div className="relative">
+              <div className="absolute -inset-1 rounded-xl bg-gradient-to-r from-blue-500/30 to-cyan-500/20 opacity-70 blur-sm"></div>
+              <div className="relative flex h-8 w-8 items-center justify-center rounded-xl bg-background">
+                <Code className="h-4 w-4 text-blue-500" />
+              </div>
+            </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-4">
             <div className="flex flex-wrap gap-2">
               {templateTypes.length > 0 ? (
                 templateTypes.map((type) => (
-                  <Badge key={type} variant="outline">
+                  <Badge key={type} variant="outline" className="bg-gradient-to-r from-blue-500/10 to-cyan-500/10 hover:from-blue-500/20 hover:to-cyan-500/20 transition-colors">
                     {type}
                   </Badge>
                 ))
@@ -440,23 +468,30 @@ export default function AdminPrompts() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
+        <Card className="overflow-hidden border border-border/40 shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-muted/20">
             <CardTitle className="text-sm font-medium">
               Chatbots con plantillas
             </CardTitle>
+            <div className="relative">
+              <div className="absolute -inset-1 rounded-xl bg-gradient-to-r from-purple-500/30 to-violet-500/20 opacity-70 blur-sm"></div>
+              <div className="relative flex h-8 w-8 items-center justify-center rounded-xl bg-background">
+                <Wand2 className="h-4 w-4 text-purple-500" />
+              </div>
+            </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-4">
             <div className="text-2xl font-bold">
-              {new Set(chatbotMappings.map(m => m.chatbot_id)).size}
+              {chatbotsWithTemplates}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {chatbotMappings.length} asignaciones totales
+              {chatbotContextos.length} asignaciones totales
             </p>
           </CardContent>
         </Card>
       </div>
 
+      {/* Filtros y controles de vista */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <div className="relative w-full sm:w-[280px]">
@@ -464,7 +499,7 @@ export default function AdminPrompts() {
             <Input
               type="search"
               placeholder="Buscar plantilla..."
-              className="pl-9"
+              className="pl-9 border-border/40 focus-visible:ring-primary/30"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -473,7 +508,7 @@ export default function AdminPrompts() {
             value={selectedType}
             onValueChange={setSelectedType}
           >
-            <SelectTrigger className="w-full sm:w-[180px]">
+            <SelectTrigger className="w-full sm:w-[180px] border-border/40">
               <SelectValue placeholder="Filtrar por tipo" />
             </SelectTrigger>
             <SelectContent>
@@ -509,15 +544,27 @@ export default function AdminPrompts() {
         </div>
       </div>
 
+      {/* Estado de carga y mensajes de resultado vacío */}
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
-          <div className="animate-pulse text-muted-foreground">Cargando plantillas...</div>
+          <div className="flex flex-col items-center">
+            <div className="relative">
+              <div className="h-16 w-16 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <FileCode2 className="h-6 w-6 text-primary animate-pulse" />
+              </div>
+            </div>
+            <p className="mt-4 text-sm text-muted-foreground">Cargando plantillas...</p>
+          </div>
         </div>
       ) : filteredTemplates.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-center">
-          <FileCode2 className="h-12 w-12 text-muted-foreground mb-4 opacity-30" />
+          <div className="relative mb-4">
+            <div className="absolute -inset-4 rounded-full opacity-20 blur-lg bg-gradient-to-r from-primary/30 to-primary/20"></div>
+            <FileCode2 className="h-12 w-12 text-primary opacity-80" />
+          </div>
           <h3 className="text-lg font-medium">No se encontraron plantillas</h3>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-muted-foreground mt-1 max-w-md">
             {searchQuery || selectedType !== "all"
               ? "Prueba a cambiar los filtros de búsqueda"
               : "Comienza creando una nueva plantilla de prompt"}
@@ -525,7 +572,7 @@ export default function AdminPrompts() {
           {(searchQuery || selectedType !== "all") && (
             <Button
               variant="outline"
-              className="mt-4"
+              className="mt-4 border-dashed"
               onClick={() => {
                 setSearchQuery("");
                 setSelectedType("all");
@@ -535,7 +582,8 @@ export default function AdminPrompts() {
             </Button>
           )}
           {!searchQuery && selectedType === "all" && (
-            <Button className="mt-4" onClick={() => handleOpenEditor()}>
+            <Button className="mt-4 relative overflow-hidden group" onClick={() => handleOpenEditor()}>
+              <div className="absolute inset-0 w-3 bg-gradient-to-r from-primary/80 via-primary/0 to-transparent transition-all duration-300 -translate-x-full group-hover:translate-x-[500%]"></div>
               <PlusCircle className="mr-2 h-4 w-4" />
               Crear plantilla
             </Button>
@@ -543,79 +591,25 @@ export default function AdminPrompts() {
         </div>
       ) : (
         <>
+          {/* Vista de tarjetas */}
           {activeView === "grid" ? (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4">
               {filteredTemplates.map((template) => (
-                <Card key={template.id} className="flex flex-col overflow-hidden">
-                  <CardHeader className="pb-2">
-                    <div className="flex justify-between">
-                      <CardTitle className="truncate text-base">
-                        {template.nombre}
-                      </CardTitle>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => handleOpenEditor(template)}>
-                            <Edit className="mr-2 h-4 w-4" />
-                            Editar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleOpenChatbotSelector(template.id)}>
-                            <Wand2 className="mr-2 h-4 w-4" />
-                            Asignar a chatbot
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => {
-                            navigator.clipboard.writeText(template.contenido);
-                            toast.info("Contenido copiado al portapapeles");
-                          }}>
-                            <Copy className="mr-2 h-4 w-4" />
-                            Copiar contenido
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem 
-                            className="text-destructive focus:text-destructive" 
-                            onClick={() => handleDeleteTemplate(template.id)}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Eliminar
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                    {template.tipo_template && (
-                      <Badge variant="outline" className="mt-1 self-start">
-                        {template.tipo_template}
-                      </Badge>
-                    )}
-                  </CardHeader>
-                  <CardContent className="flex-grow p-4">
-                    <p className="text-muted-foreground text-sm line-clamp-2">
-                      {template.descripcion || "Sin descripción"}
-                    </p>
-                  </CardContent>
-                  <CardFooter className="flex justify-between p-4 pt-0 text-xs text-muted-foreground">
-                    <div className="flex items-center">
-                      <Code className="mr-1 h-3 w-3" />
-                      <span>
-                        {template.variables?.length || 0} variables
-                      </span>
-                    </div>
-                    <div>
-                      {new Date(template.updated_at).toLocaleDateString()}
-                    </div>
-                  </CardFooter>
-                </Card>
+                <PromptTemplateCard
+                  key={template.id}
+                  template={template}
+                  onEdit={handleOpenEditor}
+                  onDelete={handleDeleteTemplate}
+                  onAssign={handleOpenChatbotSelector}
+                  variant="card"
+                />
               ))}
             </div>
           ) : (
-            <div className="rounded-md border">
+            /* Vista de lista */
+            <div className="rounded-md border border-border/40 shadow-sm overflow-hidden">
               <Table>
-                <TableHeader>
+                <TableHeader className="bg-muted/20">
                   <TableRow>
                     <TableHead>Nombre</TableHead>
                     <TableHead>Tipo</TableHead>
@@ -626,64 +620,14 @@ export default function AdminPrompts() {
                 </TableHeader>
                 <TableBody>
                   {filteredTemplates.map((template) => (
-                    <TableRow key={template.id}>
-                      <TableCell>
-                        <div className="font-medium">{template.nombre}</div>
-                        <div className="text-sm text-muted-foreground line-clamp-1">
-                          {template.descripcion || "Sin descripción"}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {template.tipo_template && (
-                          <Badge variant="outline">
-                            {template.tipo_template}
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        {template.variables?.length || 0}
-                      </TableCell>
-                      <TableCell className="hidden lg:table-cell">
-                        {new Date(template.updated_at).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <MoreHorizontal className="h-4 w-4" />
-                              <span className="sr-only">Acciones</span>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => handleOpenEditor(template)}>
-                              <Edit className="mr-2 h-4 w-4" />
-                              Editar
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleOpenChatbotSelector(template.id)}>
-                              <Wand2 className="mr-2 h-4 w-4" />
-                              Asignar a chatbot
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => {
-                              navigator.clipboard.writeText(template.contenido);
-                              toast.info("Contenido copiado al portapapeles");
-                            }}>
-                              <Copy className="mr-2 h-4 w-4" />
-                              Copiar contenido
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem 
-                              className="text-destructive focus:text-destructive" 
-                              onClick={() => handleDeleteTemplate(template.id)}
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Eliminar
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
+                    <PromptTemplateCard
+                      key={template.id}
+                      template={template}
+                      onEdit={handleOpenEditor}
+                      onDelete={handleDeleteTemplate}
+                      onAssign={handleOpenChatbotSelector}
+                      variant="row"
+                    />
                   ))}
                 </TableBody>
               </Table>
@@ -726,7 +670,7 @@ export default function AdminPrompts() {
           </SheetHeader>
           <div className="py-4">
             <ChatbotSelector
-              templateId={templateForChatbot || ""}
+              templateId={templateForChatbot?.toString() || ""}
               onAssign={handleAssignToChatbot}
               onCancel={() => setIsChatbotSelectorOpen(false)}
             />
