@@ -214,19 +214,22 @@ export function useMessages(conversationId: string | undefined) {
   // Mark messages as read
   const markAsReadMutation = useMutation({
     mutationFn: async (conversationId: string) => {
-      // Mark all lead messages as read
+      console.log("Marcando mensajes como leídos para conversación:", conversationId);
+      
+      // Marcar todos los mensajes del lead/usuario como leídos
       const { error } = await supabase
         .from("mensajes")
         .update({ leido: true })
         .eq("conversacion_id", conversationId)
-        .eq("origen", "lead")
+        .in("origen", ["lead", "user"])
         .is("leido", false);
       
       if (error) {
         console.error("Error marcando mensajes como leídos:", error);
         throw error;
       }
-      
+
+      console.log("Mensajes marcados como leídos correctamente");
       return true;
     },
     onSuccess: () => {
