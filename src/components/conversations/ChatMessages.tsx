@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useRef, useEffect } from "react";
 import { Bot, Calendar, CheckCheck, Loader2, MessageSquare, User } from "lucide-react";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -43,6 +43,14 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
   getChannelName
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+
+  // Efecto para hacer scroll al último mensaje cada vez que cambian los mensajes
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages]);
 
   if (isLoading) {
     return (
@@ -174,7 +182,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
   };
 
   return (
-    <ScrollArea className="flex-1 p-4  conversation-background">
+    <ScrollArea className="flex-1 p-4 conversation-background" ref={scrollAreaRef}>
       <div className="space-y-4 chat-message-container">
         {(() => {
           let currentConversationId = '';
@@ -211,7 +219,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
             return renderMessageBubble(msg, senderType, isLead, isChatbot, isAgent, messageDate, index);
           });
         })()}
-        <div ref={messagesEndRef} />
+        <div ref={messagesEndRef} className="h-1" /> {/* Añadida altura para asegurar visibilidad */}
       </div>
     </ScrollArea>
   );

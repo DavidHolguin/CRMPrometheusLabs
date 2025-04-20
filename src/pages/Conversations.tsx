@@ -66,8 +66,7 @@ const ConversationsPage = () => {
   const { data: canales = [] } = useCanalesQuery();
 
   const { 
-    pipelines,
-    stages,
+    data: pipelines = [],
     isLoading: stagesLoading
   } = usePipelines();
 
@@ -438,39 +437,26 @@ const ConversationsPage = () => {
   };
 
   useEffect(() => {
-    const fetchAgents = async () => {
-      if (!user?.companyId || !transferDialogOpen) return;
-      
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('id, full_name, avatar_url, role')
-          .eq('empresa_id', user.companyId)
-          .eq('is_active', true)
-          .neq('id', user.id);
-          
-        if (error) {
-          throw error;
-        }
-        
-        setAgents(data || []);
-        
-      } catch (error) {
-        console.error('Error fetching agents:', error);
-        toast.error('No se pudieron cargar los agentes');
-      }
-    };
-    
-    if (transferDialogOpen) {
-      fetchAgents();
-    }
-  }, [transferDialogOpen, user?.companyId, user?.id]);
-
-  useEffect(() => {
     if (conversationId) {
+      // Marcar mensajes como leídos inmediatamente al cambiar de conversación
       markAsRead(conversationId);
     }
   }, [conversationId, markAsRead]);
+
+  // Nuevo efecto para marcar mensajes como leídos cuando llegan nuevos mensajes
+  useEffect(() => {
+    if (conversationId && messages.length > 0) {
+      // Verificar si hay mensajes sin leer del lead
+      const hasUnreadMessages = messages.some(msg => 
+        (msg.origen === 'lead' || msg.origen === 'user') && msg.leido === false
+      );
+      
+      if (hasUnreadMessages) {
+        console.log("Marcando mensajes no leídos como leídos");
+        markAsRead(conversationId);
+      }
+    }
+  }, [conversationId, messages, markAsRead]);
 
   useEffect(() => {
     if (selectedLeadId) {
