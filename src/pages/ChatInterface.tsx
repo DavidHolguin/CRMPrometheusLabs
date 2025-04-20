@@ -107,6 +107,15 @@ const ChatInterface = () => {
     };
   }, [recordingInterval]);
 
+  useEffect(() => {
+    const channel = setupRealtimeSubscription();
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [conversationId]);
+
   const fetchChatbotInfo = async () => {
     try {
       const { data, error } = await supabase
@@ -123,6 +132,64 @@ const ChatInterface = () => {
       console.error("Error fetching chatbot info:", error);
       setLoading(false);
     }
+  };
+
+  // Nueva función para suscribirse a mensajes en tiempo real
+  const setupRealtimeSubscription = () => {
+    if (!conversationId) return null;
+    
+    console.log(`Configurando suscripción en tiempo real para conversación: ${conversationId}`);
+    
+    // Usar un timestamp único para evitar conflictos de canales
+    const timestamp = Date.now();
+    const channelName = `chat-messages-${conversationId}-${timestamp}`;
+    
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT', // Escuchar solo inserciones para evitar duplicados
+          schema: 'public',
+          table: 'mensajes',
+          filter: `conversacion_id=eq.${conversationId}`
+        },
+        (payload) => {
+          console.log("Evento de mensaje en tiempo real recibido:", payload);
+          
+          if (payload.eventType === 'INSERT') {
+            const newMessage = payload.new as any;
+            console.log("Nuevo mensaje recibido:", newMessage);
+            
+            // Verificar que el mensaje no existe ya en el estado para evitar duplicados
+            const messageExists = messages.some(msg => msg.id === newMessage.id);
+            if (messageExists) {
+              console.log("Mensaje ya existe en el estado, omitiendo");
+              return;
+            }
+            
+            // Formatear el mensaje según la estructura esperada por ChatMessage
+            const formattedMessage: ChatMessage = {
+              id: newMessage.id,
+              contenido: newMessage.contenido,
+              origen: newMessage.origen,
+              created_at: newMessage.created_at,
+              metadata: newMessage.metadata || {}
+            };
+            
+            // Agregar el mensaje al estado
+            addMessage(formattedMessage);
+            
+            // Hacer scroll al último mensaje automáticamente
+            setTimeout(scrollToBottom, 100);
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log(`Estado de suscripción en tiempo real para ${channelName}: ${status}`);
+      });
+      
+    return channel;
   };
 
   const stopRecording = () => {
@@ -186,27 +253,39 @@ const ChatInterface = () => {
         let canalIdentificador = "web";
 
         try {
-          const { data: canalData, error: canalError } = await supabase
+          // Modificado para obtener todos los canales y elegir el canal web si existe
+          const { data: canalesData, error: canalError } = await supabase
             .from("chatbot_canales")
-            .select("canal_id")
-            .eq("chatbot_id", chatbotId)
-            .single();
-
+            .select("id, canal_id")
+            .eq("chatbot_id", chatbotId);
+          
           if (canalError) {
             console.warn("No se pudo obtener canal_id de chatbot_canales:", canalError);
-          } else if (canalData) {
-            canalId = canalData.canal_id;
-            console.log("Usando canal_id de chatbot_canales:", canalId);
+          } else if (canalesData && canalesData.length > 0) {
+            // Intentar encontrar el canal web primero
+            const canalWeb = canalesData.find(canal => canal.canal_id === 'web');
             
-            const { data: canalInfo, error: canalInfoError } = await supabase
-              .from("canales")
-              .select("tipo")
-              .eq("id", canalId)
-              .single();
-              
-            if (!canalInfoError && canalInfo) {
-              canalIdentificador = canalInfo.tipo || "web";
-              console.log("Usando canal_identificador:", canalIdentificador);
+            if (canalWeb) {
+              canalId = 'web'; // Usar 'web' como identificador para el canal web
+              console.log("Usando canal web encontrado:", canalWeb.id);
+            } else {
+              // Si no hay canal web, usar el primer canal disponible
+              canalId = canalesData[0].canal_id;
+              console.log("Usando primer canal disponible:", canalesData[0].id);
+            }
+            
+            // Obtener más información sobre el canal seleccionado
+            if (canalId) {
+              const { data: canalInfo, error: canalInfoError } = await supabase
+                .from("canales")
+                .select("tipo")
+                .eq("id", canalId)
+                .single();
+                
+              if (!canalInfoError && canalInfo) {
+                canalIdentificador = canalInfo.tipo || "web";
+                console.log("Usando canal_identificador:", canalIdentificador);
+              }
             }
           }
         } catch (canalError) {
@@ -466,7 +545,10 @@ const ChatInterface = () => {
   const renderMessageContent = (msg: ChatMessage) => {
     if (msg.isAudio) {
       return (
-        <AudioMessage audioUrl={msg.audioUrl || ''} duration={msg.audioDuration} />
+        <AudioMessage 
+          src={msg.audioUrl || ''} 
+          duration={msg.audioDuration || 0} 
+        />
       );
     }
 
@@ -733,21 +815,73 @@ const ChatInterface = () => {
       
       const apiEndpoint = "https://web-production-01457.up.railway.app";
       
+      // Obtenemos el canal_id del chatbot para Web Chat específicamente
+      const CANAL_WEB_ID = "13956803-a8ca-4087-8050-e3c98eafa4bd";
+      let canalId = CANAL_WEB_ID; // Valor predeterminado
+      let canalIdentificador = window.location.href;
+      
+      try {
+        // Modificado para obtener todos los canales y encontrar específicamente el canal web
+        const { data: canalesData, error: canalError } = await supabase
+          .from("chatbot_canales")
+          .select(`
+            id, 
+            canal_id
+          `)
+          .eq("chatbot_id", chatbotId);
+        
+        if (canalError) {
+          console.warn("No se pudo obtener canales de chatbot_canales:", canalError);
+        } else if (canalesData && canalesData.length > 0) {
+          // Buscar explícitamente el canal que tiene canal_id = CANAL_WEB_ID
+          const canalWebFound = canalesData.find(canal => canal.canal_id === CANAL_WEB_ID);
+          
+          if (canalWebFound) {
+            console.log(`Canal Web encontrado con ID: ${canalWebFound.id}`);
+            // Usamos el canal encontrado
+          } else {
+            // Si no existe un canal específicamente web, usar el primer canal disponible
+            console.log(`Canal Web no encontrado, usando el primer canal disponible: ${canalesData[0].canal_id}`);
+            canalId = canalesData[0].canal_id;
+          }
+        }
+      } catch (canalError) {
+        console.error("Error al obtener información del canal:", canalError);
+      }
+      
+      // Recopilamos metadata adicional
+      const metadata = {
+        browser: navigator.userAgent,
+        page: window.location.pathname,
+        url: window.location.href,
+        referer: document.referrer || null,
+        screenWidth: window.screen.width,
+        screenHeight: window.screen.height,
+        language: navigator.language,
+        platform: navigator.platform,
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        timestamp: new Date().toISOString()
+      };
+      
       const apiRequest = {
         empresa_id: empresaId,
         chatbot_id: chatbotId,
         mensaje: messageContent,
         session_id: sessionId,
         lead_id: leadId || null,
-        metadata: {
-          browser: navigator.userAgent,
-          page: window.location.pathname
-        }
+        canal_id: canalId,
+        canal_identificador: canalIdentificador,
+        metadata: metadata,
+        conversacion_id: conversationId // Enviar el ID de conversación si existe
       };
       
-      console.log("Enviando mensaje a la API (datos simplificados):", apiRequest);
+      console.log("Enviando mensaje a la API (datos simplificados):", {
+        ...apiRequest,
+        metadata: { ...metadata, browser: "[browser_info]" } // Simplificamos la información del navegador en los logs
+      });
       
-      const response = await fetch(`${apiEndpoint}/api/v1/channels/web`, {
+      // Corregimos la ruta de la API según la documentación proporcionada
+      const response = await fetch(`${apiEndpoint}/api/v1/message`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
