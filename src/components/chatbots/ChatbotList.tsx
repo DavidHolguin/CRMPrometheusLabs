@@ -2,21 +2,16 @@ import { useState, useEffect } from "react";
 import { Chatbot } from "@/hooks/useChatbots";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { MoreHorizontal, Edit, Trash2, MessageSquare, Bot, Copy, Share2, Globe, Mail, Instagram, Facebook, ArrowUpRight, ArrowDownRight, Settings } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { MessageSquare, Bot, Copy, Globe, Mail, Instagram, Facebook, ArrowUpRight, ArrowDownRight, Settings } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { EditChatbotModal } from "./EditChatbotModal";
 import { useNavigate } from "react-router-dom";
 
 interface ChatbotListProps {
   chatbots: Chatbot[];
-  onDelete: () => void;
-  onEdit: () => void;
   onLiveView: (id: string) => void;
 }
 
@@ -27,19 +22,62 @@ interface ChatbotStats {
   leadsChange: number;
 }
 
-export function ChatbotList({ chatbots, onDelete, onEdit, onLiveView }: ChatbotListProps) {
-  const [deletingChatbot, setDeletingChatbot] = useState<Chatbot | null>(null);
-  const [editingChatbot, setEditingChatbot] = useState<Chatbot | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+interface Canal {
+  id: string;
+  tipo: string;
+  nombre: string;
+  color: string | null;
+  logo_url: string | null;
+}
+
+export function ChatbotList({ chatbots, onLiveView }: ChatbotListProps) {
   const [chatbotStats, setChatbotStats] = useState<Record<string, ChatbotStats>>({});
   const [isLoadingStats, setIsLoadingStats] = useState(true);
+  const [chatbotCanales, setChatbotCanales] = useState<Record<string, Canal[]>>({});
   const navigate = useNavigate();
 
   useEffect(() => {
     if (chatbots.length > 0) {
       fetchAllChatbotStats();
+      fetchAllChatbotCanales();
     }
   }, [chatbots]);
+
+  const fetchAllChatbotCanales = async () => {
+    try {
+      const canalesPorChatbot: Record<string, Canal[]> = {};
+      
+      for (const chatbot of chatbots) {
+        // Obtener los canales conectados a este chatbot desde chatbot_canales con todos sus detalles
+        const { data, error } = await supabase
+          .from("chatbot_canales")
+          .select(`
+            canal_id,
+            canales (
+              id,
+              tipo,
+              nombre,
+              color,
+              logo_url
+            )
+          `)
+          .eq("chatbot_id", chatbot.id)
+          .eq("is_active", true);
+          
+        if (!error && data && data.length > 0) {
+          // Extraer los detalles del canal de la respuesta anidada
+          canalesPorChatbot[chatbot.id] = data.flatMap(item => item.canales) as Canal[];
+        } else {
+          // Si no hay canales, al menos mostramos el canal web por defecto
+          canalesPorChatbot[chatbot.id] = [{ id: "default", tipo: "web", nombre: "Web", color: "#3b82f6", logo_url: null }];
+        }
+      }
+      
+      setChatbotCanales(canalesPorChatbot);
+    } catch (error) {
+      console.error("Error obteniendo canales:", error);
+    }
+  };
 
   const fetchAllChatbotStats = async () => {
     setIsLoadingStats(true);
@@ -117,43 +155,6 @@ export function ChatbotList({ chatbots, onDelete, onEdit, onLiveView }: ChatbotL
     }
   };
 
-  const handleDelete = async () => {
-    if (!deletingChatbot) return;
-    
-    setIsDeleting(true);
-    try {
-      // Primero eliminar los contextos del chatbot
-      await supabase
-        .from("chatbot_contextos")
-        .delete()
-        .eq("chatbot_id", deletingChatbot.id);
-        
-      // Luego eliminar el chatbot
-      const { error } = await supabase
-        .from("chatbots")
-        .delete()
-        .eq("id", deletingChatbot.id);
-      
-      if (error) throw error;
-      
-      toast.success("Chatbot eliminado exitosamente");
-      onDelete();
-    } catch (error) {
-      console.error("Error eliminando chatbot:", error);
-      toast.error("Error al eliminar el chatbot");
-    } finally {
-      setIsDeleting(false);
-      setDeletingChatbot(null);
-    }
-  };
-
-  // Función para copiar enlace del chatbot
-  const copyEmbedCode = (id: string) => {
-    const embedCode = `<script src="https://your-domain.com/embed/${id}.js"></script>`;
-    navigator.clipboard.writeText(embedCode);
-    toast.success("Código de embebido copiado al portapapeles");
-  };
-
   // Función para compartir enlace del chatbot
   const shareChatbot = (id: string) => {
     // URL de chat para compartir
@@ -162,234 +163,167 @@ export function ChatbotList({ chatbots, onDelete, onEdit, onLiveView }: ChatbotL
     toast.success("Enlace copiado al portapapeles");
   };
 
-  // Mock canales conectados - En una implementación real, esto vendría de la base de datos
-  const getChannels = (id: string) => [
-    { type: "web", active: true },
-    { type: "email", active: Math.random() > 0.5 },
-    { type: "instagram", active: Math.random() > 0.5 },
-    { type: "facebook", active: Math.random() > 0.7 },
-  ];
-
-  const getChannelIcon = (type: string) => {
-    switch (type) {
-      case "web": return <Globe size={12} />;
-      case "email": return <Mail size={12} />;
-      case "instagram": return <Instagram size={12} />;
-      case "facebook": return <Facebook size={12} />;
-      default: return <Globe size={12} />;
+  const getChannelIcon = (tipo: string) => {
+    switch (tipo.toLowerCase()) {
+      case "web": return <Globe size={14} />;
+      case "email": return <Mail size={14} />;
+      case "instagram": return <Instagram size={14} />;
+      case "facebook": return <Facebook size={14} />;
+      case "messenger": return <Facebook size={14} />;
+      default: return <Globe size={14} />;
     }
   };
 
   return (
-    <>
-      <div className="rounded-md border dark:border-slate-700">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[250px]">Nombre</TableHead>
-              <TableHead className="w-[150px]">Canales</TableHead>
-              <TableHead className="w-[120px]">Mensajes</TableHead>
-              <TableHead className="w-[120px]">Leads</TableHead>
-              <TableHead className="w-[150px]">Creado</TableHead>
-              <TableHead className="w-[180px] text-right">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {chatbots.map((chatbot) => {
-              const creationDate = chatbot.created_at ? 
-                format(new Date(chatbot.created_at), "dd MMM yyyy", { locale: es }) : "Fecha desconocida";
-              const stats = chatbotStats[chatbot.id];
-              const channels = getChannels(chatbot.id);
+    <div className="rounded-md border dark:border-slate-700">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-[250px]">Nombre</TableHead>
+            <TableHead className="w-[180px]">Canales</TableHead>
+            <TableHead className="w-[120px]">Mensajes</TableHead>
+            <TableHead className="w-[120px]">Leads</TableHead>
+            <TableHead className="w-[150px]">Creado</TableHead>
+            <TableHead className="w-[200px] text-right">Acciones</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {chatbots.map((chatbot) => {
+            const creationDate = chatbot.created_at ? 
+              format(new Date(chatbot.created_at), "dd MMM yyyy", { locale: es }) : "Fecha desconocida";
+            const stats = chatbotStats[chatbot.id];
+            const canales = chatbotCanales[chatbot.id] || [{ id: "default", tipo: "web", nombre: "Web", color: "#3b82f6", logo_url: null }];
 
-              return (
-                <TableRow key={chatbot.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-8 w-8 border rounded-md">
-                        {chatbot.avatar_url ? (
-                          <AvatarImage src={chatbot.avatar_url} alt={chatbot.nombre} />
+            return (
+              <TableRow key={chatbot.id}>
+                <TableCell>
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-8 w-8 border rounded-md">
+                      {chatbot.avatar_url ? (
+                        <AvatarImage src={chatbot.avatar_url} alt={chatbot.nombre} />
+                      ) : (
+                        <AvatarFallback className="bg-primary/10 text-primary rounded-md">
+                          <Bot size={16} className="text-primary" />
+                        </AvatarFallback>
+                      )}
+                    </Avatar>
+                    <span className="font-medium">{chatbot.nombre}</span>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-1">
+                    {canales.map((canal, index) => (
+                      <div 
+                        key={index} 
+                        className="h-5 w-5 flex items-center justify-center rounded-full"
+                        style={{ 
+                          backgroundColor: canal.color ? `${canal.color}20` : '#3b82f620', 
+                          color: canal.color || '#3b82f6' 
+                        }}
+                        title={`Conectado a ${canal.nombre || canal.tipo}`}
+                      >
+                        {canal.logo_url ? (
+                          <img 
+                            src={canal.logo_url} 
+                            alt={canal.nombre || canal.tipo}
+                            className="h-3.5 w-3.5 object-contain"
+                          />
                         ) : (
-                          <AvatarFallback className="bg-primary/10 text-primary rounded-md">
-                            <Bot size={16} className="text-primary" />
-                          </AvatarFallback>
-                        )}
-                      </Avatar>
-                      <span className="font-medium">{chatbot.nombre}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      {channels.map((channel, index) => (
-                        channel.active && (
-                          <div 
-                            key={index} 
-                            className="h-5 w-5 flex items-center justify-center bg-primary/10 text-primary rounded-full"
-                            title={`Conectado a ${channel.type}`}
-                          >
-                            {getChannelIcon(channel.type)}
-                          </div>
-                        )
-                      ))}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {isLoadingStats ? (
-                      <span className="font-medium">...</span>
-                    ) : stats ? (
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{stats.messages}</span>
-                        {stats.messagesChange !== 0 && (
-                          <div className="flex items-center text-xs">
-                            {stats.messagesChange > 0 ? (
-                              <ArrowUpRight className="h-3 w-3 text-green-500 mr-0.5" />
-                            ) : (
-                              <ArrowDownRight className="h-3 w-3 text-red-500 mr-0.5" />
-                            )}
-                            <span className={stats.messagesChange > 0 ? "text-green-500" : "text-red-500"}>
-                              {stats.messagesChange > 0 ? '+' : ''}{stats.messagesChange}%
-                            </span>
-                          </div>
+                          getChannelIcon(canal.tipo)
                         )}
                       </div>
-                    ) : (
-                      <span className="font-medium">0</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {isLoadingStats ? (
-                      <span className="font-medium">...</span>
-                    ) : stats ? (
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{stats.leads}</span>
-                        {stats.leadsChange !== 0 && (
-                          <div className="flex items-center text-xs">
-                            {stats.leadsChange > 0 ? (
-                              <ArrowUpRight className="h-3 w-3 text-green-500 mr-0.5" />
-                            ) : (
-                              <ArrowDownRight className="h-3 w-3 text-red-500 mr-0.5" />
-                            )}
-                            <span className={stats.leadsChange > 0 ? "text-green-500" : "text-red-500"}>
-                              {stats.leadsChange > 0 ? '+' : ''}{stats.leadsChange}%
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="font-medium">0</span>
-                    )}
-                  </TableCell>
-                  <TableCell>{creationDate}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-8 w-8 p-0"
-                        onClick={() => copyEmbedCode(chatbot.id)}
-                        title="Copiar código de embebido"
-                      >
-                        <Copy size={14} />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-8 w-8 p-0"
+                    ))}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  {isLoadingStats ? (
+                    <span className="font-medium">...</span>
+                  ) : stats ? (
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{stats.messages}</span>
+                      {stats.messagesChange !== 0 && (
+                        <div className="flex items-center text-xs">
+                          {stats.messagesChange > 0 ? (
+                            <ArrowUpRight className="h-3 w-3 text-green-500 mr-0.5" />
+                          ) : (
+                            <ArrowDownRight className="h-3 w-3 text-red-500 mr-0.5" />
+                          )}
+                          <span className={stats.messagesChange > 0 ? "text-green-500" : "text-red-500"}>
+                            {stats.messagesChange > 0 ? '+' : ''}{stats.messagesChange}%
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="font-medium">0</span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  {isLoadingStats ? (
+                    <span className="font-medium">...</span>
+                  ) : stats ? (
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{stats.leads}</span>
+                      {stats.leadsChange !== 0 && (
+                        <div className="flex items-center text-xs">
+                          {stats.leadsChange > 0 ? (
+                            <ArrowUpRight className="h-3 w-3 text-green-500 mr-0.5" />
+                          ) : (
+                            <ArrowDownRight className="h-3 w-3 text-red-500 mr-0.5" />
+                          )}
+                          <span className={stats.leadsChange > 0 ? "text-green-500" : "text-red-500"}>
+                            {stats.leadsChange > 0 ? '+' : ''}{stats.leadsChange}%
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="font-medium">0</span>
+                  )}
+                </TableCell>
+                <TableCell>{creationDate}</TableCell>
+                <TableCell className="text-right">
+                  <div className="flex items-center justify-end gap-2">
+                    <div className="relative flex items-center">
+                      <input 
+                        type="text" 
+                        value={`${window.location.origin}/chat/${chatbot.id}`}
+                        readOnly
+                        className="w-[140px] h-8 py-1 px-2 text-xs bg-slate-100 dark:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-700"
+                      />
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        className="absolute right-1 h-6 w-6"
                         onClick={() => shareChatbot(chatbot.id)}
-                        title="Compartir enlace"
                       >
-                        <Share2 size={14} />
+                        <Copy size={12} />
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-8 w-8 p-0"
-                        onClick={() => setEditingChatbot(chatbot)}
-                        title="Editar chatbot"
-                      >
-                        <Edit size={14} />
-                      </Button>
-                      <Button
-                        size="sm"
-                        className="h-8 gap-1"
-                        onClick={() => onLiveView(chatbot.id)}
-                      >
-                        <MessageSquare size={14} />
-                        Chat rápido
-                      </Button>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreHorizontal size={14} />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => onLiveView(chatbot.id)} className="gap-2 text-sm">
-                            <MessageSquare size={14} />
-                            Chat rápido
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => setEditingChatbot(chatbot)} className="gap-2 text-sm">
-                            <Edit size={14} />
-                            Editar
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem 
-                            onClick={() => navigate(`/chatbots/${chatbot.id}/settings`)}
-                            className="gap-2 text-sm"
-                          >
-                            <Settings size={14} />
-                            Configuración avanzada
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem 
-                            onClick={() => setDeletingChatbot(chatbot)}
-                            className="text-destructive gap-2 text-sm"
-                          >
-                            <Trash2 size={14} />
-                            Eliminar
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
                     </div>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </div>
-
-      <AlertDialog open={!!deletingChatbot} onOpenChange={(open) => !open && setDeletingChatbot(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar chatbot?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta acción no se puede deshacer. Se eliminará permanentemente el chatbot "{deletingChatbot?.nombre}" y todos sus datos asociados.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => {
-                e.preventDefault();
-                handleDelete();
-              }}
-              disabled={isDeleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {isDeleting ? "Eliminando..." : "Eliminar"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {editingChatbot && (
-        <EditChatbotModal
-          chatbot={editingChatbot}
-          open={!!editingChatbot}
-          onOpenChange={(open) => !open && setEditingChatbot(null)}
-          onSuccess={onEdit}
-        />
-      )}
-    </>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 text-xs"
+                      onClick={() => navigate(`/dashboard/chatbots/${chatbot.id}/settings`)}
+                    >
+                      <Settings size={14} className="mr-1" />
+                      Editar
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="h-8 text-xs whitespace-nowrap"
+                      onClick={() => onLiveView(chatbot.id)}
+                    >
+                      <MessageSquare size={14} className="mr-1" />
+                      Chat rápido
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </div>
   );
 }

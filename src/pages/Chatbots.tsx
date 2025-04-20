@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Grid2X2, List, Plus } from "lucide-react";
 import { useChatbots } from "@/hooks/useChatbots";
@@ -79,8 +78,6 @@ const Chatbots = () => {
                     <ChatbotCard 
                       key={chatbot.id} 
                       chatbot={chatbot} 
-                      onDelete={() => refetch()}
-                      onEdit={() => refetch()}
                       onLiveView={() => navigate(`/chat/${chatbot.id}`)}
                     />
                   ))}
@@ -88,8 +85,6 @@ const Chatbots = () => {
               ) : (
                 <ChatbotList 
                   chatbots={chatbots} 
-                  onDelete={() => refetch()}
-                  onEdit={() => refetch()}
                   onLiveView={(id) => navigate(`/chat/${id}`)}
                 />
               )
