@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams, useLocation } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -69,6 +69,7 @@ const ConversationsPage = () => {
   const filterCanalId = searchParams.get('canal');
   const filterAssignment = searchParams.get('assigned') as 'all' | 'assigned_to_me' | 'unassigned' || 'all';
   const filterTags = searchParams.get('tags')?.split(',') || [];
+  const sortOrder = searchParams.get('sort') || 'date_desc';
 
   const { useCanalesQuery } = useCanales();
   const { data: canales = [] } = useCanalesQuery();
@@ -216,45 +217,14 @@ const ConversationsPage = () => {
     fetchAgents();
   }, [transferDialogOpen, user?.companyId, user?.id]);
 
-  // Actualizar los filtros en la URL
-  const updateFilters = (params: {
-    unread?: boolean,
-    canal?: string | null,
-    assigned?: 'all' | 'assigned_to_me' | 'unassigned',
-    tags?: string[]
+  // Actualizar los filtros en la URL - versión optimizada como useCallback
+  const updateFilters = useCallback((params: {
+    sortOrder?: string,
   }) => {
     const newSearchParams = new URLSearchParams(location.search);
     
-    if (params.unread !== undefined) {
-      if (params.unread) {
-        newSearchParams.set('unread', 'true');
-      } else {
-        newSearchParams.delete('unread');
-      }
-    }
-    
-    if (params.canal !== undefined) {
-      if (params.canal) {
-        newSearchParams.set('canal', params.canal);
-      } else {
-        newSearchParams.delete('canal');
-      }
-    }
-    
-    if (params.assigned) {
-      if (params.assigned === 'all') {
-        newSearchParams.delete('assigned');
-      } else {
-        newSearchParams.set('assigned', params.assigned);
-      }
-    }
-    
-    if (params.tags) {
-      if (params.tags.length > 0) {
-        newSearchParams.set('tags', params.tags.join(','));
-      } else {
-        newSearchParams.delete('tags');
-      }
+    if (params.sortOrder !== undefined) {
+      newSearchParams.set('sort', params.sortOrder);
     }
     
     const newSearch = newSearchParams.toString();
@@ -262,7 +232,7 @@ const ConversationsPage = () => {
       pathname: location.pathname,
       search: newSearch ? `?${newSearch}` : ''
     }, { replace: true });
-  };
+  }, [location.pathname, location.search, navigate]);
 
   const toggleChatbot = async (status?: boolean) => {
     if (!conversationId) return;
@@ -451,7 +421,6 @@ const ConversationsPage = () => {
             .single();
           
           if (updatedLeadData && updatedLeadData.asignado_a === user.id) {
-            console.log("Lead asignado correctamente, datos actualizados:", updatedLeadData);
             if (conversationId) {
               navigate(`/dashboard/conversations/${conversationId}?refresh=${new Date().getTime()}`);
             }
@@ -523,7 +492,6 @@ const ConversationsPage = () => {
     if (conversationId) {
       // Agregamos un breve retraso para asegurar que la UI se haya actualizado antes de marcar como leídos
       const timer = setTimeout(() => {
-        console.log("Marcando mensajes como leídos al cambiar de conversación", conversationId);
         markAsRead(conversationId);
       }, 300);
       
@@ -540,7 +508,6 @@ const ConversationsPage = () => {
       );
       
       if (hasUnreadMessages) {
-        console.log("Marcando mensajes no leídos como leídos al recibir nuevos mensajes");
         markAsRead(conversationId);
       }
     }
@@ -553,7 +520,7 @@ const ConversationsPage = () => {
     }
   }, [selectedLeadId]);
 
-  // Suscripción a cambios en asignaciones de leads
+  // Suscripción a cambios en asignaciones de leads - Optimizada
   useEffect(() => {
     if (!user?.companyId) return;
     
@@ -566,9 +533,7 @@ const ConversationsPage = () => {
           table: 'leads',
           filter: `asignado_a=is.not.null`
         }, 
-        (payload) => {
-          refetchConversations();
-        }
+        () => refetchConversations()
       )
       .on('postgres_changes', 
         {
@@ -577,36 +542,7 @@ const ConversationsPage = () => {
           table: 'leads',
           filter: `asignado_a=is.null`
         }, 
-        (payload) => {
-          refetchConversations();
-        }
-      )
-      .subscribe();
-    
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [refetchConversations, user?.companyId]);
-
-  // Suscripción a cambios en mensajes para actualizar contadores en tiempo real
-  useEffect(() => {
-    if (!user?.companyId) return;
-    
-    const channel = supabase
-      .channel('new-messages-notifications')
-      .on('postgres_changes', 
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'mensajes'
-        }, 
-        (payload) => {
-          // Cuando llega un nuevo mensaje, refrescar las conversaciones para actualizar contadores
-          if (payload.new && payload.new.origen === 'lead') {
-            console.log('Nuevo mensaje recibido:', payload.new);
-            refetchConversations();
-          }
-        }
+        () => refetchConversations()
       )
       .subscribe();
     
@@ -648,6 +584,10 @@ const ConversationsPage = () => {
     return canal ? canal.nombre : "N/A";
   };
 
+  const handleFilterChange = useCallback((filters: { sortOrder: string }) => {
+    updateFilters({ sortOrder: filters.sortOrder });
+  }, [updateFilters]);
+
   if (!user?.companyId) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -662,23 +602,6 @@ const ConversationsPage = () => {
         isLoading={conversationsLoading}
         groupedConversations={groupedConversations}
         selectedLeadId={selectedLeadId}
-        // Pasamos parámetros iniciales de filtros basados en la URL
-        initialFilters={{
-          showUnreadOnly: filterUnreadOnly,
-          assignmentFilter: filterAssignment,
-          selectedCanal: filterCanalId,
-          selectedTags: filterTags,
-          sortOrder: 'date_desc'
-        }}
-        // Manejador para actualizar los filtros en la URL
-        onFilterChange={(filters) => {
-          updateFilters({
-            unread: filters.showUnreadOnly,
-            canal: filters.selectedCanal,
-            assigned: filters.assignmentFilter,
-            tags: filters.selectedTags,
-          });
-        }}
         setSelectedLeadId={(leadId) => {
           setSelectedLeadId(leadId);
           const leadGroup = groupedConversations.find(g => g.lead_id === leadId);
@@ -699,6 +622,8 @@ const ConversationsPage = () => {
         }}
         canales={canales}
         user={user}
+        initialFilters={{ sortOrder: sortOrder as any }}
+        onFilterChange={handleFilterChange}
       />
 
       <main className="flex-1 flex flex-col h-full border-l border-r border-border">

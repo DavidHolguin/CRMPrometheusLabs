@@ -299,10 +299,6 @@ export function useConversations(chatbotId?: string) {
               chatbotIdentifiers[0] : 
               (item.mensaje_origen === 'chatbot' ? item.mensaje_remitente_id : null);
             
-            if (chatbotId && chatbotIdentifiers.length === 0) {
-              console.log(`Advertencia: Conversación ${item.conversacion_id.substring(0, 6)} sin identificador de chatbot`);
-            }
-            
             if (chatbotId) {
               const tieneCoincidencia = chatbotIdentifiers.some(identifier => identifier === chatbotId);
               
@@ -420,7 +416,9 @@ export function useConversations(chatbotId?: string) {
       }
     },
     enabled: true,
-    refetchInterval: 15000, // Refrescar cada 15 segundos para mantener los datos actualizados
-    staleTime: 10000 // Los datos se consideran obsoletos después de 10 segundos
+    // Optimizado para menor frecuencia de actualizaciones
+    refetchInterval: 45000, // Aumentado a 45 segundos (era 15 segundos)
+    staleTime: 30000, // Aumentado a 30 segundos (era 10 segundos)
+    refetchOnWindowFocus: false // Deshabilitamos refetch en focus de ventana
   });
 }
