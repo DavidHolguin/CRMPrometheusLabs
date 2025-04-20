@@ -34,7 +34,7 @@ import { LeadCard } from "@/components/pipeline/LeadCard";
 import { format } from "date-fns";
 
 const PipelineManagement = () => {
-  const { pipelines, isLoading: pipelinesLoading } = usePipelines();
+  const { data: pipelines, isLoading: pipelinesLoading } = usePipelines();
   const [selectedPipeline, setSelectedPipeline] = useState<string | null>(null);
   const { leadsByStage, updateLeadStage, isLoading: leadsLoading, refetch } = usePipelineLeads(selectedPipeline);
   const [currentSlide, setCurrentSlide] = useState(0);
