@@ -38,12 +38,16 @@ export function LeadDataTab({ lead, formatDate }: LeadDataTabProps) {
   const phone = lead.telefono;
   const location = lead.ciudad || lead.pais;
   
-  const { pipelines = [] } = usePipelines();
+  const { data: pipelines = [], isLoading: loadingPipelines } = usePipelines();
   const [stages, setStages] = useState<any[]>([]);
+  const [loadingStages, setLoadingStages] = useState(false);
   const [tags, setTags] = useState<any[]>([]);
   const [selectedPipelineId, setSelectedPipelineId] = useState<string>(lead.pipeline_id || '');
   const [stagesOpen, setStagesOpen] = useState(false);
   const [tagsOpen, setTagsOpen] = useState(false);
+  const [isCreatingTag, setIsCreatingTag] = useState(false);
+  const [newTagName, setNewTagName] = useState('');
+  const [newTagColor, setNewTagColor] = useState('#3b82f6');
   
   // Información básica del lead
   const contactInfo = [
@@ -74,21 +78,28 @@ export function LeadDataTab({ lead, formatDate }: LeadDataTabProps) {
     fetchTags();
   }, []);
   
+  // Establecer el pipeline inicial y cargar etapas cuando pipelines estén listos
+  useEffect(() => {
+    if (pipelines.length > 0) {
+      // Si el lead no tiene pipeline asignado, usamos el primero disponible
+      if (!selectedPipelineId) {
+        const defaultPipeline = pipelines.find(p => p.is_default) || pipelines[0];
+        setSelectedPipelineId(defaultPipeline.id);
+      }
+      
+      // Si ya hay un pipeline seleccionado, cargar sus etapas
+      if (selectedPipelineId) {
+        fetchStages(selectedPipelineId);
+      }
+    }
+  }, [pipelines, lead.pipeline_id]);
+  
   // Fetch stages cuando el pipeline cambia
   useEffect(() => {
     if (selectedPipelineId) {
       fetchStages(selectedPipelineId);
     }
   }, [selectedPipelineId]);
-  
-  // Establecer el pipeline inicial
-  useEffect(() => {
-    if (lead.pipeline_id) {
-      setSelectedPipelineId(lead.pipeline_id);
-    } else if (pipelines.length > 0) {
-      setSelectedPipelineId(pipelines[0].id);
-    }
-  }, [lead.pipeline_id, pipelines]);
   
   const fetchTags = async () => {
     try {
@@ -106,19 +117,27 @@ export function LeadDataTab({ lead, formatDate }: LeadDataTabProps) {
   };
   
   const fetchStages = async (pipelineId: string) => {
+    setLoadingStages(true);
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('pipeline_stages')
         .select('*')
         .eq('pipeline_id', pipelineId)
         .eq('is_active', true)
         .order('posicion', { ascending: true });
       
+      if (error) {
+        throw error;
+      }
+      
       if (data) {
         setStages(data);
       }
     } catch (error) {
       console.error('Error fetching stages:', error);
+      toast.error('Error al cargar las etapas');
+    } finally {
+      setLoadingStages(false);
     }
   };
   
@@ -194,6 +213,51 @@ export function LeadDataTab({ lead, formatDate }: LeadDataTabProps) {
       console.error(error);
     }
   };
+
+  const handleCreateTag = async () => {
+    if (!newTagName.trim()) {
+      toast.error('Debe ingresar un nombre para la etiqueta');
+      return;
+    }
+
+    try {
+      // Crear la nueva etiqueta
+      const { data, error } = await supabase
+        .from('lead_tags')
+        .insert({
+          empresa_id: lead.empresa_id,
+          nombre: newTagName.trim(),
+          color: newTagColor
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      if (data) {
+        // Añadir la etiqueta al lead automáticamente
+        await supabase
+          .from('lead_tag_relation')
+          .insert({
+            lead_id: lead.id,
+            tag_id: data.id
+          });
+
+        // Actualizar las etiquetas
+        fetchTags();
+        
+        // Resetear los campos
+        setNewTagName('');
+        setNewTagColor('#3b82f6');
+        setIsCreatingTag(false);
+        
+        toast.success('Etiqueta creada y aplicada al lead');
+      }
+    } catch (error) {
+      console.error('Error creating tag:', error);
+      toast.error('Error al crear la etiqueta');
+    }
+  };
   
   // Preparar opciones para los selectores
   const pipelineOptions = pipelines.map(p => ({
@@ -223,16 +287,30 @@ export function LeadDataTab({ lead, formatDate }: LeadDataTabProps) {
             <Select 
               value={selectedPipelineId} 
               onValueChange={handlePipelineChange}
+              disabled={loadingPipelines}
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Seleccionar pipeline" />
+                {loadingPipelines ? (
+                  <div className="flex items-center gap-2">
+                    <div className="h-3.5 w-3.5 rounded-full border-2 border-current border-r-transparent animate-spin opacity-70" />
+                    <span className="opacity-70">Cargando...</span>
+                  </div>
+                ) : (
+                  <SelectValue placeholder="Seleccionar pipeline" />
+                )}
               </SelectTrigger>
               <SelectContent>
-                {pipelineOptions.map((pipeline) => (
-                  <SelectItem key={pipeline.value} value={pipeline.value}>
-                    {pipeline.label}
+                {pipelineOptions.length > 0 ? (
+                  pipelineOptions.map((pipeline) => (
+                    <SelectItem key={pipeline.value} value={pipeline.value}>
+                      {pipeline.label}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value="no-pipeline" disabled>
+                    No hay pipelines disponibles
                   </SelectItem>
-                ))}
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -247,8 +325,14 @@ export function LeadDataTab({ lead, formatDate }: LeadDataTabProps) {
                   role="combobox" 
                   aria-expanded={stagesOpen}
                   className="w-full justify-between"
+                  disabled={loadingStages || stages.length === 0}
                 >
-                  {currentStage ? (
+                  {loadingStages ? (
+                    <div className="flex items-center gap-2">
+                      <div className="h-3.5 w-3.5 rounded-full border-2 border-current border-r-transparent animate-spin opacity-70" />
+                      <span className="opacity-70">Cargando etapas...</span>
+                    </div>
+                  ) : currentStage ? (
                     <div className="flex items-center gap-2">
                       {currentStage.color && (
                         <div 
@@ -258,7 +342,7 @@ export function LeadDataTab({ lead, formatDate }: LeadDataTabProps) {
                       )}
                       <span>{currentStage.label}</span>
                     </div>
-                  ) : "Seleccionar etapa"}
+                  ) : stages.length > 0 ? "Seleccionar etapa" : "No hay etapas disponibles"}
                   <X
                     className={cn(
                       "ml-2 h-4 w-4 shrink-0 opacity-50",
@@ -267,12 +351,12 @@ export function LeadDataTab({ lead, formatDate }: LeadDataTabProps) {
                   />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-[200px] p-0">
+              <PopoverContent className="w-[250px] p-0">
                 <Command>
                   <CommandInput placeholder="Buscar etapa..." />
                   <CommandList>
-                    <CommandEmpty>No se encontraron resultados</CommandEmpty>
-                    <CommandGroup>
+                    <CommandEmpty>No se encontraron etapas</CommandEmpty>
+                    <CommandGroup heading="Etapas disponibles">
                       {stageOptions.map((stage) => (
                         <CommandItem
                           key={stage.value}
@@ -288,6 +372,9 @@ export function LeadDataTab({ lead, formatDate }: LeadDataTabProps) {
                               />
                             )}
                             <span>{stage.label}</span>
+                            {stage.value === lead.stage_id && (
+                              <span className="ml-auto text-primary">✓</span>
+                            )}
                           </div>
                         </CommandItem>
                       ))}
@@ -310,34 +397,109 @@ export function LeadDataTab({ lead, formatDate }: LeadDataTabProps) {
                   <span>Gestionar</span>
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-[200px] p-0">
-                <Command>
-                  <CommandInput placeholder="Buscar etiqueta..." />
-                  <CommandList>
-                    <CommandEmpty>No se encontraron resultados</CommandEmpty>
-                    <CommandGroup>
-                      {tags.map((tag) => {
-                        const isSelected = lead.tags?.some(t => t.id === tag.id);
-                        return (
-                          <CommandItem
-                            key={tag.id}
-                            value={tag.nombre}
-                            onSelect={() => handleTagToggle(tag.id)}
-                            className="cursor-pointer"
-                          >
-                            <div className="flex items-center gap-2 w-full">
-                              <div className="h-3 w-3 rounded-full" style={{ backgroundColor: tag.color }} />
-                              <span>{tag.nombre}</span>
-                              {isSelected && (
-                                <span className="ml-auto">✓</span>
-                              )}
-                            </div>
-                          </CommandItem>
-                        )
-                      })}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
+              <PopoverContent className="w-[250px] p-0">
+                {isCreatingTag ? (
+                  <div className="p-3 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm font-medium">Nueva etiqueta</div>
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => setIsCreatingTag(false)}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="grid gap-1.5">
+                        <label className="text-xs text-muted-foreground">Nombre</label>
+                        <input 
+                          type="text" 
+                          placeholder="Nombre de la etiqueta" 
+                          value={newTagName}
+                          onChange={(e) => setNewTagName(e.target.value)}
+                          className="border rounded-md px-2 py-1 text-sm w-full focus:outline-none focus:ring-1 focus:ring-primary"
+                          autoFocus
+                        />
+                      </div>
+                      <div className="grid gap-1.5">
+                        <label className="text-xs text-muted-foreground">Color</label>
+                        <div className="flex items-center gap-2">
+                          <input 
+                            type="color" 
+                            value={newTagColor}
+                            onChange={(e) => setNewTagColor(e.target.value)}
+                            className="w-10 h-7 border rounded cursor-pointer"
+                          />
+                          <div className="flex-1 flex items-center">
+                            <div 
+                              className="w-full h-5 rounded-md" 
+                              style={{ backgroundColor: newTagColor }}
+                            ></div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex justify-end gap-2 mt-3">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => setIsCreatingTag(false)}
+                        >
+                          Cancelar
+                        </Button>
+                        <Button 
+                          size="sm"
+                          onClick={handleCreateTag}
+                        >
+                          Crear
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <Command>
+                    <CommandInput placeholder="Buscar etiqueta..." />
+                    <CommandList className="max-h-[200px]">
+                      <CommandEmpty>
+                        No se encontraron etiquetas existentes.
+                      </CommandEmpty>
+                      <CommandGroup heading="Etiquetas disponibles">
+                        {tags.map((tag) => {
+                          const isSelected = lead.tags?.some(t => t.id === tag.id);
+                          return (
+                            <CommandItem
+                              key={tag.id}
+                              value={tag.nombre}
+                              onSelect={() => handleTagToggle(tag.id)}
+                              className="cursor-pointer"
+                            >
+                              <div className="flex items-center gap-2 w-full">
+                                <div className="h-3 w-3 rounded-full" style={{ backgroundColor: tag.color }} />
+                                <span>{tag.nombre}</span>
+                                {isSelected && (
+                                  <span className="ml-auto">✓</span>
+                                )}
+                              </div>
+                            </CommandItem>
+                          )
+                        })}
+                      </CommandGroup>
+                    </CommandList>
+
+                    <div className="p-2 border-t">
+                      <Button 
+                        variant="outline" 
+                        className="w-full justify-center text-primary gap-1 border-dashed"
+                        onClick={() => setIsCreatingTag(true)}
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        <span>Crear nueva etiqueta</span>
+                      </Button>
+                    </div>
+                  </Command>
+                )}
               </PopoverContent>
             </Popover>
           </div>

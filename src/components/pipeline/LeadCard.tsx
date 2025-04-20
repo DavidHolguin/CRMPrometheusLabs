@@ -30,7 +30,7 @@ interface LeadCardProps {
 export function LeadCard({ lead, isDragging }: LeadCardProps) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const isMobile = useIsMobile();
-  const { pipelines = [] } = usePipelines();
+  const { data: pipelines = [] } = usePipelines();
   const [stages, setStages] = useState<any[]>([]);
   const [tags, setTags] = useState<any[]>([]);
   const [leadEvaluation, setLeadEvaluation] = useState<any | null>(null);
