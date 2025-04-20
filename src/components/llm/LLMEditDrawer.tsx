@@ -37,6 +37,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { LLMConfig, CreateLLMConfigInput, UpdateLLMConfigInput } from "@/hooks/useLLMConfigs";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const llmConfigSchema = z.object({
   nombre: z.string().min(1, {
@@ -88,6 +89,8 @@ export function LLMEditDrawer({
   const [activeTab, setActiveTab] = useState("general");
   const [showApiKey, setShowApiKey] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
+  const [useCustomProvider, setUseCustomProvider] = useState(false);
+  const [useCustomModel, setUseCustomModel] = useState(false);
   
   // Crear formulario
   const form = useForm<LLMConfigFormValues>({
@@ -128,6 +131,16 @@ export function LLMEditDrawer({
         },
       });
       setSelectedProvider(config.proveedor);
+      
+      // Verificar si el proveedor o modelo son personalizados
+      setUseCustomProvider(!providers.some(p => p.id === config.proveedor));
+      
+      if (providers.some(p => p.id === config.proveedor)) {
+        const provider = providers.find(p => p.id === config.proveedor);
+        setUseCustomModel(!provider?.models.some(m => m.id === config.modelo));
+      } else {
+        setUseCustomModel(true);
+      }
     } else {
       form.reset({
         nombre: "",
@@ -145,14 +158,17 @@ export function LLMEditDrawer({
         },
       });
       setSelectedProvider(null);
+      setUseCustomProvider(false);
+      setUseCustomModel(false);
     }
-  }, [config, form]);
+  }, [config, form, providers]);
 
   // Manejar cambio de proveedor
   const handleProviderChange = (value: string) => {
     setSelectedProvider(value);
     form.setValue("proveedor", value);
     form.setValue("modelo", ""); // Resetear modelo cuando cambia el proveedor
+    setUseCustomModel(false); // Resetear bandera de modelo personalizado
   };
 
   // Obtener modelos para el proveedor seleccionado
@@ -225,70 +241,160 @@ export function LLMEditDrawer({
                       )}
                     />
 
-                    <FormField
-                      control={form.control}
-                      name="proveedor"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Proveedor</FormLabel>
-                          <Select
-                            onValueChange={handleProviderChange}
-                            defaultValue={field.value}
-                            value={field.value}
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between">
+                        <FormLabel>Proveedor</FormLabel>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox 
+                            id="custom-provider" 
+                            checked={useCustomProvider}
+                            onCheckedChange={(checked) => {
+                              setUseCustomProvider(!!checked);
+                              if (checked) {
+                                form.setValue("proveedor", "");
+                                setSelectedProvider(null);
+                              }
+                            }}
+                          />
+                          <label
+                            htmlFor="custom-provider"
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                           >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Selecciona un proveedor" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {providers.map((provider) => (
-                                <SelectItem key={provider.id} value={provider.id}>
-                                  {provider.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormDescription>
-                            Selecciona el proveedor del modelo de lenguaje
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
+                            Personalizado
+                          </label>
+                        </div>
+                      </div>
+                      
+                      {useCustomProvider ? (
+                        <FormField
+                          control={form.control}
+                          name="proveedor"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormControl>
+                                <Input 
+                                  placeholder="Ej: Anthropic, Mistral AI, etc."
+                                  {...field} 
+                                />
+                              </FormControl>
+                              <FormDescription>
+                                Introduce manualmente el nombre del proveedor
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      ) : (
+                        <FormField
+                          control={form.control}
+                          name="proveedor"
+                          render={({ field }) => (
+                            <FormItem>
+                              <Select
+                                onValueChange={handleProviderChange}
+                                defaultValue={field.value}
+                                value={field.value}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Selecciona un proveedor" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {providers.map((provider) => (
+                                    <SelectItem key={provider.id} value={provider.id}>
+                                      {provider.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormDescription>
+                                Selecciona el proveedor del modelo de lenguaje
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
                       )}
-                    />
+                    </div>
 
-                    <FormField
-                      control={form.control}
-                      name="modelo"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Modelo</FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            defaultValue={field.value}
-                            value={field.value}
-                            disabled={!selectedProvider}
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between">
+                        <FormLabel>Modelo</FormLabel>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox 
+                            id="custom-model"
+                            checked={useCustomModel}
+                            disabled={useCustomProvider || !selectedProvider}
+                            onCheckedChange={(checked) => {
+                              setUseCustomModel(!!checked);
+                              if (checked) {
+                                form.setValue("modelo", "");
+                              }
+                            }}
+                          />
+                          <label
+                            htmlFor="custom-model"
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                           >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Selecciona un modelo" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {getModelsForProvider().map((model) => (
-                                <SelectItem key={model.id} value={model.id}>
-                                  {model.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormDescription>
-                            Selecciona el modelo específico a utilizar
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
+                            Personalizado
+                          </label>
+                        </div>
+                      </div>
+                      
+                      {useCustomModel || useCustomProvider ? (
+                        <FormField
+                          control={form.control}
+                          name="modelo"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormControl>
+                                <Input
+                                  placeholder="Ej: gpt-4o, claude-3-opus, etc."
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormDescription>
+                                Introduce manualmente el nombre del modelo
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      ) : (
+                        <FormField
+                          control={form.control}
+                          name="modelo"
+                          render={({ field }) => (
+                            <FormItem>
+                              <Select
+                                onValueChange={field.onChange}
+                                defaultValue={field.value}
+                                value={field.value}
+                                disabled={!selectedProvider}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Selecciona un modelo" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {getModelsForProvider().map((model) => (
+                                    <SelectItem key={model.id} value={model.id}>
+                                      {model.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormDescription>
+                                Selecciona el modelo específico a utilizar
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
                       )}
-                    />
+                    </div>
 
                     <FormField
                       control={form.control}

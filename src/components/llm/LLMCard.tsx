@@ -9,6 +9,8 @@ import {
   Trash2,
   Star,
   Power,
+  ChevronRight,
+  Sliders,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
@@ -61,16 +63,38 @@ export function LLMCard({
   const getProviderColor = (provider: string) => {
     switch (provider.toLowerCase()) {
       case 'openai':
-        return "bg-gradient-to-r from-green-500 to-emerald-600";
+        return "from-emerald-500 to-teal-500";
       case 'anthropic':
-        return "bg-gradient-to-r from-purple-500 to-violet-600";
+        return "from-purple-500 to-violet-500";
       case 'mistral':
-        return "bg-gradient-to-r from-blue-500 to-cyan-600";
+        return "from-blue-500 to-cyan-500";
       case 'gemini':
-        return "bg-gradient-to-r from-orange-500 to-amber-600";
+        return "from-orange-500 to-amber-500";
       default:
-        return "bg-gradient-to-r from-slate-500 to-slate-600";
+        return "from-slate-500 to-slate-600";
     }
+  };
+
+  // Gradiente para el borde de los iconos
+  const getProviderBorderGradient = (provider: string) => {
+    switch (provider.toLowerCase()) {
+      case 'openai':
+        return "from-emerald-500 to-teal-500";
+      case 'anthropic':
+        return "from-purple-500 to-violet-500";
+      case 'mistral':
+        return "from-blue-500 to-cyan-500";
+      case 'gemini':
+        return "from-orange-500 to-amber-500";
+      default:
+        return "from-slate-500 to-slate-600";
+    }
+  };
+
+  // Calcular un valor de progreso basado en la temperatura
+  const getTemperatureProgress = () => {
+    const temp = config.configuracion?.temperature || 0.7;
+    return (temp / 2) * 100; // Temperatura va de 0 a 2, convertimos a porcentaje
   };
 
   // Si es vista de fila (tabla)
@@ -79,8 +103,11 @@ export function LLMCard({
       <tr className={cn("transition-colors hover:bg-muted/50", !config.is_active && "opacity-60")}>
         <td className="p-4 align-middle">
           <div className="flex items-center gap-3">
-            <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-md", getProviderColor(config.proveedor))}>
-              <Cpu className="h-5 w-5 text-white" />
+            <div className="relative">
+              <div className={cn("absolute -inset-1 rounded-xl bg-gradient-to-r opacity-30 blur-sm", getProviderBorderGradient(config.proveedor))}></div>
+              <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-card">
+                <Cpu className={cn("h-5 w-5", config.is_active ? "text-primary" : "text-muted-foreground")} />
+              </div>
             </div>
             <div>
               <div className="font-medium">{config.nombre}</div>
@@ -169,102 +196,119 @@ export function LLMCard({
     );
   }
 
-  // Vista de tarjeta
+  // Vista de tarjeta moderna
   return (
-    <Card className={cn("overflow-hidden", !config.is_active && "opacity-60")}>
-      <div
-        className={cn("h-2", getProviderColor(config.proveedor))}
-      />
-      <CardHeader className="flex flex-row items-start justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <CardTitle>{config.nombre}</CardTitle>
+    <Card className={cn("group relative overflow-hidden shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl", !config.is_active && "opacity-80")}>
+      <div className="absolute -left-16 -top-16 h-32 w-32 rounded-full bg-gradient-to-br from-primary/20 to-primary/0 blur-2xl transition-all duration-500 group-hover:scale-150 group-hover:opacity-70"></div>
+      <div className="absolute -right-16 -bottom-16 h-32 w-32 rounded-full bg-gradient-to-br from-primary/20 to-primary/0 blur-2xl transition-all duration-500 group-hover:scale-150 group-hover:opacity-70"></div>
+
+      <div className="p-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <div className={cn("absolute -inset-1 rounded-xl bg-gradient-to-r opacity-30 blur-sm transition-opacity duration-300 group-hover:opacity-60", getProviderBorderGradient(config.proveedor))}></div>
+              <div className="relative flex h-12 w-12 items-center justify-center rounded-xl bg-card">
+                <Cpu className={cn("h-6 w-6", config.is_active ? "text-primary" : "text-muted-foreground")} />
+              </div>
+            </div>
+
+            <div>
+              <h3 className="font-semibold">{config.nombre}</h3>
+              <p className="text-sm text-muted-foreground">{config.proveedor} / {config.modelo}</p>
+            </div>
+          </div>
+
+          <div className="flex flex-col items-end gap-1">
+            <span className="text-xs text-muted-foreground">{formattedDate}</span>
             {config.is_default && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div>
-                    <Badge variant="secondary" className="gap-1 items-center">
-                      <Star className="h-3 w-3" />
-                      <span>Predeterminado</span>
-                    </Badge>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>Configuración predeterminada para todos los chatbots</TooltipContent>
-              </Tooltip>
+              <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
+                <span className="h-1 w-1 rounded-full bg-primary"></span>
+                Predeterminado
+              </span>
             )}
           </div>
-          <CardDescription>
-            {config.proveedor} / {config.modelo}
-          </CardDescription>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div>
-                <Switch
-                  checked={config.is_active}
-                  onCheckedChange={(checked) => onToggleActive(config.id, checked)}
-                />
+        <div className="mt-6 space-y-4">
+          <div className="rounded-xl bg-muted/50 p-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                <Sliders className="h-4 w-4 text-primary" />
               </div>
-            </TooltipTrigger>
-            <TooltipContent>{config.is_active ? "Desactivar" : "Activar"}</TooltipContent>
-          </Tooltip>
-          
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <MoreVertical className="h-4 w-4" />
-                <span className="sr-only">Abrir menú</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => onEdit(config)}>
-                <Edit className="mr-2 h-4 w-4" />
-                Editar
-              </DropdownMenuItem>
-              {!config.is_default && (
-                <DropdownMenuItem onClick={() => onSetDefault(config.id)}>
-                  <Star className="mr-2 h-4 w-4" />
-                  Establecer como predeterminado
+              <p className="text-sm text-muted-foreground">
+                Temperatura: {config.configuracion?.temperature || 0.7}
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-medium">Tokens máximos</span>
+              <span className="text-muted-foreground">{config.configuracion?.max_tokens || 2048}</span>
+            </div>
+
+            <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+              <div className={cn("h-full rounded-full bg-gradient-to-r", getProviderColor(config.proveedor))} 
+                   style={{ width: `${getTemperatureProgress()}%` }}>
+                <div className="h-full w-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/25 to-transparent"></div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-between items-center">
+            <Switch
+              checked={config.is_active}
+              onCheckedChange={(checked) => onToggleActive(config.id, checked)}
+              className="mr-2"
+            />
+            <span className="text-xs text-muted-foreground flex-1">
+              Estado: {config.is_active ? "Activo" : "Inactivo"}
+            </span>
+            
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => onEdit(config)}>
+                  <Edit className="mr-2 h-4 w-4" />
+                  Editar
                 </DropdownMenuItem>
-              )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
-                onClick={() => setIsConfirmingDelete(true)}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Eliminar
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </CardHeader>
-
-      <CardContent className="text-sm text-muted-foreground">
-        <div className="flex flex-col gap-2">
-          <div>
-            <span className="font-medium text-foreground">Temperatura:</span>{" "}
-            {config.configuracion?.temperature ?? "No especificada"}
+                {!config.is_default && (
+                  <DropdownMenuItem onClick={() => onSetDefault(config.id)}>
+                    <Star className="mr-2 h-4 w-4" />
+                    Establecer como predeterminado
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={() => setIsConfirmingDelete(true)}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Eliminar
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
-          <div>
-            <span className="font-medium text-foreground">Tokens máximos:</span>{" "}
-            {config.configuracion?.max_tokens ?? "No especificados"}
-          </div>
-        </div>
-      </CardContent>
 
-      <CardFooter className="flex justify-between border-t px-6 py-4">
-        <div className="text-xs text-muted-foreground">
-          Actualizado {formattedDate}
+          <Button 
+            variant="outline" 
+            onClick={() => onEdit(config)}
+            className="w-full group/btn relative overflow-hidden bg-gradient-to-r from-primary/0 to-primary/0 p-px text-foreground shadow-sm transition-colors hover:shadow-md"
+          >
+            <div className="relative rounded-md px-4 py-2 transition-colors">
+              <span className="flex items-center justify-center gap-2">
+                Configurar
+                <ChevronRight className="h-4 w-4 transition-transform duration-300 group-hover/btn:translate-x-1" />
+              </span>
+            </div>
+          </Button>
         </div>
-        <Button variant="outline" size="sm" onClick={() => onEdit(config)}>
-          <Edit className="mr-2 h-3 w-3" />
-          Configurar
-        </Button>
-      </CardFooter>
-
+      </div>
+      
       {isConfirmingDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
           <div className="max-w-md rounded-lg border bg-card p-6 shadow-lg">
