@@ -7,6 +7,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import SimpleToggleSwitch from "@/components/ui/simple-toggle-switch";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger
 } from "@/components/ui/dialog";
@@ -24,7 +25,7 @@ import { Conversation } from "@/hooks/useConversations";
 interface ChatHeaderProps {
   selectedLead: Lead | null;
   selectedConversation: Conversation | null;
-  toggleChatbot: () => void;
+  toggleChatbot: (status?: boolean) => void;
   toggleChatbotLoading: boolean;
   formatDate: (date: string) => string;
 }
@@ -96,24 +97,20 @@ const ChatHeader = ({
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={toggleChatbot}
-                    disabled={toggleChatbotLoading}
-                    className="h-8 w-8"
-                  >
-                    {toggleChatbotLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : selectedConversation.chatbot_activo ? (
-                      <BotOff className="h-4 w-4" />
-                    ) : (
-                      <Bot className="h-4 w-4" />
-                    )}
-                  </Button>
+                  <div className="flex items-center mr-2">
+                    <SimpleToggleSwitch
+                      isOn={selectedConversation.chatbot_activo || false}
+                      onToggle={toggleChatbot}
+                      isLoading={toggleChatbotLoading}
+                      disabled={toggleChatbotLoading}
+                      className="mt-1"
+                    />
+                  </div>
                 </TooltipTrigger>
                 <TooltipContent>
-                  {selectedConversation.chatbot_activo ? 'Desactivar Chatbot' : 'Activar Chatbot'}
+                  {selectedConversation.chatbot_activo ? 
+                    'Desactivar chatbot para responder manualmente' : 
+                    'Activar chatbot para respuestas automáticas'}
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>

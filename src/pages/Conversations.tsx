@@ -235,36 +235,53 @@ const ConversationsPage = () => {
   }, [location.pathname, location.search, navigate]);
 
   const toggleChatbot = async (status?: boolean) => {
-    if (!conversationId) return;
+    if (!conversationId) {
+      toast.error('No hay una conversación seleccionada');
+      return;
+    }
     
     try {
       setToggleChatbotLoading(true);
       
       const toggleStatus = status !== undefined ? status : !selectedConversation?.chatbot_activo;
+      console.log(`Intentando ${toggleStatus ? 'activar' : 'desactivar'} el chatbot para la conversación ${conversationId}`);
+      
+      // Asegurarnos de enviar solo valores simples, no el evento completo de React
+      const requestBody = {
+        conversation_id: conversationId,
+        chatbot_activo: toggleStatus
+      };
+      
+      console.log('Enviando solicitud a la API:', requestBody);
       
       const response = await fetch('https://web-production-01457.up.railway.app/api/v1/agent/toggle-chatbot', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          conversation_id: conversationId,
-          chatbot_activo: toggleStatus
-        })
+        body: JSON.stringify(requestBody)
       });
       
       const data = await response.json();
+      console.log('Respuesta de la API:', data);
       
       if (!response.ok || !data.success) {
-        throw new Error(data.detail || 'Error al actualizar el estado del chatbot');
+        const errorMessage = data.detail 
+          ? (typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail)) 
+          : 'Error al actualizar el estado del chatbot';
+        throw new Error(errorMessage);
       }
       
       toast.success(toggleStatus ? 'Chatbot activado' : 'Chatbot desactivado');
-      refetchConversations();
+      
+      // Esperar un momento y luego actualizar los datos
+      setTimeout(() => {
+        refetchConversations();
+      }, 300);
       
     } catch (error) {
       console.error('Error toggling chatbot:', error);
-      toast.error('No se pudo cambiar el estado del chatbot');
+      toast.error(`No se pudo ${selectedConversation?.chatbot_activo ? 'desactivar' : 'activar'} el chatbot: ${error.message || 'Error desconocido'}`);
     } finally {
       setToggleChatbotLoading(false);
     }
