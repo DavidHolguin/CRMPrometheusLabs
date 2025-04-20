@@ -35,6 +35,9 @@ import DashboardLayout from "./components/layouts/DashboardLayout";
 import AuthLayout from "./components/layouts/AuthLayout";
 import OnboardingLayout from "./components/layouts/OnboardingLayout";
 
+// Auth
+import { ProtectedAdminRoute } from "./components/auth/ProtectedAdminRoute";
+
 const App = () => {
   const [mounted, setMounted] = useState(false);
 
@@ -81,11 +84,13 @@ const App = () => {
           <Route path="perfil-empresa" element={<PerfilEmpresa />} />
           <Route path="settings" element={<Dashboard />} />
 
-          {/* Admin routes */}
-          <Route path="admin/agentes" element={<AdminAgentes />} />
-          <Route path="admin/llm" element={<AdminLLM />} />
-          <Route path="admin/prompts" element={<AdminPrompts />} />
-          <Route path="admin/leads" element={<AdminLeads />} />
+          {/* Admin routes - Protegidas */}
+          <Route element={<ProtectedAdminRoute />}>
+            <Route path="admin/agentes" element={<AdminAgentes />} />
+            <Route path="admin/llm" element={<AdminLLM />} />
+            <Route path="admin/prompts" element={<AdminPrompts />} />
+            <Route path="admin/leads" element={<AdminLeads />} />
+          </Route>
         </Route>
         
         {/* Standalone Chat Interface - No Dashboard Layout */}
