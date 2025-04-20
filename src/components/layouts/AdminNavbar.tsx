@@ -1,7 +1,7 @@
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
 import { NavLink } from "react-router-dom";
-import { Users, Cpu, FileText, BarChartHorizontal } from "lucide-react";
+import { Users, Cpu, FileText, Database } from "lucide-react";
 
 export function AdminNavbar() {
   const { user } = useAuth();
@@ -35,9 +35,9 @@ export function AdminNavbar() {
       icon: <FileText className="h-4 w-4" />,
     },
     {
-      href: "/dashboard/admin/evaluaciones",
-      label: "Evaluaciones IA",
-      icon: <BarChartHorizontal className="h-4 w-4" />,
+      href: "/dashboard/admin/leads",
+      label: "Gestión de Leads",
+      icon: <Database className="h-4 w-4" />,
     },
   ];
 

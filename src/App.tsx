@@ -28,6 +28,7 @@ import ChatbotConfig from "./pages/ChatbotConfig";
 import AdminAgentes from "./pages/admin/AdminAgentes";
 import AdminLLM from "./pages/admin/AdminLLM";
 import AdminPrompts from "./pages/admin/AdminPrompts";
+import AdminLeads from "./pages/admin/AdminLeads";
 
 // Layout
 import DashboardLayout from "./components/layouts/DashboardLayout";
@@ -84,7 +85,7 @@ const App = () => {
           <Route path="admin/agentes" element={<AdminAgentes />} />
           <Route path="admin/llm" element={<AdminLLM />} />
           <Route path="admin/prompts" element={<AdminPrompts />} />
-          <Route path="admin/evaluaciones" element={<NotFound />} />
+          <Route path="admin/leads" element={<AdminLeads />} />
         </Route>
         
         {/* Standalone Chat Interface - No Dashboard Layout */}

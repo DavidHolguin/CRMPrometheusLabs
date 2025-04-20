@@ -53,6 +53,8 @@ export interface Lead {
   fecha_actualizacion?: string;
   lead_score?: number;
   lead_estado?: string;
+  lead_creado?: string;
+  lead_actualizado?: string;
   pipeline_nombre?: string;
   probabilidad_cierre?: number;
   agente_nombre?: string;
@@ -60,6 +62,14 @@ export interface Lead {
   agente_avatar?: string;
   empresa_nombre?: string;
   empresa_descripcion?: string;
+  empresa_logo?: string;
+  canal_nombre_detalle?: string;
+  canal_tipo_detalle?: string;
+  canal_descripcion?: string;
+  canal_logo_url?: string;
+  canal_color?: string;
+  canal_configuracion?: any;
+  canal_is_active?: boolean;
   etiquetas?: string;
   intenciones_detectadas?: string;
   ultimas_interacciones?: string;
@@ -71,6 +81,7 @@ export interface Lead {
   chatbot_info?: any;
   total_conversaciones?: number;
   total_mensajes?: number;
+  mensajes_sin_leer?: number;
   dias_en_etapa_actual?: number;
   // Propiedad para la temperatura/calificación del lead
   temperatura_actual?: 'Hot' | 'Warm' | 'Cold' | string;
@@ -83,11 +94,11 @@ export function useLeads(chatbotId?: string) {
     queryKey: ['leads', chatbotId],
     queryFn: async () => {
       try {
-        // Utilizamos la vista vista_lead_completa para obtener todos los datos de los leads en una sola consulta
+        // Utilizamos la vista vista_leads_completa para obtener todos los datos de los leads en una sola consulta
         let query = supabase
-          .from('vista_lead_completa')
+          .from('vista_leads_completa')
           .select('*')
-          .order('fecha_creacion', { ascending: false });
+          .order('lead_creado', { ascending: false });
 
         // Si se proporciona un chatbotId, filtramos para obtener solo los leads relacionados con ese chatbot
         if (chatbotId) {
@@ -113,10 +124,10 @@ export function useLeads(chatbotId?: string) {
           
           // Filtrar los leads por IDs
           query = supabase
-            .from('vista_lead_completa')
+            .from('vista_leads_completa')
             .select('*')
             .in('lead_id', leadIds)
-            .order('fecha_creacion', { ascending: false });
+            .order('lead_creado', { ascending: false });
         }
         
         // Limitamos a 100 para evitar problemas de rendimiento
@@ -125,7 +136,7 @@ export function useLeads(chatbotId?: string) {
         const { data, error } = await query;
         
         if (error) {
-          console.error('Error obteniendo leads desde vista_lead_completa:', error);
+          console.error('Error obteniendo leads desde vista_leads_completa:', error);
           throw error;
         }
         
@@ -159,21 +170,36 @@ export function useLeads(chatbotId?: string) {
             apellido: item.apellido,
             email: item.email,
             telefono: item.telefono,
-            score: item.lead_score,
+            score: item.score,
             canal_origen: item.canal_origen,
-            created_at: item.fecha_creacion,
-            updated_at: item.fecha_actualizacion,
+            created_at: item.fecha_creacion || item.lead_creado,
+            updated_at: item.fecha_actualizacion || item.lead_actualizado,
             ultima_interaccion: item.ultima_interaccion,
             stage_name: item.stage_nombre,
             stage_color: item.stage_color,
+            asignado_a: item.asignado_a,
             ciudad: item.ciudad,
             pais: item.pais,
             direccion: item.direccion,
             datos_adicionales: item.datos_adicionales,
+            // Nuevos campos específicos de vista_leads_completa
+            lead_creado: item.lead_creado,
+            lead_actualizado: item.lead_actualizado,
+            canal_nombre_detalle: item.canal_nombre_detalle,
+            canal_tipo_detalle: item.canal_tipo_detalle,
+            canal_descripcion: item.canal_descripcion,
+            canal_logo_url: item.canal_logo_url,
+            canal_color: item.canal_color,
+            canal_configuracion: item.canal_configuracion,
+            canal_is_active: item.canal_is_active,
+            empresa_nombre: item.empresa_nombre,
+            empresa_descripcion: item.empresa_descripcion,
+            empresa_logo: item.empresa_logo,
             // Usando la función helper para procesar etiquetas de forma segura
             tags: procesarEtiquetas(item.etiquetas),
             // Campos adicionales de la vista
             message_count: item.total_mensajes,
+            mensajes_sin_leer: item.mensajes_sin_leer,
             interaction_count: parseInt(item.ultimas_interacciones?.split(",").length || "0"),
             agente_nombre: item.agente_nombre,
             agente_email: item.agente_email,
@@ -183,11 +209,15 @@ export function useLeads(chatbotId?: string) {
             probabilidad_cierre: item.probabilidad_cierre,
             dias_en_etapa_actual: item.dias_en_etapa_actual,
             total_conversaciones: item.total_conversaciones,
-            ultima_conversacion_id: item.ultima_conversacion_id, // Añadimos el ID de la última conversación
+            ultima_conversacion_id: item.ultima_conversacion_id,
+            ultimo_mensaje: item.ultimo_mensaje,
+            ultimos_comentarios: item.ultimos_comentarios,
+            intenciones_detectadas: item.intenciones_detectadas,
+            chatbot_info: item.chatbot_info,
             // Añadimos el mapeo de temperatura_actual o lo calculamos basado en el score si no existe
             temperatura_actual: item.temperatura_actual || (
-              item.lead_score >= 70 ? 'Hot' : 
-              item.lead_score >= 40 ? 'Warm' : 'Cold'
+              item.score >= 70 ? 'Hot' : 
+              item.score >= 40 ? 'Warm' : 'Cold'
             )
           };
         });
