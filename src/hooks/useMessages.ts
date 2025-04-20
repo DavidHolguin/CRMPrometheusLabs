@@ -216,26 +216,66 @@ export function useMessages(conversationId: string | undefined) {
     mutationFn: async (conversationId: string) => {
       console.log("Marcando mensajes como leídos para conversación:", conversationId);
       
-      // Marcar todos los mensajes del lead/usuario como leídos
-      const { error } = await supabase
-        .from("mensajes")
-        .update({ leido: true })
-        .eq("conversacion_id", conversationId)
-        .in("origen", ["lead", "user"])
-        .is("leido", false);
-      
-      if (error) {
-        console.error("Error marcando mensajes como leídos:", error);
+      try {
+        // Primero, obtener el ID del lead asociado a esta conversación
+        const { data: convData, error: convError } = await supabase
+          .from("conversaciones")
+          .select("lead_id")
+          .eq("id", conversationId)
+          .single();
+        
+        if (convError) {
+          console.error("Error obteniendo lead_id de la conversación:", convError);
+          throw convError;
+        }
+        
+        const leadId = convData?.lead_id;
+        if (!leadId) {
+          console.error("No se encontró lead_id para la conversación:", conversationId);
+          throw new Error("Lead ID no encontrado");
+        }
+        
+        // Marcar todos los mensajes del lead/usuario como leídos
+        const { error } = await supabase
+          .from("mensajes")
+          .update({ leido: true })
+          .eq("conversacion_id", conversationId)
+          .in("origen", ["lead", "user"])
+          .is("leido", false);
+        
+        if (error) {
+          console.error("Error marcando mensajes como leídos:", error);
+          throw error;
+        }
+
+        // También actualizar la función RPC que actualiza los contadores en la vista vista_leads_completa
+        // Esta función necesita ser creada en Supabase si no existe
+        const { error: rpcError } = await supabase
+          .rpc('actualizar_contadores_mensajes_no_leidos', {
+            p_lead_id: leadId
+          });
+
+        if (rpcError) {
+          console.error("Error actualizando contadores en vista_leads_completa:", rpcError);
+          // No lanzar error aquí para no interrumpir el flujo principal
+        }
+
+        console.log("Mensajes marcados como leídos correctamente");
+        return { success: true, leadId };
+      } catch (error) {
+        console.error("Error en markAsRead:", error);
         throw error;
       }
-
-      console.log("Mensajes marcados como leídos correctamente");
-      return true;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       // Invalidate related queries to refresh data
       queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
       queryClient.invalidateQueries({ queryKey: ["conversations"] });
+      
+      // También invalidar la consulta de leads para actualizar los contadores en la interfaz
+      if (data?.leadId) {
+        queryClient.invalidateQueries({ queryKey: ["leads"] });
+      }
     },
   });
 

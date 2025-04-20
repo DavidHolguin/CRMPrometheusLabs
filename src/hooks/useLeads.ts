@@ -72,6 +72,8 @@ export interface Lead {
   total_conversaciones?: number;
   total_mensajes?: number;
   dias_en_etapa_actual?: number;
+  // Propiedad para la temperatura/calificación del lead
+  temperatura_actual?: 'Hot' | 'Warm' | 'Cold' | string;
 }
 
 export function useLeads(chatbotId?: string) {
@@ -181,7 +183,12 @@ export function useLeads(chatbotId?: string) {
             probabilidad_cierre: item.probabilidad_cierre,
             dias_en_etapa_actual: item.dias_en_etapa_actual,
             total_conversaciones: item.total_conversaciones,
-            ultima_conversacion_id: item.ultima_conversacion_id // Añadimos el ID de la última conversación
+            ultima_conversacion_id: item.ultima_conversacion_id, // Añadimos el ID de la última conversación
+            // Añadimos el mapeo de temperatura_actual o lo calculamos basado en el score si no existe
+            temperatura_actual: item.temperatura_actual || (
+              item.lead_score >= 70 ? 'Hot' : 
+              item.lead_score >= 40 ? 'Warm' : 'Cold'
+            )
           };
         });
       } catch (error) {

@@ -3,7 +3,7 @@ import React from "react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { CanalIcon } from "@/components/canales/CanalIcon";
-import { MessageSquare, Trophy } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 
 interface LeadCardModernProps {
   lead: {
@@ -14,7 +14,7 @@ interface LeadCardModernProps {
     ultima_actualizacion: string;
     total_mensajes_sin_leer: number;
     ultimo_mensaje?: string;
-    temperatura?: string; // Hot, Warm, Cold
+    temperatura_actual?: string; // Cambiado de temperatura a temperatura_actual para usar el campo de vista_leads_completa
     canal_origen?: string; // ID del canal de origen
     conversations: Array<{
       id: string;
@@ -90,20 +90,9 @@ export const LeadCardModern = ({
     }
   };
   
-  // Determinar el color de fondo basado en la temperatura del lead
-  const getTemperatureColor = () => {
-    switch(lead.temperatura) {
-      case 'Hot':
-        return 'from-red-500/20 to-orange-400/10';
-      case 'Warm':
-        return 'from-amber-500/20 to-yellow-400/10';
-      case 'Cold':
-        return 'from-blue-500/20 to-cyan-400/10';
-      default:
-        return 'from-emerald-500/20 to-teal-500/0';
-    }
-  };
-
+  // Verificar si el lead tiene temperatura HOT para mostrar el gradiente
+  const isHot = lead.temperatura_actual === 'Hot';
+  
   // Determinar el color del score basado en su valor
   const getScoreColor = () => {
     if (!lead.lead_score && lead.lead_score !== 0) return { bg: 'bg-gray-500/10', text: 'text-gray-400' };
@@ -131,15 +120,17 @@ export const LeadCardModern = ({
           hasUnread ? "border-l-2 border-primary" : ""
         )}
       >
-        <div
-          className={cn(
-            "absolute -left-16 -top-16 h-32 w-32 rounded-full bg-gradient-to-br blur-2xl transition-all duration-500 group-hover:scale-150 group-hover:opacity-70",
-            getTemperatureColor()
-          )}
-        ></div>
-        <div
-          className="absolute -right-16 -bottom-16 h-32 w-32 rounded-full bg-gradient-to-br from-teal-500/20 to-emerald-500/0 blur-2xl transition-all duration-500 group-hover:scale-150 group-hover:opacity-70"
-        ></div>
+        {/* Mostrar el gradiente solo si temperatura_actual es HOT */}
+        {isHot && (
+          <>
+            <div
+              className="absolute -left-16 -top-16 h-32 w-32 rounded-full bg-gradient-to-br from-red-500/20 to-orange-400/10 blur-2xl transition-all duration-500 group-hover:scale-150 group-hover:opacity-70"
+            ></div>
+            <div
+              className="absolute -right-16 -bottom-16 h-32 w-32 rounded-full bg-gradient-to-br from-teal-500/20 to-emerald-500/0 blur-2xl transition-all duration-500 group-hover:scale-150 group-hover:opacity-70"
+            ></div>
+          </>
+        )}
 
         <div className="relative p-4 cursor-pointer" onClick={onClick}>
           <div className="flex items-center justify-between">
@@ -148,18 +139,18 @@ export const LeadCardModern = ({
                 <div
                   className={cn(
                     "absolute -inset-1 rounded-xl bg-gradient-to-r opacity-30 blur-sm transition-opacity duration-300 group-hover:opacity-40",
-                    lead.temperatura === 'Hot' ? "from-red-500 to-orange-500" :
-                    lead.temperatura === 'Warm' ? "from-amber-500 to-yellow-500" :
-                    lead.temperatura === 'Cold' ? "from-blue-500 to-cyan-500" :
+                    isHot ? "from-red-500 to-orange-500" :
+                    lead.temperatura_actual === 'Warm' ? "from-amber-500 to-yellow-500" :
+                    lead.temperatura_actual === 'Cold' ? "from-blue-500 to-cyan-500" :
                     "from-emerald-500 to-teal-500"
                   )}
                 ></div>
                 <div className="relative flex h-12 w-12 items-center justify-center rounded-xl bg-slate-900">
                   <span className={cn(
                     "text-lg font-medium",
-                    lead.temperatura === 'Hot' ? "text-red-500" :
-                    lead.temperatura === 'Warm' ? "text-amber-500" :
-                    lead.temperatura === 'Cold' ? "text-blue-500" :
+                    isHot ? "text-red-500" :
+                    lead.temperatura_actual === 'Warm' ? "text-amber-500" :
+                    lead.temperatura_actual === 'Cold' ? "text-blue-500" :
                     "text-emerald-500"
                   )}>
                     {getInitials(leadName)}
@@ -170,35 +161,50 @@ export const LeadCardModern = ({
               <div>
                 <h3 className="font-semibold text-white">{leadName}</h3>
                 <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                  {/* Score Badge */}
+                  {/* Score - Ahora muestra texto "Score: X%" sin icono */}
                   <div className={`flex items-center rounded-md px-1.5 py-0.5 ${scoreColors.bg}`}>
-                    <Trophy className={`h-3 w-3 mr-1 ${scoreColors.text}`} />
-                    <span className={`text-xs font-medium ${scoreColors.text}`}>{lead.lead_score || 0}%</span>
+                    <span className={`text-xs font-medium ${scoreColors.text}`}>
+                      Score: {lead.lead_score || 0}%
+                    </span>
                   </div>
                   
-                  {/* Canal Badge */}
+                  {/* Canal Badge con logo más prominente */}
                   <div className="flex items-center rounded-md px-1.5 py-0.5 bg-slate-800/80">
-                    <div className="flex h-3 w-3 items-center justify-center mr-1">
-                      <CanalIcon 
-                        tipo={canalOrigen.type} 
-                        size={10} 
-                        className="text-slate-300" 
-                      />
-                    </div>
-                    <span className="text-xs text-slate-300">{canalOrigen.name}</span>
+                    <CanalIcon 
+                      tipo={canalOrigen.type} 
+                      size={14} 
+                      className="text-slate-300" 
+                    />
+                    <span className="text-xs text-slate-300 ml-1">{canalOrigen.name}</span>
                   </div>
                 </div>
               </div>
             </div>
 
             <div className="flex flex-col items-end gap-1">
-              <span className="text-xs text-slate-400">{formatDate(lead.ultima_actualizacion)}</span>
+              {/* Fecha con resaltado si hay mensajes sin leer */}
+              <span className={cn(
+                "text-xs",
+                hasUnread ? "text-emerald-400 font-medium" : "text-slate-400"
+              )}>
+                {formatDate(lead.ultima_actualizacion)}
+              </span>
               
+              {/* Total de mensajes - resaltado si hay sin leer */}
               <div className="flex items-center">
-                <MessageSquare className="h-3 w-3 mr-1 text-slate-400" />
-                <span className="text-xs text-slate-400">{totalMessages}</span>
+                <MessageSquare className={cn(
+                  "h-3 w-3 mr-1",
+                  hasUnread ? "text-emerald-400" : "text-slate-400"
+                )} />
+                <span className={cn(
+                  "text-xs",
+                  hasUnread ? "text-emerald-400 font-medium" : "text-slate-400"
+                )}>
+                  {totalMessages}
+                </span>
               </div>
               
+              {/* Badge de mensajes sin leer */}
               {hasUnread && (
                 <span
                   className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-500 mt-1"

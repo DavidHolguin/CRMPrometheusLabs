@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useLocation } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -46,6 +46,7 @@ interface Mensaje {
 const ConversationsPage = () => {
   const { user } = useAuth();
   const { conversationId } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [commentDialogOpen, setCommentDialogOpen] = useState(false);
@@ -61,6 +62,13 @@ const ConversationsPage = () => {
   const [isTransferring, setIsTransferring] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
   const [isReleasing, setIsReleasing] = useState(false);
+  
+  // Filtros de búsqueda que obtenemos de la URL
+  const searchParams = new URLSearchParams(location.search);
+  const filterUnreadOnly = searchParams.get('unread') === 'true';
+  const filterCanalId = searchParams.get('canal');
+  const filterAssignment = searchParams.get('assigned') as 'all' | 'assigned_to_me' | 'unassigned' || 'all';
+  const filterTags = searchParams.get('tags')?.split(',') || [];
 
   const { useCanalesQuery } = useCanales();
   const { data: canales = [] } = useCanalesQuery();
@@ -105,6 +113,7 @@ const ConversationsPage = () => {
           lead_email: conv.lead?.email,
           lead_telefono: conv.lead?.telefono,
           lead_score: conv.lead?.score,
+          temperatura_actual: conv.lead?.temperatura_actual || (conv.lead?.score && conv.lead?.score >= 70 ? 'Hot' : (conv.lead?.score && conv.lead?.score >= 40 ? 'Warm' : 'Cold')),
           lead: {
             ...conv.lead,
             asignado_a: asignadoA || null,
@@ -181,6 +190,79 @@ const ConversationsPage = () => {
       };
     });
   }, [messages]);
+
+  // Cargar agentes disponibles para transferencia al abrir el diálogo
+  useEffect(() => {
+    const fetchAgents = async () => {
+      if (!user?.companyId || !transferDialogOpen) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, full_name, email, avatar_url')
+          .eq('company_id', user.companyId)
+          .in('role', ['admin', 'agent'])
+          .neq('id', user.id); // Excluir al usuario actual
+          
+        if (error) throw error;
+        
+        setAgents(data || []);
+      } catch (error) {
+        console.error('Error fetching agents:', error);
+        toast.error('No se pudieron cargar los agentes');
+      }
+    };
+    
+    fetchAgents();
+  }, [transferDialogOpen, user?.companyId, user?.id]);
+
+  // Actualizar los filtros en la URL
+  const updateFilters = (params: {
+    unread?: boolean,
+    canal?: string | null,
+    assigned?: 'all' | 'assigned_to_me' | 'unassigned',
+    tags?: string[]
+  }) => {
+    const newSearchParams = new URLSearchParams(location.search);
+    
+    if (params.unread !== undefined) {
+      if (params.unread) {
+        newSearchParams.set('unread', 'true');
+      } else {
+        newSearchParams.delete('unread');
+      }
+    }
+    
+    if (params.canal !== undefined) {
+      if (params.canal) {
+        newSearchParams.set('canal', params.canal);
+      } else {
+        newSearchParams.delete('canal');
+      }
+    }
+    
+    if (params.assigned) {
+      if (params.assigned === 'all') {
+        newSearchParams.delete('assigned');
+      } else {
+        newSearchParams.set('assigned', params.assigned);
+      }
+    }
+    
+    if (params.tags) {
+      if (params.tags.length > 0) {
+        newSearchParams.set('tags', params.tags.join(','));
+      } else {
+        newSearchParams.delete('tags');
+      }
+    }
+    
+    const newSearch = newSearchParams.toString();
+    navigate({
+      pathname: location.pathname,
+      search: newSearch ? `?${newSearch}` : ''
+    }, { replace: true });
+  };
 
   const toggleChatbot = async (status?: boolean) => {
     if (!conversationId) return;
@@ -436,14 +518,20 @@ const ConversationsPage = () => {
     }
   };
 
+  // Efecto para marcar mensajes como leídos cuando se abre una conversación
   useEffect(() => {
     if (conversationId) {
-      // Marcar mensajes como leídos inmediatamente al cambiar de conversación
-      markAsRead(conversationId);
+      // Agregamos un breve retraso para asegurar que la UI se haya actualizado antes de marcar como leídos
+      const timer = setTimeout(() => {
+        console.log("Marcando mensajes como leídos al cambiar de conversación", conversationId);
+        markAsRead(conversationId);
+      }, 300);
+      
+      return () => clearTimeout(timer);
     }
   }, [conversationId, markAsRead]);
 
-  // Nuevo efecto para marcar mensajes como leídos cuando llegan nuevos mensajes
+  // Efecto para marcar mensajes como leídos cuando llegan nuevos mensajes
   useEffect(() => {
     if (conversationId && messages.length > 0) {
       // Verificar si hay mensajes sin leer del lead
@@ -452,18 +540,20 @@ const ConversationsPage = () => {
       );
       
       if (hasUnreadMessages) {
-        console.log("Marcando mensajes no leídos como leídos");
+        console.log("Marcando mensajes no leídos como leídos al recibir nuevos mensajes");
         markAsRead(conversationId);
       }
     }
   }, [conversationId, messages, markAsRead]);
 
+  // Efecto para cargar comentarios cuando cambia el lead seleccionado
   useEffect(() => {
     if (selectedLeadId) {
       fetchLeadComments(selectedLeadId);
     }
   }, [selectedLeadId]);
 
+  // Suscripción a cambios en asignaciones de leads
   useEffect(() => {
     if (!user?.companyId) return;
     
@@ -489,6 +579,33 @@ const ConversationsPage = () => {
         }, 
         (payload) => {
           refetchConversations();
+        }
+      )
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [refetchConversations, user?.companyId]);
+
+  // Suscripción a cambios en mensajes para actualizar contadores en tiempo real
+  useEffect(() => {
+    if (!user?.companyId) return;
+    
+    const channel = supabase
+      .channel('new-messages-notifications')
+      .on('postgres_changes', 
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'mensajes'
+        }, 
+        (payload) => {
+          // Cuando llega un nuevo mensaje, refrescar las conversaciones para actualizar contadores
+          if (payload.new && payload.new.origen === 'lead') {
+            console.log('Nuevo mensaje recibido:', payload.new);
+            refetchConversations();
+          }
         }
       )
       .subscribe();
@@ -544,12 +661,35 @@ const ConversationsPage = () => {
       <LeadsList 
         isLoading={conversationsLoading}
         groupedConversations={groupedConversations}
-        selectedLeadId={selectedLeadId} 
+        selectedLeadId={selectedLeadId}
+        // Pasamos parámetros iniciales de filtros basados en la URL
+        initialFilters={{
+          showUnreadOnly: filterUnreadOnly,
+          assignmentFilter: filterAssignment,
+          selectedCanal: filterCanalId,
+          selectedTags: filterTags,
+          sortOrder: 'date_desc'
+        }}
+        // Manejador para actualizar los filtros en la URL
+        onFilterChange={(filters) => {
+          updateFilters({
+            unread: filters.showUnreadOnly,
+            canal: filters.selectedCanal,
+            assigned: filters.assignmentFilter,
+            tags: filters.selectedTags,
+          });
+        }}
         setSelectedLeadId={(leadId) => {
           setSelectedLeadId(leadId);
           const leadGroup = groupedConversations.find(g => g.lead_id === leadId);
           if (leadGroup && leadGroup.conversations.length > 0) {
-            const firstConv = leadGroup.conversations.sort((a:any, b:any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+            // Encontrar la conversación más reciente
+            const firstConv = leadGroup.conversations.sort((a:any, b:any) => 
+              new Date(b.ultimo_mensaje || b.created_at).getTime() - 
+              new Date(a.ultimo_mensaje || a.created_at).getTime()
+            )[0];
+            
+            // Si estamos cambiando de conversación, navegar a la nueva URL
             if (firstConv && firstConv.id !== conversationId) {
               navigate(`/dashboard/conversations/${firstConv.id}`);
             }
@@ -558,6 +698,7 @@ const ConversationsPage = () => {
           }
         }}
         canales={canales}
+        user={user}
       />
 
       <main className="flex-1 flex flex-col h-full border-l border-r border-border">

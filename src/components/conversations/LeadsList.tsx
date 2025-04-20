@@ -26,6 +26,21 @@ interface LeadsListProps {
   selectedLeadId: string | null;
   setSelectedLeadId: (id: string) => void;
   canales: any[];
+  user?: any;
+  initialFilters?: {
+    showUnreadOnly?: boolean;
+    assignmentFilter?: 'all' | 'assigned_to_me' | 'unassigned';
+    selectedCanal?: string | null;
+    selectedTags?: string[];
+    sortOrder?: SortOrder;
+  };
+  onFilterChange?: (filters: {
+    showUnreadOnly: boolean;
+    assignmentFilter: 'all' | 'assigned_to_me' | 'unassigned';
+    selectedCanal: string | null;
+    selectedTags: string[];
+    sortOrder: SortOrder;
+  }) => void;
 }
 
 type SortOrder = 'date_desc' | 'date_asc' | 'score_desc' | 'score_asc' | 'messages_desc' | 'messages_asc' | 'unread_desc';
@@ -36,20 +51,34 @@ const LeadsList = ({
   groupedConversations,
   selectedLeadId,
   setSelectedLeadId,
-  canales
+  canales,
+  user,
+  initialFilters,
+  onFilterChange
 }: LeadsListProps) => {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
-  const [showUnreadOnly, setShowUnreadOnly] = useState(false);
-  const [sortOrder, setSortOrder] = useState<SortOrder>('date_desc');
-  const [assignmentFilter, setAssignmentFilter] = useState<FilterAssignment>('all');
-  const [selectedCanal, setSelectedCanal] = useState<string | null>(null);
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [showUnreadOnly, setShowUnreadOnly] = useState(initialFilters?.showUnreadOnly || false);
+  const [sortOrder, setSortOrder] = useState<SortOrder>(initialFilters?.sortOrder || 'date_desc');
+  const [assignmentFilter, setAssignmentFilter] = useState<FilterAssignment>(initialFilters?.assignmentFilter || 'all');
+  const [selectedCanal, setSelectedCanal] = useState<string | null>(initialFilters?.selectedCanal || null);
+  const [selectedTags, setSelectedTags] = useState<string[]>(initialFilters?.selectedTags || []);
   const [availableTags, setAvailableTags] = useState<any[]>([]);
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
+  const [fullLeadData, setFullLeadData] = useState<Record<string, any>>({});
 
-  // Cargar etiquetas disponibles
+  useEffect(() => {
+    if (onFilterChange) {
+      onFilterChange({
+        showUnreadOnly,
+        assignmentFilter,
+        selectedCanal,
+        selectedTags,
+        sortOrder
+      });
+    }
+  }, [showUnreadOnly, assignmentFilter, selectedCanal, selectedTags, sortOrder, onFilterChange]);
+
   useEffect(() => {
     const fetchTags = async () => {
       if (!user?.companyId) return;
@@ -75,7 +104,37 @@ const LeadsList = ({
     fetchTags();
   }, [user?.companyId]);
 
-  // Obtener texto descriptivo para el filtro de asignación
+  useEffect(() => {
+    const fetchLeadCompleteData = async () => {
+      if (groupedConversations.length === 0) return;
+      
+      try {
+        const leadIds = groupedConversations.map(group => group.lead_id);
+        
+        const { data, error } = await supabase
+          .from('vista_leads_completa')
+          .select('*')
+          .in('lead_id', leadIds);
+          
+        if (error) {
+          console.error('Error fetching complete lead data:', error);
+          return;
+        }
+        
+        const leadsMap: Record<string, any> = {};
+        data?.forEach(lead => {
+          leadsMap[lead.lead_id] = lead;
+        });
+        
+        setFullLeadData(leadsMap);
+      } catch (error) {
+        console.error('Error loading complete lead data:', error);
+      }
+    };
+    
+    fetchLeadCompleteData();
+  }, [groupedConversations]);
+
   const getAssignmentFilterLabel = () => {
     switch(assignmentFilter) {
       case 'assigned_to_me': return 'Asignados a mí';
@@ -84,7 +143,6 @@ const LeadsList = ({
     }
   };
 
-  // Obtener texto descriptivo para el orden
   const getSortOrderLabel = () => {
     switch(sortOrder) {
       case 'date_desc': return 'Más recientes primero';
@@ -98,10 +156,8 @@ const LeadsList = ({
     }
   };
 
-  // Filtrar y ordenar las conversaciones
   const processedConversations = groupedConversations
     .filter(group => {
-      // Para depuración - verificar la estructura de los datos de cada lead
       if (assignmentFilter !== 'all' && process.env.NODE_ENV === 'development') {
         console.log("Filtrando lead:", {
           id: group.lead_id,
@@ -115,14 +171,11 @@ const LeadsList = ({
         });
       }
 
-      // Filtro de búsqueda por nombre
       const leadName = `${group.lead_nombre || ''} ${group.lead_apellido || ''}`.toLowerCase();
       const matchesSearch = searchTerm ? leadName.includes(searchTerm.toLowerCase()) : true;
       
-      // Filtro de mensajes no leídos
       const matchesUnread = showUnreadOnly ? group.total_mensajes_sin_leer > 0 : true;
       
-      // Filtro de asignación - utilizando la propiedad lead para acceder a los datos de asignación
       let matchesAssignment = true;
       if (assignmentFilter === 'assigned_to_me') {
         matchesAssignment = group.lead?.asignado_a === user?.id;
@@ -130,12 +183,11 @@ const LeadsList = ({
         matchesAssignment = !group.lead?.asignado_a;
       }
       
-      // Filtro de canal - verificando todos los canales de las conversaciones en el grupo
       const matchesCanal = selectedCanal ? 
-        group.conversations.some((conv: any) => conv.canal_id === selectedCanal) : 
+        group.conversations.some((conv: any) => conv.canal_id === selectedCanal) || 
+        group.canal_origen === selectedCanal : 
         true;
       
-      // Filtro de etiquetas - verificando si tiene alguna de las etiquetas seleccionadas
       const matchesTags = selectedTags.length > 0 ? 
         group.lead?.tags && group.lead.tags.some((tag: any) => selectedTags.includes(tag.id)) : 
         true;
@@ -143,7 +195,6 @@ const LeadsList = ({
       return matchesSearch && matchesUnread && matchesAssignment && matchesCanal && matchesTags;
     })
     .sort((a, b) => {
-      // Ordenar según el criterio seleccionado
       switch(sortOrder) {
         case 'date_desc':
           return new Date(b.ultima_actualizacion).getTime() - new Date(a.ultima_actualizacion).getTime();
@@ -202,7 +253,6 @@ const LeadsList = ({
     }
   };
   
-  // Eliminar un filtro activo
   const removeFilter = (type: string, value?: string) => {
     switch(type) {
       case 'unread':
@@ -224,29 +274,21 @@ const LeadsList = ({
     }
   };
 
-  // Comprobar si hay algún filtro activo
   const hasActiveFilters = showUnreadOnly || assignmentFilter !== 'all' || selectedCanal !== null || selectedTags.length > 0;
   
-  // Obtener el nombre de un tag por su ID
   const getTagName = (tagId: string) => {
-    // Buscamos el tag correspondiente en el array de tags disponibles
     const tag = availableTags.find(t => t.id === tagId);
-    // Si encontramos el tag, devolvemos su nombre, si no un valor por defecto
     return tag ? tag.nombre : 'Sin nombre';
   };
   
-  // Obtener el color de un tag por su ID
   const getTagColor = (tagId: string) => {
-    // Buscamos el tag correspondiente en el array de tags disponibles
     const tag = availableTags.find(t => t.id === tagId);
-    // Si encontramos el tag, devolvemos su color, si no un color por defecto
     return tag ? tag.color : '#6b7280';
   };
 
   return (
     <div className="w-80 border-r flex flex-col h-full">
       <div className="p-4 border-b bg-card/50 space-y-3">
-        {/* Buscador con filtro */}
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -270,7 +312,6 @@ const LeadsList = ({
             <DropdownMenuContent className="w-56" align="end">
               <DropdownMenuLabel>Filtrar por</DropdownMenuLabel>
               
-              {/* Filtro de mensajes no leídos */}
               <DropdownMenuGroup>
                 <DropdownMenuItem 
                   onClick={() => setShowUnreadOnly(!showUnreadOnly)}
@@ -283,7 +324,6 @@ const LeadsList = ({
               
               <DropdownMenuSeparator />
               
-              {/* Filtro de asignación */}
               <DropdownMenuLabel>Asignación</DropdownMenuLabel>
               <DropdownMenuGroup>
                 <DropdownMenuItem 
@@ -322,7 +362,6 @@ const LeadsList = ({
                 <>
                   <DropdownMenuSeparator />
                   
-                  {/* Filtro de canales */}
                   <DropdownMenuLabel>Canal</DropdownMenuLabel>
                   <DropdownMenuGroup>
                     {canales.map(canal => (
@@ -346,7 +385,6 @@ const LeadsList = ({
                 <>
                   <DropdownMenuSeparator />
                   
-                  {/* Filtro de etiquetas */}
                   <DropdownMenuLabel>Etiquetas</DropdownMenuLabel>
                   <DropdownMenuGroup>
                     {availableTags.map(tag => (
@@ -377,7 +415,6 @@ const LeadsList = ({
               
               <DropdownMenuSeparator />
               
-              {/* Opciones de ordenación */}
               <DropdownMenuLabel>Ordenar por</DropdownMenuLabel>
               <DropdownMenuGroup>
                 <DropdownMenuItem 
@@ -453,66 +490,8 @@ const LeadsList = ({
               </DropdownMenuGroup>
             </DropdownMenuContent>
           </DropdownMenu>
-          
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                title="Ordenar"
-              >
-                <SortDesc className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56" align="end">
-              <DropdownMenuLabel>Ordenar por</DropdownMenuLabel>
-              <DropdownMenuGroup>
-                <DropdownMenuItem 
-                  onClick={() => setSortOrder('date_desc')}
-                  className="flex items-center justify-between"
-                >
-                  <span className="flex items-center">
-                    <ArrowDown className="h-4 w-4 mr-2" />
-                    Más recientes primero
-                  </span>
-                  {sortOrder === 'date_desc' && <Badge variant="outline" className="ml-2 px-1 h-5">✓</Badge>}
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => setSortOrder('date_asc')}
-                  className="flex items-center justify-between"
-                >
-                  <span className="flex items-center">
-                    <ArrowUp className="h-4 w-4 mr-2" />
-                    Más antiguos primero
-                  </span>
-                  {sortOrder === 'date_asc' && <Badge variant="outline" className="ml-2 px-1 h-5">✓</Badge>}
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => setSortOrder('score_desc')}
-                  className="flex items-center justify-between"
-                >
-                  <span className="flex items-center">
-                    <ArrowDown className="h-4 w-4 mr-2" />
-                    Mayor score primero
-                  </span>
-                  {sortOrder === 'score_desc' && <Badge variant="outline" className="ml-2 px-1 h-5">✓</Badge>}
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => setSortOrder('unread_desc')}
-                  className="flex items-center justify-between"
-                >
-                  <span className="flex items-center">
-                    <ArrowDown className="h-4 w-4 mr-2" />
-                    No leídos primero
-                  </span>
-                  {sortOrder === 'unread_desc' && <Badge variant="outline" className="ml-2 px-1 h-5">✓</Badge>}
-                </DropdownMenuItem>
-              </DropdownMenuGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
         
-        {/* Mostrar etiquetas de filtros activos */}
         {hasActiveFilters && (
           <div className="flex flex-wrap gap-1.5 mt-2">
             {showUnreadOnly && (
@@ -595,15 +574,8 @@ const LeadsList = ({
         ) : (
           <div className="py-2">
             {processedConversations.map((group) => {
-              // Obtener la temperatura del lead basada en el score
-              const getLeadTemperature = (score: number | undefined) => {
-                if (!score) return undefined;
-                if (score >= 70) return 'Hot';
-                if (score >= 40) return 'Warm';
-                return 'Cold';
-              };
+              const completeLeadData = fullLeadData[group.lead_id] || {};
               
-              // Prepara los datos del lead para el nuevo componente
               const leadData = {
                 lead_id: group.lead_id,
                 lead_nombre: group.lead_nombre,
@@ -612,7 +584,11 @@ const LeadsList = ({
                 ultima_actualizacion: group.ultima_actualizacion,
                 total_mensajes_sin_leer: group.total_mensajes_sin_leer,
                 ultimo_mensaje: group.ultimo_mensaje,
-                temperatura: getLeadTemperature(group.lead_score),
+                temperatura_actual: completeLeadData?.temperatura_actual || 
+                                   group.temperatura_actual ||
+                                   (group.lead_score >= 70 ? 'Hot' : 
+                                   (group.lead_score >= 40 ? 'Warm' : 'Cold')),
+                canal_origen: completeLeadData?.canal_id || group.canal_origen || group.conversations[0]?.canal_id,
                 conversations: group.conversations,
                 lead: group.lead
               };
@@ -635,6 +611,12 @@ const LeadsList = ({
           </div>
         )}
       </ScrollArea>
+
+      <div className="p-2 border-t text-xs text-muted-foreground text-center">
+        {processedConversations.length} 
+        {processedConversations.length === 1 ? ' lead encontrado' : ' leads encontrados'}
+        {hasActiveFilters && ' con los filtros aplicados'}
+      </div>
     </div>
   );
 };
