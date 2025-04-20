@@ -378,23 +378,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         console.log("No website channel found in database");
       }
       
-      console.log("Creating chatbot with data:", {
+      // Preparar los datos del chatbot sin el campo instrucciones
+      const chatbotInsertData = {
         empresa_id: user.companyId,
         nombre: chatbotData.name,
-        personalidad: chatbotData.persona,
-        instrucciones: chatbotData.customInstructions,
-        avatar_url: uploadedAvatarUrl
-      });
+        descripcion: chatbotData.description || "",
+        avatar_url: uploadedAvatarUrl,
+        pipeline_id: chatbotData.pipeline_id || null,
+        is_active: true
+      };
+      
+      console.log("Creating chatbot with data:", chatbotInsertData);
       
       const { data: chatbotResult, error: chatbotError } = await supabase
         .from('chatbots')
-        .insert([{
-          empresa_id: user.companyId,
-          nombre: chatbotData.name,
-          personalidad: chatbotData.persona,
-          instrucciones: chatbotData.customInstructions,
-          avatar_url: uploadedAvatarUrl
-        }])
+        .insert([chatbotInsertData])
         .select('id')
         .single();
         
