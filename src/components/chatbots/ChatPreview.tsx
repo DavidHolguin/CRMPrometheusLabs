@@ -41,9 +41,22 @@ export function ChatPreview({ chatbotId, empresaId, chatbotName = "Chatbot", ava
   
   // Crear un lead de prueba si no hay uno
   useEffect(() => {
-    if (!leadId && !testLead && !isCreating) {
+    // Crear una clave única para este chatbot en localStorage
+    const storageKey = `chatbot_preview_lead_${chatbotId}`;
+    
+    // Intentar recuperar el lead_id de localStorage primero
+    const savedLeadId = localStorage.getItem(storageKey);
+    
+    if (savedLeadId) {
+      // Si ya tenemos un lead guardado para este chatbot, lo utilizamos
+      setLeadId(savedLeadId);
+      console.log("Lead recuperado del almacenamiento local:", savedLeadId);
+    } else if (!leadId && !testLead && !isCreating) {
+      // Si no hay un lead guardado ni uno activo, creamos uno nuevo
       createTestLead(undefined, {
         onSuccess: (data) => {
+          // Guardar el nuevo lead_id en localStorage para este chatbot
+          localStorage.setItem(storageKey, data.id);
           setLeadId(data.id);
           toast.success("Lead de prueba creado para chatear");
         },
@@ -52,9 +65,11 @@ export function ChatPreview({ chatbotId, empresaId, chatbotName = "Chatbot", ava
         }
       });
     } else if (testLead) {
+      // Si ya hay un lead de prueba recién creado, lo guardamos en localStorage
       setLeadId(testLead.id);
+      localStorage.setItem(storageKey, testLead.id);
     }
-  }, [testLead, isCreating, leadId]);
+  }, [testLead, isCreating, leadId, chatbotId, createTestLead]);
   
   // Hacer scroll al último mensaje
   useEffect(() => {
