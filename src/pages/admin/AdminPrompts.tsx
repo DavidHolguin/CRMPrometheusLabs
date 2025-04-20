@@ -78,6 +78,7 @@ import { ChatbotSelector } from "../../components/prompts/ChatbotSelector";
 // Tipos
 interface PromptTemplate {
   id: string;
+  empresa_id: string; // Añadido para mantener compatibilidad con PromptTemplateCard y PromptTemplateForm
   nombre: string;
   descripcion: string;
   tipo_template: string;
@@ -390,10 +391,13 @@ export default function AdminPrompts() {
   };
 
   // Asignar template a chatbot
-  const handleAssignToChatbot = async (chatbotId: string, tipo: string = "prompt") => {
+  const handleAssignToChatbot = async (chatbotId: string, params: Record<string, any> = {}) => {
     if (!templateForChatbot) return;
     
     try {
+      // Extraemos el tipo si viene en los parámetros o usamos 'prompt' como valor por defecto
+      const tipo = params.tipo || "prompt";
+      
       await assignTemplateToChatbot(chatbotId, templateForChatbot, tipo);
       setIsChatbotSelectorOpen(false);
     } catch (error) {
