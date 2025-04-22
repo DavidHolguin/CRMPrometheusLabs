@@ -15,7 +15,7 @@ import {
   LineChart as LineIcon, 
   PieChart as PieIcon,
   Users,
-  Click,
+  MousePointerClick,
   Eye,
   Percent
 } from "lucide-react";
@@ -85,7 +85,7 @@ export function MarketingAnalytics({
       nombre: "Clics",
       valor: 3245,
       incremento: 8.2,
-      icon: <Click className="h-4 w-4 text-green-500" />
+      icon: <MousePointerClick className="h-4 w-4 text-green-500" />
     },
     {
       nombre: "CTR promedio",
