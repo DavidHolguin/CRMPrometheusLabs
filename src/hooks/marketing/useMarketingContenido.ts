@@ -74,6 +74,9 @@ export const useMarketingContenido = (options: MarketingContenidoOptions = {}) =
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
+  // Obtener el empresaId directamente del usuario
+  const empresaId = user?.companyId;
+  
   // Valores predeterminados
   const page = options.page || 0;
   const pageSize = options.pageSize || 10;
@@ -86,32 +89,18 @@ export const useMarketingContenido = (options: MarketingContenidoOptions = {}) =
   
   // Consulta principal para obtener contenidos
   const { data: contenidos, isLoading, isError, refetch } = useQuery({
-    queryKey: ["marketing-contenidos", page, pageSize, filters, sort, user?.id],
+    queryKey: ["marketing-contenidos", page, pageSize, filters, sort, empresaId],
     queryFn: async () => {
       try {
-        if (!user?.id) {
+        if (!empresaId) {
           return [];
         }
-        
-        // Obtener la empresa_id del usuario actual
-        const { data: userData, error: userError } = await supabase
-          .from("usuarios")
-          .select("empresa_id")
-          .eq("user_id", user.id)
-          .single();
-          
-        if (userError || !userData?.empresa_id) {
-          console.error("Error al obtener empresa_id:", userError);
-          return [];
-        }
-        
-        const empresa_id = userData.empresa_id;
         
         // Construir la consulta base
         let query = supabase
           .from("marketing_contenidos")
           .select("*", { count: "exact" })
-          .eq("empresa_id", empresa_id);
+          .eq("empresa_id", empresaId);
         
         // Aplicar filtros
         if (filters.tipo) {
@@ -177,34 +166,21 @@ export const useMarketingContenido = (options: MarketingContenidoOptions = {}) =
         return [];
       }
     },
-    enabled: !!user?.id
+    enabled: !!empresaId
   });
 
   // Crear nuevo contenido
   const createContenido = useMutation({
     mutationFn: async (contenido: MarketingContenidoInput) => {
-      if (!user?.id) {
-        throw new Error("Usuario no autenticado");
-      }
-      
-      // Obtener la empresa_id del usuario actual
-      const { data: userData, error: userError } = await supabase
-        .from("usuarios")
-        .select("empresa_id")
-        .eq("user_id", user.id)
-        .single();
-        
-      if (userError || !userData?.empresa_id) {
+      if (!empresaId) {
         throw new Error("No se pudo determinar la empresa del usuario");
       }
-      
-      const empresa_id = userData.empresa_id;
       
       const { data, error } = await supabase
         .from("marketing_contenidos")
         .insert([{ 
           ...contenido,
-          empresa_id,
+          empresa_id: empresaId,
           is_active: contenido.is_active !== undefined ? contenido.is_active : true 
         }])
         .select()
@@ -325,29 +301,16 @@ export const useMarketingContenido = (options: MarketingContenidoOptions = {}) =
   // Obtener categorías disponibles
   const getCategorias = async (): Promise<string[]> => {
     try {
-      if (!user?.id) {
+      if (!empresaId) {
         return [];
       }
-      
-      // Obtener la empresa_id del usuario actual
-      const { data: userData, error: userError } = await supabase
-        .from("usuarios")
-        .select("empresa_id")
-        .eq("user_id", user.id)
-        .single();
-        
-      if (userError || !userData?.empresa_id) {
-        return [];
-      }
-      
-      const empresa_id = userData.empresa_id;
       
       // Esta es una consulta que obtiene categorías únicas utilizadas en los contenidos
       // de la empresa del usuario actual
       const { data, error } = await supabase
         .from("marketing_contenidos")
         .select("categoria")
-        .eq("empresa_id", empresa_id)
+        .eq("empresa_id", empresaId)
         .not("categoria", "is", null);
       
       if (error) {

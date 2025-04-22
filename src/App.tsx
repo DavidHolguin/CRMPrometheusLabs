@@ -33,6 +33,10 @@ import AdminLeads from "./pages/admin/AdminLeads";
 // Marketing pages
 import MarketingDashboard from "./pages/marketing/MarketingDashboard";
 import MarketingAnalytics from "./pages/marketing/MarketingAnalytics";
+import MarketingCampanias from "./pages/marketing/MarketingCampanias";
+import MarketingContenido from "./pages/marketing/MarketingContenido";
+import MarketingAudiencias from "./pages/marketing/MarketingAudiencias";
+import MarketingInteligencia from "./pages/marketing/MarketingInteligencia";
 
 // Layout
 import DashboardLayout from "./components/layouts/DashboardLayout";
@@ -92,10 +96,14 @@ const App = () => {
           <Route path="marketing">
             <Route index element={<MarketingDashboard />} />
             <Route path="analytics" element={<MarketingAnalytics />} />
-            <Route path="campaigns" element={<Navigate to="/dashboard/marketing" replace />} />
-            <Route path="content" element={<Navigate to="/dashboard/marketing" replace />} />
-            <Route path="audience" element={<Navigate to="/dashboard/marketing" replace />} />
-            <Route path="competition" element={<Navigate to="/dashboard/marketing" replace />} />
+            <Route path="campaigns" element={<MarketingCampanias />} />
+            <Route path="content" element={<MarketingContenido />} />
+            <Route path="audience" element={<MarketingAudiencias />} />
+            <Route path="intelligence" element={<MarketingInteligencia />} />
+            <Route path="insights" element={<Navigate to="/dashboard/marketing/analytics" replace />} />
+            <Route path="trends" element={<Navigate to="/dashboard/marketing/analytics" replace />} />
+            <Route path="kpis" element={<Navigate to="/dashboard/marketing/analytics" replace />} />
+            <Route path="documentation" element={<Navigate to="/dashboard/marketing" replace />} />
           </Route>
 
           {/* Admin routes - Protegidas */}

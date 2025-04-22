@@ -20,7 +20,7 @@ export function MarketingNavigationMenu() {
         <NavigationMenuItem>
           <NavigationMenuTrigger className="bg-transparent">Marketing</NavigationMenuTrigger>
           <NavigationMenuContent>
-            <ul className="grid gap-3 p-4 md:w-[400px] lg:w-[500px] lg:grid-cols-[.75fr_1fr]">
+            <ul className="grid gap-3 p-4 md:w-[400px] lg:w-[600px] lg:grid-cols-[.75fr_1fr]">
               <li className="row-span-6">
                 <div className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-muted/50 to-muted p-6 no-underline outline-none focus:shadow-md">
                   <MarketingIcon className="h-8 w-8" />
@@ -62,12 +62,12 @@ export function MarketingNavigationMenu() {
                 Segmentación y análisis de audiencias objetivo
               </ListItem>
               <ListItem 
-                to="/dashboard/marketing/competition" 
-                title="Competencia"
+                to="/dashboard/marketing/intelligence" 
+                title="Inteligencia de Mercado"
                 icon={<Search className="mr-2 h-4 w-4" />}
                 badge={1}
               >
-                Análisis de competidores y benchmarking
+                Análisis competitivo y tendencias de mercado
               </ListItem>
             </ul>
           </NavigationMenuContent>
@@ -126,6 +126,7 @@ interface ListItemProps {
   title: string;
   icon?: React.ReactNode;
   badge?: number;
+  className?: string;
 }
 
 const ListItem = React.forwardRef<React.ElementRef<"a">, ListItemProps>(
