@@ -1,13 +1,11 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { 
-  BarChart2,
   ChevronLeft, 
   ChevronRight, 
   LayoutDashboard, 
   MessageSquare, 
   Settings, 
-  User, 
   Users,
   Building,
   LogOut,
@@ -15,8 +13,9 @@ import {
   Database,
   Link2,
   Brain,
-  ChevronUp,
-  UserCircle
+  UserCircle,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { 

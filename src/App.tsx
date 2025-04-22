@@ -30,6 +30,10 @@ import AdminLLM from "./pages/admin/AdminLLM";
 import AdminPrompts from "./pages/admin/AdminPrompts";
 import AdminLeads from "./pages/admin/AdminLeads";
 
+// Marketing pages
+import MarketingDashboard from "./pages/marketing/MarketingDashboard";
+import MarketingAnalytics from "./pages/marketing/MarketingAnalytics";
+
 // Layout
 import DashboardLayout from "./components/layouts/DashboardLayout";
 import AuthLayout from "./components/layouts/AuthLayout";
@@ -83,6 +87,16 @@ const App = () => {
           <Route path="entrenamiento-ia" element={<EntrenamientoIA />} />
           <Route path="perfil-empresa" element={<PerfilEmpresa />} />
           <Route path="settings" element={<Dashboard />} />
+
+          {/* Marketing routes */}
+          <Route path="marketing">
+            <Route index element={<MarketingDashboard />} />
+            <Route path="analytics" element={<MarketingAnalytics />} />
+            <Route path="campaigns" element={<Navigate to="/dashboard/marketing" replace />} />
+            <Route path="content" element={<Navigate to="/dashboard/marketing" replace />} />
+            <Route path="audience" element={<Navigate to="/dashboard/marketing" replace />} />
+            <Route path="competition" element={<Navigate to="/dashboard/marketing" replace />} />
+          </Route>
 
           {/* Admin routes - Protegidas */}
           <Route element={<ProtectedAdminRoute />}>

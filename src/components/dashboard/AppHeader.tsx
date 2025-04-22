@@ -1,10 +1,10 @@
-
 import { useState } from "react";
 import { useLocation, Link } from "react-router-dom";
-import { BellIcon, MenuIcon, SearchIcon } from "lucide-react";
+import { MenuIcon, Search, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useAuth } from "@/context/AuthContext";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -13,22 +13,16 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+
+// Importamos nuestros componentes
+import { MarketingNavigationMenu } from "@/components/marketing/MarketingNavigationMenu";
+import { UserProfileMenu } from "@/components/dashboard/UserProfileMenu";
 
 interface AppHeaderProps {
   toggleSidebar: () => void;
 }
 
 export function AppHeader({ toggleSidebar }: AppHeaderProps) {
-  const { logout } = useAuth();
-  const [showSearch, setShowSearch] = useState(false);
   const location = useLocation();
 
   // Function to get breadcrumb items based on current route
@@ -44,7 +38,15 @@ export function AppHeader({ toggleSidebar }: AppHeaderProps) {
       'chatbots': 'Chatbots',
       'settings': 'Configuración',
       'crm': 'CRM',
-      'canales': 'Canales'
+      'canales': 'Canales',
+      'marketing': 'Marketing',
+      'analytics': 'Analíticas',
+      'campaigns': 'Campañas',
+      'content': 'Contenido',
+      'audience': 'Audiencias',
+      'competition': 'Competencia',
+      'insights': 'Insights',
+      'documentation': 'Documentación'
     };
 
     return segments.map((segment, index) => {
@@ -63,96 +65,67 @@ export function AppHeader({ toggleSidebar }: AppHeaderProps) {
   const breadcrumbItems = getBreadcrumbItems();
 
   return (
-    <header className="sticky top-0 z-20 w-full bg-[#020817] border-b">
-      <div className="flex h-16 items-center px-4 md:px-6">
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          onClick={toggleSidebar} 
-          className="mr-2 md:hidden"
-        >
-          <MenuIcon className="h-5 w-5" />
-          <span className="sr-only">Toggle Menu</span>
-        </Button>
-        
-        <div className="flex items-center gap-2">
-          <Breadcrumb>
-            <BreadcrumbList>
-              {breadcrumbItems.map((item, index) => (
-                <BreadcrumbItem key={index}>
-                  {item.isLast ? (
-                    <BreadcrumbPage>{item.name}</BreadcrumbPage>
-                  ) : (
-                    <BreadcrumbLink asChild>
-                      <Link to={item.path}>{item.name}</Link>
-                    </BreadcrumbLink>
-                  )}
-                  {!item.isLast && <BreadcrumbSeparator />}
-                </BreadcrumbItem>
-              ))}
-            </BreadcrumbList>
-          </Breadcrumb>
+    <header className="sticky top-0 z-40 w-full bg-[#020817] border-b">
+      <div className="flex h-16 items-center justify-between px-4 md:px-6">
+        {/* Sección izquierda: Menú móvil y breadcrumbs */}
+        <div className="flex items-center gap-4">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={toggleSidebar} 
+            className="mr-2 md:hidden"
+          >
+            <MenuIcon className="h-5 w-5" />
+            <span className="sr-only">Toggle Menu</span>
+          </Button>
+          
+          <div className="hidden md:flex items-center gap-2">
+            <Breadcrumb>
+              <BreadcrumbList>
+                {breadcrumbItems.map((item, index) => (
+                  <BreadcrumbItem key={index}>
+                    {item.isLast ? (
+                      <BreadcrumbPage>{item.name}</BreadcrumbPage>
+                    ) : (
+                      <BreadcrumbLink asChild>
+                        <Link to={item.path}>{item.name}</Link>
+                      </BreadcrumbLink>
+                    )}
+                    {!item.isLast && <BreadcrumbSeparator />}
+                  </BreadcrumbItem>
+                ))}
+              </BreadcrumbList>
+            </Breadcrumb>
+          </div>
         </div>
         
-        <div className="flex items-center space-x-2 ml-auto">
-          {showSearch ? (
-            <div className="relative">
-              <Input
-                className="w-[200px] md:w-[300px] pl-8"
-                placeholder="Buscar..."
-                autoFocus
-                onBlur={() => setShowSearch(false)}
-              />
-              <SearchIcon className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            </div>
-          ) : (
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => setShowSearch(true)}
-            >
-              <SearchIcon className="h-5 w-5" />
-              <span className="sr-only">Search</span>
-            </Button>
-          )}
+        {/* Sección derecha: Menú de marketing, notificaciones, buscador y perfil de usuario */}
+        <div className="flex items-center space-x-4">
+          {/* Menú de navegación de marketing (visible solo en pantallas grandes) */}
+          <MarketingNavigationMenu />
           
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="relative"
-              >
-                <BellIcon className="h-5 w-5" />
-                <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary flex items-center justify-center text-[10px] text-white">
-                  3
-                </span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-80">
-              <DropdownMenuLabel>Notificaciones</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <div className="max-h-80 overflow-auto">
-                {[1, 2, 3].map((i) => (
-                  <DropdownMenuItem key={i} className="p-3 cursor-pointer">
-                    <div className="flex flex-col gap-1">
-                      <p className="font-medium text-sm">Nuevo lead registrado</p>
-                      <p className="text-xs text-muted-foreground">
-                        Juan Pérez ha iniciado una conversación con tu chatbot
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Hace {i*5} minutos
-                      </p>
-                    </div>
-                  </DropdownMenuItem>
-                ))}
-              </div>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="justify-center text-primary">
-                Ver todas las notificaciones
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/* Botón de notificaciones */}
+          <Button variant="outline" size="icon" className="relative">
+            <Bell className="h-4 w-4" />
+            <Badge className="absolute -top-2 -right-2 flex items-center justify-center h-5 w-5 rounded-full p-0">
+              <span className="text-xs">3</span>
+            </Badge>
+          </Button>
+          
+          {/* Buscador */}
+          <div className="relative hidden md:block">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Buscar..."
+                className="w-[180px] appearance-none bg-background pl-8 shadow-none h-9 focus-visible:ring-1"
+              />
+            </div>
+          </div>
+          
+          {/* Menu del perfil de usuario */}
+          <UserProfileMenu />
         </div>
       </div>
     </header>
