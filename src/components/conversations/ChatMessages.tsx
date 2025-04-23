@@ -115,9 +115,12 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
     const bubbleClass = isLead ? 'user-bubble' : (isChatbot ? 'bot-bubble' : 'agent-bubble');
     const leadName = selectedLead ? `${selectedLead.nombre || ''} ${selectedLead.apellido || ''}`.trim() : 'Usuario';
     
+    // Crear una clave verdaderamente única usando prefijos según el tipo de mensaje
+    const messageKey = `${senderType}-${msg.id || `idx-${index}`}-${Date.now()}`;
+    
     return (
       <div 
-        key={msg.id || index} 
+        key={messageKey}
         className={`flex ${isLead ? 'justify-end' : 'justify-start'} mb-1`}
       >
         <div 
@@ -205,17 +208,20 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
               // Mostrar el divisor sólo si hay un cambio de conversación
               if (index > 0) {
                 return (
-                  <div key={`divider-${msg.id}`} className="space-y-4">
-                    <ConversationDivider 
-                      date={msg.created_at} 
-                      canalName={getChannelName(conversation?.canal_id || null)} 
-                    />
-                    {renderMessageBubble(msg, senderType, isLead, isChatbot, isAgent, messageDate)}
-                  </div>
+                  <React.Fragment key={`fragment-${msg.id || index}`}>
+                    <div key={`divider-${index}`} className="space-y-4">
+                      <ConversationDivider 
+                        date={msg.created_at} 
+                        canalName={getChannelName(conversation?.canal_id || null)} 
+                      />
+                    </div>
+                    {renderMessageBubble(msg, senderType, isLead, isChatbot, isAgent, messageDate, index)}
+                  </React.Fragment>
                 );
               }
             }
             
+            // Usar un prefijo para asegurar que las claves sean únicas
             return renderMessageBubble(msg, senderType, isLead, isChatbot, isAgent, messageDate, index);
           });
         })()}

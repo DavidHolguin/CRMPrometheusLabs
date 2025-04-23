@@ -7,7 +7,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import SimpleToggleSwitch from "@/components/ui/simple-toggle-switch";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger
 } from "@/components/ui/dialog";
@@ -98,12 +98,14 @@ const ChatHeader = ({
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div className="flex items-center mr-2">
-                    <SimpleToggleSwitch
-                      isOn={selectedConversation.chatbot_activo || false}
-                      onToggle={toggleChatbot}
-                      isLoading={toggleChatbotLoading}
+                    {toggleChatbotLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : null}
+                    <Switch
+                      checked={selectedConversation.chatbot_activo || false}
+                      onCheckedChange={toggleChatbot}
                       disabled={toggleChatbotLoading}
-                      className="mt-1"
+                      aria-label={selectedConversation.chatbot_activo ? 'Desactivar chatbot' : 'Activar chatbot'}
                     />
                   </div>
                 </TooltipTrigger>
