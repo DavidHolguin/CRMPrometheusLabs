@@ -213,27 +213,45 @@ export function ContextTab({ value, onChange }: ContextTabProps) {
 
   // Función para actualizar las instrucciones especiales basado en los bloques habilitados
   const updateSpecialInstructions = () => {
-    // Guardar la configuración de los bloques al inicio del texto
-    const blocksConfig = instructionBlocks.map(block => ({
-      id: block.id,
-      title: block.title,
-      enabled: block.enabled,
-      isPredefined: block.isPredefined,
-      category: block.category
-    }));
-    
-    const blocksConfigText = `CUSTOM_BLOCKS:${JSON.stringify(blocksConfig)}\n\n`;
-    
-    // Generar el texto de las instrucciones combinando los bloques habilitados
-    const instructionsText = instructionBlocks
-      .filter(block => block.enabled)
-      .map(block => `## ${block.title}\n\n${block.content}`)
-      .join('\n\n');
-    
-    // Combinar configuración + instrucciones
-    const finalInstructions = blocksConfigText + instructionsText;
-    
-    handleChange("special_instructions", finalInstructions);
+    try {
+      // Crear una lista plana de IDs de bloques activos para referencia
+      const activeBlocksIds = instructionBlocks
+        .filter(block => block.enabled)
+        .map(block => block.id)
+        .join(',');
+      
+      // Crear un encabezado simple con la configuración
+      const configHeader = `ACTIVE_BLOCKS: ${activeBlocksIds}\n\n`;
+      
+      // Generar el texto plano de las instrucciones combinando los bloques habilitados
+      const plainInstructions = instructionBlocks
+        .filter(block => block.enabled)
+        .map(block => {
+          // Limpiar el contenido, eliminar caracteres que puedan causar problemas
+          const cleanTitle = block.title.replace(/[^\w\s\.\-]/g, '');
+          const cleanContent = block.content
+            .replace(/\n+/g, '. ')  // Reemplazar saltos de línea con puntos
+            .replace(/\s+/g, ' ');  // Normalizar espacios
+
+          return `${cleanTitle}. ${cleanContent}`;
+        })
+        .join('. ');
+      
+      // Combinar configuración + instrucciones
+      const finalInstructions = configHeader + plainInstructions;
+      
+      // Actualizar el valor en el padre
+      handleChange("special_instructions", finalInstructions);
+    } catch (error) {
+      console.error("Error al serializar las instrucciones especiales:", error);
+      // Si ocurre un error, crear un texto plano simplificado como fallback
+      const fallbackInstructions = instructionBlocks
+        .filter(block => block.enabled)
+        .map(block => `${block.title}. ${block.content.replace(/\n+/g, '. ')}`)
+        .join('. ');
+      
+      handleChange("special_instructions", fallbackInstructions);
+    }
   };
 
   // Función para abrir el diálogo de creación de un nuevo bloque
