@@ -36,7 +36,7 @@ export function BasicConfigTab({ value, onChange }: BasicConfigTabProps) {
   const { user } = useAuth();
   const [isUploading, setIsUploading] = useState(false);
   const [selectedStageId, setSelectedStageId] = useState(value.stage_id);
-  const { data: llmConfigs = [], isLoading: isLoadingLLM } = useLLMConfigs();
+  const { llmConfigs = [], isLoading: isLoadingLLM } = useLLMConfigs();
   const { data: pipelines = [], isLoading: isLoadingPipelines } = usePipelines();
   
   // Encuentra el pipeline seleccionado
@@ -83,19 +83,19 @@ export function BasicConfigTab({ value, onChange }: BasicConfigTabProps) {
     try {
       // Generar nombre único para el archivo
       const fileExt = file.name.split('.').pop();
-      const fileName = `${user.companyId}/chatbot-avatars/${Date.now()}.${fileExt}`;
+      const fileName = `chatbot-avatars/${Date.now()}.${fileExt}`;
       
-      // Subir a Supabase Storage
+      // Subir a Supabase Storage usando el bucket 'avatars' en lugar de 'public'
       const { error: uploadError } = await supabase.storage
-        .from('public')
-        .upload(fileName, file);
+        .from('avatars')
+        .upload(`chatbots/${user.companyId}/${fileName}`, file);
         
       if (uploadError) throw uploadError;
       
-      // Obtener la URL pública
+      // Obtener la URL pública desde el bucket 'avatars'
       const { data: publicUrl } = supabase.storage
-        .from('public')
-        .getPublicUrl(fileName);
+        .from('avatars')
+        .getPublicUrl(`chatbots/${user.companyId}/${fileName}`);
         
       if (publicUrl) {
         handleChange("avatar_url", publicUrl.publicUrl);
