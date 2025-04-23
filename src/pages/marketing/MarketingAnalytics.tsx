@@ -1,12 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, ChevronDown, Download, FileBarChart, Filter } from "lucide-react";
+import { Calendar, ChevronDown, Download, FileBarChart, Filter, PieChart, Activity, Clock } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { format } from "date-fns";
+import { format, subDays, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { es } from "date-fns/locale";
 import {
   ResponsiveContainer,
@@ -19,10 +19,16 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
+  PieChart as RechartsPieChart,
+  Pie,
+  Cell,
+  AreaChart,
+  Area,
 } from "recharts";
 import { useAuth } from "@/context/AuthContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { useMarketingData, EventoAccion, TipoEvento, EventosSummary, EventosPorDia, MarketingFilterParams } from "@/hooks/useMarketingData";
 
 // Datos de ejemplo - En producción estos vendrían de una API
 const visitasData = [
@@ -59,22 +65,138 @@ const fuentesTraficoData = [
 
 const MarketingAnalytics = () => {
   const { user } = useAuth();
-  const [isLoading, setIsLoading] = useState(false);
+  const {
+    isLoading, 
+    error,
+    tiposEventos,
+    eventosAcciones,
+    loadTiposEventos,
+    loadEventosAcciones,
+    getEventosSummary,
+    getEventosPorDia
+  } = useMarketingData();
+
+  const [estados, setEstados] = useState({
+    loadingEventos: false,
+    errorEventos: null as string | null
+  });
+
   const [dateRange, setDateRange] = useState<{
     from: Date | undefined;
     to: Date | undefined;
   }>({
-    from: new Date(2025, 3, 1),
-    to: new Date(2025, 3, 14),
+    from: subDays(new Date(), 30),
+    to: new Date(),
   });
   
   // Estado para filtros
-  const [periodoFiltro, setPeriodoFiltro] = useState("ultimos14dias");
-
+  const [periodoFiltro, setPeriodoFiltro] = useState("ultimos30dias");
+  const [tipoEventoFiltro, setTipoEventoFiltro] = useState("todos");
+  
   // Función para formatear números con separadores de miles
   const formatNumber = (num: number) => {
     return new Intl.NumberFormat('es-ES').format(num);
   };
+
+  // Función para cambiar el filtro de período
+  const handlePeriodoChange = (value: string) => {
+    setPeriodoFiltro(value);
+    
+    const now = new Date();
+    let from: Date | undefined;
+    let to: Date | undefined = now;
+    
+    switch (value) {
+      case "hoy":
+        from = new Date(now.setHours(0, 0, 0, 0));
+        break;
+      case "ayer":
+        from = subDays(new Date(now.setHours(0, 0, 0, 0)), 1);
+        to = new Date(from.getTime());
+        to.setHours(23, 59, 59, 999);
+        break;
+      case "ultimos7dias":
+        from = subDays(now, 7);
+        break;
+      case "ultimos14dias":
+        from = subDays(now, 14);
+        break;
+      case "ultimos30dias":
+        from = subDays(now, 30);
+        break;
+      case "estemés":
+        from = startOfMonth(now);
+        to = endOfMonth(now);
+        break;
+      case "mesanterior":
+        from = startOfMonth(subMonths(now, 1));
+        to = endOfMonth(subMonths(now, 1));
+        break;
+      default:
+        // Mantener el rango personalizado
+        break;
+    }
+    
+    setDateRange({ from, to });
+    
+    // Cargar eventos con el nuevo filtro de fecha
+    if (from && to) {
+      const params: MarketingFilterParams = {
+        fechaInicio: from.toISOString(),
+        fechaFin: to.toISOString(),
+        tipo: tipoEventoFiltro !== "todos" ? tipoEventoFiltro : undefined
+      };
+      
+      loadEventosAcciones(params);
+    }
+  };
+
+  // Función para restablecer filtros
+  const resetFilters = () => {
+    setPeriodoFiltro("ultimos30dias");
+    setTipoEventoFiltro("todos");
+    setDateRange({
+      from: subDays(new Date(), 30),
+      to: new Date(),
+    });
+    
+    // Cargar todos los eventos de los últimos 30 días
+    const params: MarketingFilterParams = {
+      fechaInicio: subDays(new Date(), 30).toISOString(),
+      fechaFin: new Date().toISOString()
+    };
+    
+    loadEventosAcciones(params);
+  };
+
+  // Efecto para cargar los datos iniciales
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      setEstados(prev => ({ ...prev, loadingEventos: true }));
+      
+      try {
+        // Cargar tipos de eventos
+        await loadTiposEventos();
+        
+        // Cargar eventos de los últimos 30 días
+        const params: MarketingFilterParams = {
+          fechaInicio: dateRange.from?.toISOString(),
+          fechaFin: dateRange.to?.toISOString()
+        };
+        
+        await loadEventosAcciones(params);
+      } catch (err: any) {
+        setEstados(prev => ({ 
+          ...prev, 
+          errorEventos: err.message || "Error al cargar datos de eventos" 
+        }));
+      } finally {
+        setEstados(prev => ({ ...prev, loadingEventos: false }));
+      }
+    };
+    
+    fetchInitialData();
+  }, []);
 
   // Calcular métricas totales
   const calcularTotales = () => {
@@ -87,6 +209,50 @@ const MarketingAnalytics = () => {
   };
 
   const { totalVisitas, totalClics, totalLeads, ctr } = calcularTotales();
+
+  // Preparar los datos para los gráficos de eventos
+  const prepararDatosEventos = () => {
+    // Resumen de eventos por categoría para el gráfico de torta
+    const resumenEventos = getEventosSummary();
+    
+    // Eventos por día para el gráfico de líneas
+    const eventosPorDia = getEventosPorDia();
+    
+    // Convertir el formato de los eventos por día para facilitar su uso en gráficos
+    const eventosPorDiaFormateado = eventosPorDia.map(item => {
+      const formattedDate = format(new Date(item.fecha), 'dd MMM', { locale: es });
+      return {
+        fecha: formattedDate,
+        total: item.total,
+        ...item.por_categoria
+      };
+    });
+    
+    return {
+      resumenEventos,
+      eventosPorDiaFormateado
+    };
+  };
+
+  const { resumenEventos, eventosPorDiaFormateado } = prepararDatosEventos();
+
+  // Colores para los gráficos de eventos
+  const COLORES_CATEGORIAS = [
+    "#8884d8", "#82ca9d", "#ffc658", "#ff8042", "#0088fe", 
+    "#00C49F", "#FFBB28", "#FF8042", "#a4de6c", "#d0ed57"
+  ];
+  
+  // Calcular estadísticas de eventos
+  const eventosStats = {
+    total: eventosAcciones.length,
+    totalCategorias: resumenEventos.length,
+    promedioEventosPorDia: eventosPorDiaFormateado.length > 0 
+      ? Math.round(eventosAcciones.length / eventosPorDiaFormateado.length) 
+      : 0,
+    maxEventosEnUnDia: eventosPorDiaFormateado.length > 0
+      ? Math.max(...eventosPorDiaFormateado.map(item => item.total))
+      : 0
+  };
 
   // Cambiar el formato de las fechas para el gráfico
   const formattedChartData = visitasData.map(item => ({
@@ -119,7 +285,7 @@ const MarketingAnalytics = () => {
         </div>
 
         <div className="flex flex-wrap gap-2 items-center">
-          <Select value={periodoFiltro} onValueChange={setPeriodoFiltro}>
+          <Select value={periodoFiltro} onValueChange={handlePeriodoChange}>
             <SelectTrigger className="w-[180px] h-9">
               <SelectValue placeholder="Seleccionar período" />
             </SelectTrigger>
@@ -161,10 +327,22 @@ const MarketingAnalytics = () => {
                   selected={dateRange}
                   onSelect={(range) => {
                     if (range) {
-                      setDateRange({
+                      const newRange = {
                         from: range.from,
                         to: range.to || range.from
-                      });
+                      };
+                      setDateRange(newRange);
+                      
+                      // Si hay un rango completo, cargar datos
+                      if (range.from && (range.to || range.from)) {
+                        const params: MarketingFilterParams = {
+                          fechaInicio: range.from.toISOString(),
+                          fechaFin: (range.to || range.from).toISOString(),
+                          tipo: tipoEventoFiltro !== "todos" ? tipoEventoFiltro : undefined
+                        };
+                        
+                        loadEventosAcciones(params);
+                      }
                     }
                   }}
                   numberOfMonths={2}
@@ -172,8 +350,33 @@ const MarketingAnalytics = () => {
               </PopoverContent>
             </Popover>
           )}
+
+          {/* Añadir filtro de tipo de evento */}
+          <Select value={tipoEventoFiltro} onValueChange={(value) => {
+            setTipoEventoFiltro(value);
+            
+            const params: MarketingFilterParams = {
+              fechaInicio: dateRange.from?.toISOString(),
+              fechaFin: dateRange.to?.toISOString(),
+              tipo: value !== "todos" ? value : undefined
+            };
+            
+            loadEventosAcciones(params);
+          }}>
+            <SelectTrigger className="w-[180px] h-9">
+              <SelectValue placeholder="Tipo de evento" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos los eventos</SelectItem>
+              {tiposEventos.map((tipo) => (
+                <SelectItem key={tipo.tipo_evento_id} value={tipo.tipo_evento_id}>
+                  {tipo.nombre}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           
-          <Button variant="ghost" size="sm" className="h-9">
+          <Button variant="ghost" size="sm" className="h-9" onClick={resetFilters}>
             <span>Restablecer</span>
           </Button>
         </div>
@@ -280,6 +483,7 @@ const MarketingAnalytics = () => {
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="campaigns">Campañas</TabsTrigger>
           <TabsTrigger value="content">Contenido</TabsTrigger>
+          <TabsTrigger value="eventos">Eventos</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general" className="space-y-4">
@@ -510,6 +714,355 @@ const MarketingAnalytics = () => {
                 <p className="text-muted-foreground">Datos no disponibles en esta versión</p>
                 <Badge variant="outline" className="mt-2">Próximamente</Badge>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* NUEVA PESTAÑA DE EVENTOS */}
+        <TabsContent value="eventos" className="space-y-4">
+          {/* Métricas de eventos */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Total Eventos
+                    </p>
+                    {estados.loadingEventos ? 
+                      <Skeleton className="h-8 w-16" /> : 
+                      <p className="text-2xl font-bold">{formatNumber(eventosStats.total)}</p>
+                    }
+                  </div>
+                  <div className="h-10 w-10 rounded-full flex items-center justify-center bg-blue-500/10 text-blue-500">
+                    <Activity className="h-4 w-4" />
+                  </div>
+                </div>
+                <div className="mt-4 flex items-center text-xs">
+                  <span className="text-muted-foreground">En el período seleccionado</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Categorías
+                    </p>
+                    {estados.loadingEventos ? 
+                      <Skeleton className="h-8 w-16" /> : 
+                      <p className="text-2xl font-bold">{eventosStats.totalCategorias}</p>
+                    }
+                  </div>
+                  <div className="h-10 w-10 rounded-full flex items-center justify-center bg-purple-500/10 text-purple-500">
+                    <PieChart className="h-4 w-4" />
+                  </div>
+                </div>
+                <div className="mt-4 flex items-center text-xs">
+                  <span className="text-muted-foreground">Tipos de eventos distintos</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Promedio diario
+                    </p>
+                    {estados.loadingEventos ? 
+                      <Skeleton className="h-8 w-16" /> : 
+                      <p className="text-2xl font-bold">{eventosStats.promedioEventosPorDia}</p>
+                    }
+                  </div>
+                  <div className="h-10 w-10 rounded-full flex items-center justify-center bg-green-500/10 text-green-500">
+                    <Clock className="h-4 w-4" />
+                  </div>
+                </div>
+                <div className="mt-4 flex items-center text-xs">
+                  <span className="text-muted-foreground">Eventos por día</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Máx. por día
+                    </p>
+                    {estados.loadingEventos ? 
+                      <Skeleton className="h-8 w-16" /> : 
+                      <p className="text-2xl font-bold">{eventosStats.maxEventosEnUnDia}</p>
+                    }
+                  </div>
+                  <div className="h-10 w-10 rounded-full flex items-center justify-center bg-orange-500/10 text-orange-500">
+                    <Activity className="h-4 w-4" />
+                  </div>
+                </div>
+                <div className="mt-4 flex items-center text-xs">
+                  <span className="text-muted-foreground">Pico de actividad</span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Gráfico de tendencia de eventos */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Tendencia de eventos en el tiempo</CardTitle>
+              <CardDescription>
+                Evolución de la cantidad de eventos por día en el período seleccionado
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[350px]">
+                {estados.loadingEventos ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  </div>
+                ) : eventosPorDiaFormateado.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart
+                      data={eventosPorDiaFormateado}
+                      margin={{ top: 10, right: 30, left: 0, bottom: 20 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis 
+                        dataKey="fecha" 
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis 
+                        axisLine={false}
+                        tickLine={false}
+                        width={40}
+                      />
+                      <Tooltip 
+                        formatter={(value, name) => {
+                          if (name === 'total') return [formatNumber(value as number), 'Total eventos'];
+                          return [formatNumber(value as number), name];
+                        }}
+                      />
+                      <Legend />
+                      <Area 
+                        type="monotone" 
+                        dataKey="total" 
+                        name="Total eventos" 
+                        stroke="hsl(var(--chart-1))" 
+                        fill="hsl(var(--chart-1))" 
+                        fillOpacity={0.2} 
+                        stackId="1"
+                      />
+                      {resumenEventos.map((categoria, index) => {
+                        if (eventosPorDiaFormateado[0] && eventosPorDiaFormateado[0][categoria.categoria]) {
+                          return (
+                            <Area
+                              key={index}
+                              type="monotone"
+                              dataKey={categoria.categoria}
+                              name={categoria.categoria}
+                              stroke={COLORES_CATEGORIAS[index % COLORES_CATEGORIAS.length]}
+                              fill={COLORES_CATEGORIAS[index % COLORES_CATEGORIAS.length]}
+                              fillOpacity={0.2}
+                            />
+                          );
+                        }
+                        return null;
+                      })}
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-full">
+                    <p className="text-muted-foreground">No hay datos de eventos para mostrar</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Gráficos de distribución por categoría */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Distribución por categoría</CardTitle>
+                <CardDescription>
+                  Porcentaje de eventos por categoría
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[300px]">
+                  {estados.loadingEventos ? (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    </div>
+                  ) : resumenEventos.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RechartsPieChart>
+                        <Pie
+                          data={resumenEventos}
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={100}
+                          fill="#8884d8"
+                          dataKey="total"
+                          nameKey="categoria"
+                          label={({ categoria, porcentaje }) => `${categoria}: ${porcentaje}%`}
+                        >
+                          {resumenEventos.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORES_CATEGORIAS[index % COLORES_CATEGORIAS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip 
+                          formatter={(value, name, props) => {
+                            const porcentaje = props.payload.porcentaje;
+                            return [`${formatNumber(value as number)} (${porcentaje}%)`, props.payload.categoria];
+                          }}
+                        />
+                        <Legend />
+                      </RechartsPieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-full">
+                      <p className="text-muted-foreground">No hay datos para mostrar</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>Eventos por tipo</CardTitle>
+                <CardDescription>
+                  Cantidad de eventos por categoría
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[300px]">
+                  {estados.loadingEventos ? (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    </div>
+                  ) : resumenEventos.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={resumenEventos}
+                        layout="vertical"
+                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                        <XAxis type="number" axisLine={false} tickLine={false} />
+                        <YAxis 
+                          type="category" 
+                          dataKey="categoria" 
+                          width={150}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <Tooltip formatter={(value) => [formatNumber(value as number), 'Eventos']} />
+                        <Legend />
+                        <Bar 
+                          dataKey="total" 
+                          name="Total eventos" 
+                          fill="hsl(var(--chart-1))"
+                          radius={[0, 4, 4, 0]} 
+                        >
+                          {resumenEventos.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORES_CATEGORIAS[index % COLORES_CATEGORIAS.length]} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-full">
+                      <p className="text-muted-foreground">No hay datos para mostrar</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Tabla de eventos */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Detalle de eventos</CardTitle>
+              <CardDescription>
+                Lista completa de eventos registrados en el período
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-lg border overflow-hidden">
+                <table className="w-full caption-bottom text-sm">
+                  <thead>
+                    <tr className="border-b transition-colors hover:bg-muted/50">
+                      <th className="h-12 px-4 text-left align-middle font-medium">Fecha</th>
+                      <th className="h-12 px-4 text-left align-middle font-medium">Categoría</th>
+                      <th className="h-12 px-4 text-left align-middle font-medium">Tipo de evento</th>
+                      <th className="h-12 px-4 text-left align-middle font-medium">Score</th>
+                      <th className="h-12 px-4 text-left align-middle font-medium">Resultado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {estados.loadingEventos ? (
+                      <tr>
+                        <td colSpan={5} className="p-4 text-center">
+                          <div className="flex justify-center">
+                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : eventosAcciones.length > 0 ? (
+                      eventosAcciones.slice(0, 10).map((evento, idx) => (
+                        <tr key={idx} className="border-b transition-colors hover:bg-muted/50">
+                          <td className="p-4 align-middle">
+                            {new Date(evento.created_at).toLocaleDateString('es-ES', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </td>
+                          <td className="p-4 align-middle">
+                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                              {evento.categoria_tipo_evento || 'Desconocido'}
+                            </Badge>
+                          </td>
+                          <td className="p-4 align-middle">{evento.nombre_tipo_evento || 'Desconocido'}</td>
+                          <td className="p-4 align-middle">{evento.valor_score || 0}</td>
+                          <td className="p-4 align-middle">
+                            {evento.resultado ? (
+                              <Badge variant={evento.resultado === "success" ? "success" : "secondary"}>
+                                {evento.resultado}
+                              </Badge>
+                            ) : (
+                              '-'
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={5} className="p-4 text-center text-muted-foreground">
+                          No hay eventos para mostrar en el período seleccionado
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              
+              {eventosAcciones.length > 10 && (
+                <div className="flex justify-center mt-4">
+                  <Button variant="outline">Ver todos los eventos ({eventosAcciones.length})</Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

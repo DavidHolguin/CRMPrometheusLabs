@@ -103,6 +103,59 @@ export interface MarketingPlatformData {
   [key: string]: any;
 }
 
+// Nuevas interfaces para eventos
+export interface TipoEvento {
+  tipo_evento_id: string;
+  categoria: string;
+  nombre: string;
+  descripcion: string;
+  impacto_score: number;
+  requiere_seguimiento: boolean;
+  grupo_analisis: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EventoAccion {
+  evento_accion_id: string;
+  tiempo_id: number;
+  empresa_id: string;
+  tipo_evento_id: string;
+  entidad_origen_id: string;
+  entidad_destino_id: string;
+  lead_id: string;
+  agente_id: string;
+  chatbot_id: string;
+  canal_id: string;
+  conversacion_id: string;
+  mensaje_id: string;
+  valor_score: number;
+  duracion_segundos: number;
+  resultado: string;
+  estado_final: string;
+  detalle: string;
+  metadata: Record<string, any>;
+  latitud: number;
+  longitud: number;
+  created_at: string;
+  fecha?: string; // Campo adicional para facilitar el manejo de fechas en gráficos
+  nombre_tipo_evento?: string; // Campo adicional que se llenará al unir con dim_tipos_eventos
+  categoria_tipo_evento?: string; // Campo adicional que se llenará al unir con dim_tipos_eventos
+}
+
+export interface EventosSummary {
+  categoria: string;
+  total: number;
+  porcentaje: number;
+}
+
+export interface EventosPorDia {
+  fecha: string;
+  total: number;
+  por_categoria: Record<string, number>;
+}
+
 export interface MarketingFilterParams {
   fechaInicio?: string;
   fechaFin?: string;
@@ -131,6 +184,8 @@ export const useMarketingData = () => {
   const [utms, setUtms] = useState<MarketingUTM[]>([]);
   const [audiences, setAudiences] = useState<MarketingAudience[]>([]);
   const [insights, setInsights] = useState<MarketingInsight[]>([]);
+  const [tiposEventos, setTiposEventos] = useState<TipoEvento[]>([]);
+  const [eventosAcciones, setEventosAcciones] = useState<EventoAccion[]>([]);
   
   // Función para cargar campañas de marketing
   const loadCampaigns = async (params?: MarketingFilterParams) => {
@@ -671,6 +726,171 @@ export const useMarketingData = () => {
       setIsLoading(false);
     }
   };
+
+  // NUEVAS FUNCIONES PARA EVENTOS
+  // Función para cargar tipos de eventos
+  const loadTiposEventos = async () => {
+    if (!empresaId) return;
+    
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const { data, error } = await supabase
+        .from('dim_tipos_eventos')
+        .select('*')
+        .eq('is_active', true)
+        .order('categoria', { ascending: true });
+      
+      if (error) {
+        throw error;
+      }
+      
+      setTiposEventos(data || []);
+      
+    } catch (err: any) {
+      console.error('Error al cargar tipos de eventos:', err);
+      setError(err.message || 'Error al cargar tipos de eventos');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Función para cargar eventos y acciones
+  const loadEventosAcciones = async (params?: MarketingFilterParams) => {
+    if (!empresaId) return;
+    
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      // Primero obtenemos los tipos de eventos si aún no los tenemos
+      if (tiposEventos.length === 0) {
+        await loadTiposEventos();
+      }
+
+      let query = supabase
+        .from('fact_eventos_acciones')
+        .select(`
+          *,
+          dim_tipos_eventos(tipo_evento_id, nombre, categoria),
+          dim_tiempo(fecha, hora, dia, mes, anio, nombre_mes)
+        `)
+        .eq('empresa_id', empresaId);
+        
+      // Aplicar filtros si existen
+      if (params?.fechaInicio) {
+        query = query.gte('created_at', params.fechaInicio);
+      }
+      
+      if (params?.fechaFin) {
+        query = query.lte('created_at', params.fechaFin);
+      }
+
+      if (params?.tipo) {
+        query = query.eq('tipo_evento_id', params.tipo);
+      }
+      
+      // Límite y paginación
+      if (params?.limit) {
+        query = query.limit(params.limit);
+      }
+      
+      if (params?.offset) {
+        query = query.range(params.offset, params.offset + (params?.limit || 10) - 1);
+      }
+      
+      // Ordenamiento
+      if (params?.orderBy) {
+        query = query.order(params.orderBy, { 
+          ascending: params.orderDirection === 'asc'
+        });
+      } else {
+        query = query.order('created_at', { ascending: false });
+      }
+      
+      const { data, error } = await query;
+      
+      if (error) {
+        throw error;
+      }
+      
+      // Procesamos los datos para añadir información del tipo de evento y fecha formateada
+      const eventosFormateados = data?.map(evento => {
+        const tipoEvento = evento.dim_tipos_eventos;
+        const tiempo = evento.dim_tiempo;
+        
+        return {
+          ...evento,
+          nombre_tipo_evento: tipoEvento?.nombre || 'Desconocido',
+          categoria_tipo_evento: tipoEvento?.categoria || 'Desconocido',
+          fecha: tiempo?.fecha ? new Date(tiempo.fecha).toISOString().split('T')[0] : 
+                  new Date(evento.created_at).toISOString().split('T')[0]
+        };
+      }) || [];
+      
+      setEventosAcciones(eventosFormateados);
+      
+    } catch (err: any) {
+      console.error('Error al cargar eventos y acciones:', err);
+      setError(err.message || 'Error al cargar eventos y acciones');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Función para obtener un resumen de eventos por categoría
+  const getEventosSummary = (): EventosSummary[] => {
+    const totales: Record<string, number> = {};
+    const totalEventos = eventosAcciones.length;
+
+    // Agrupamos por categoría
+    eventosAcciones.forEach(evento => {
+      const categoria = evento.categoria_tipo_evento || 'Desconocido';
+      totales[categoria] = (totales[categoria] || 0) + 1;
+    });
+
+    // Calculamos los porcentajes y formateamos la respuesta
+    return Object.entries(totales).map(([categoria, total]) => ({
+      categoria,
+      total,
+      porcentaje: totalEventos > 0 ? Math.round((total / totalEventos) * 100) : 0,
+    }));
+  };
+
+  // Función para obtener eventos agrupados por día
+  const getEventosPorDia = (): EventosPorDia[] => {
+    const eventosPorDia: Record<string, {
+      total: number,
+      por_categoria: Record<string, number>
+    }> = {};
+
+    // Agrupamos por fecha y categoría
+    eventosAcciones.forEach(evento => {
+      const fecha = evento.fecha || new Date(evento.created_at).toISOString().split('T')[0];
+      const categoria = evento.categoria_tipo_evento || 'Desconocido';
+
+      if (!eventosPorDia[fecha]) {
+        eventosPorDia[fecha] = {
+          total: 0,
+          por_categoria: {}
+        };
+      }
+
+      eventosPorDia[fecha].total += 1;
+      eventosPorDia[fecha].por_categoria[categoria] = 
+        (eventosPorDia[fecha].por_categoria[categoria] || 0) + 1;
+    });
+
+    // Formateamos la respuesta
+    return Object.entries(eventosPorDia)
+      .map(([fecha, datos]) => ({
+        fecha,
+        total: datos.total,
+        por_categoria: datos.por_categoria
+      }))
+      .sort((a, b) => a.fecha.localeCompare(b.fecha));
+  };
   
   return {
     // Estados
@@ -681,6 +901,8 @@ export const useMarketingData = () => {
     utms,
     audiences,
     insights,
+    tiposEventos,
+    eventosAcciones,
     
     // Funciones de carga
     loadCampaigns,
@@ -690,11 +912,17 @@ export const useMarketingData = () => {
     loadInsights,
     loadPlatformData,
     loadKPIs,
+    loadTiposEventos,
+    loadEventosAcciones,
     
     // Funciones de creación
     createCampaign,
     createContent,
     createUtm,
+    
+    // Funciones de análisis de eventos
+    getEventosSummary,
+    getEventosPorDia,
     
     // Estadísticas
     getMarketingStats
