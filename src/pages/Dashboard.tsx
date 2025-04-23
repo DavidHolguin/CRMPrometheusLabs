@@ -1,27 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { useAuth } from "@/context/AuthContext";
-import {
-  Bar, BarChart, LineChart, Line, ResponsiveContainer, XAxis, YAxis, 
-  CartesianGrid, Legend, Tooltip as RechartsTooltip, 
-  PieChart, Pie, Area, AreaChart, Label, RadarChart, PolarGrid, PolarAngleAxis, Radar, Cell
-} from "recharts";
+import { useState, useEffect, useMemo } from "react";
 import { 
-  Users, MessageSquare, BotIcon, TrendingUp, ArrowUpRight, 
-  ArrowDownRight, Info, BarChart3, BarChart4, ChevronDown,
-  Brain, AlertTriangle, CheckCircle, ThumbsUp, LineChart as LineChartIcon,
-  PieChart as PieChartIcon, BarChart as BarChartIcon, Download,
-  Waves, LayoutDashboard, Filter
-} from "lucide-react";
+  Card, 
+  CardContent, 
+  CardDescription, 
+  CardHeader, 
+  CardTitle,
+  CardFooter
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useToast } from "@/hooks/use-toast";
-import { 
-  useGranularData, 
-  useDimensionalData, 
-  useLeadsByChannelData 
-} from "@/hooks/useDashboardData";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { format, subDays, addDays, startOfDay, endOfDay, subMonths } from "date-fns";
+import { es } from "date-fns/locale";
 import {
   Select,
   SelectContent,
@@ -30,1034 +20,661 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { DateRange } from "react-day-picker";
+import {
   ChartConfig,
   ChartContainer,
-  ChartLegend,
-  ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { format as formatDate, subMonths, startOfMonth, endOfMonth, eachMonthOfInterval, subDays, isToday, isYesterday } from "date-fns";
-import { es } from "date-fns/locale";
-import { supabase } from "@/integrations/supabase/client";
-import { 
-  DashboardToolbar, 
-  FilterOptions, 
-  ChartVisibility, 
-  TimeRange, 
-  DateRange, 
-  GroupByTime 
-} from "@/components/dashboard/DashboardToolbar";
-import { AnalyticsPanel } from "@/components/dashboard/AnalyticsPanel";
-import React from "react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis
+} from "recharts";
+import {
+  Calendar as CalendarIcon,
+  ChevronDown,
+  Download,
+  BarChart3,
+  ArrowUpRight,
+  ArrowDownRight,
+  Info,
+  MessageSquare,
+  Timer,
+  Clock,
+  Users
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuPortal,
-  DropdownMenuSeparator,
-  DropdownMenuShortcut,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { toast } from "sonner";
+
+interface ConversacionesData {
+  fecha: string;
+  total_conversaciones: number;
+  mensajes_por_conversacion: number;
+  tiempo_respuesta_promedio_seg: number;
+}
 
 const Dashboard = () => {
   const { user } = useAuth();
-  const { toast } = useToast();
-  const [timeRange, setTimeRange] = useState<TimeRange>("30d");
-  const [dateRange, setDateRange] = useState<DateRange>({ from: undefined, to: undefined });
-  const [groupBy, setGroupBy] = useState<GroupByTime>("dia");
-  const [includeHours, setIncludeHours] = useState<boolean>(false);
-  const [hourRange, setHourRange] = useState<{start: number, end: number}>({ start: 0, end: 23 });
-  const [selectedChannels, setSelectedChannels] = useState<string[]>([]);
-  const [exportLoading, setExportLoading] = useState(false);
-  const [channelOptions, setChannelOptions] = useState<Array<{value: string, label: string}>>([]);
-  const [chartVisibility, setChartVisibility] = useState<ChartVisibility>({
-    activityChart: true,
-    evolutionChart: true,
-    monthlyComparison: true,
-    distributionChart: true
+  const [activeTab, setActiveTab] = useState("conversaciones");
+  
+  // Estado para el panel de Conversaciones y mensajes
+  const [conversacionesData, setConversacionesData] = useState<ConversacionesData[]>([]);
+  const [isLoadingConversaciones, setIsLoadingConversaciones] = useState(true);
+  const [dateRange, setDateRange] = useState<DateRange>({
+    from: subDays(new Date(), 30),
+    to: new Date()
   });
-  
-  // Consulta el tiempo real según filtros seleccionados
-  const {
-    data: granularData,
-    isLoading: isLoadingGranularData,
-    error: granularDataError
-  } = useGranularData(
-    timeRange,
-    dateRange,
-    groupBy,
-    includeHours,
-    hourRange,
-    selectedChannels
-  );
-  
-  // Para los datos dimensionales/analíticos
-  const {
-    data: dimensionalData,
-    isLoading: isLoadingDimensionalData
-  } = useDimensionalData(timeRange);
-  
-  // Para los datos de distribución por canal
-  const {
-    data: channelData,
-    isLoading: isLoadingChannelData,
-    error: channelError
-  } = useLeadsByChannelData();
+  const [predefinedRange, setPredefinedRange] = useState<string>("30d");
+  const [chartView, setChartView] = useState<"barras" | "lineas">("barras");
 
-  // Obtener canales disponibles para filtros
+  // Cargar datos de conversaciones
   useEffect(() => {
-    const fetchChannels = async () => {
+    const fetchConversacionesData = async () => {
+      if (!user?.companyId) return;
+      
+      setIsLoadingConversaciones(true);
+      
       try {
-        const { data, error } = await supabase
-          .from('canales')
-          .select('id, nombre')
-          .not('nombre', 'is', null)
-          .eq('is_active', true);
+        let startDate: Date;
+        let endDate: Date = new Date();
         
-        if (error) throw error;
+        if (dateRange.from && dateRange.to) {
+          // Usar rango personalizado si está definido
+          startDate = startOfDay(dateRange.from);
+          endDate = endOfDay(dateRange.to || dateRange.from);
+        } else {
+          // Calcular rango basado en la selección predefinida
+          switch (predefinedRange) {
+            case "7d":
+              startDate = subDays(new Date(), 7);
+              break;
+            case "14d":
+              startDate = subDays(new Date(), 14);
+              break;
+            case "30d":
+              startDate = subDays(new Date(), 30);
+              break;
+            case "90d":
+              startDate = subDays(new Date(), 90);
+              break;
+            case "6m":
+              startDate = subMonths(new Date(), 6);
+              break;
+            default:
+              startDate = subDays(new Date(), 30);
+          }
+        }
         
-        // Formatear para el selector
-        const options = data.map(channel => ({
-          value: channel.id,
-          label: channel.nombre
+        // Llamar a la función kpi_conversaciones_por_dia
+        const { data, error } = await supabase.rpc('kpi_conversaciones_por_dia', {
+          fecha_inicio: startDate.toISOString(),
+          fecha_fin: endDate.toISOString()
+        });
+        
+        if (error) {
+          throw error;
+        }
+        
+        // Formatear datos para el gráfico
+        const formattedData = data.map(item => ({
+          ...item,
+          fecha: format(new Date(item.fecha), 'dd/MM/yy'),
+          tiempo_respuesta_promedio_min: +(item.tiempo_respuesta_promedio_seg / 60).toFixed(1)
         }));
         
-        setChannelOptions(options);
+        setConversacionesData(formattedData);
       } catch (error) {
-        console.error('Error obteniendo canales:', error);
+        console.error("Error al cargar datos de conversaciones:", error);
+        toast.error("No se pudieron cargar los datos de conversaciones");
+      } finally {
+        setIsLoadingConversaciones(false);
       }
     };
     
-    fetchChannels();
-  }, [user?.companyId]);
+    fetchConversacionesData();
+  }, [user?.companyId, dateRange, predefinedRange]);
 
-  // Función para manejar cambios en los filtros
-  const handleFilterChange = (filters: FilterOptions) => {
-    if (filters.timeRange) {
-      setTimeRange(filters.timeRange);
-    }
-    
-    if (filters.dateRange) {
-      setDateRange(filters.dateRange);
-    }
-
-    if (filters.groupBy) {
-      setGroupBy(filters.groupBy);
-    }
-    
-    if (filters.channels) {
-      setSelectedChannels(filters.channels);
-    }
-
-    if (filters.includeHours !== undefined) {
-      setIncludeHours(filters.includeHours);
-    }
-
-    if (filters.hourRange) {
-      setHourRange(filters.hourRange);
-    }
-  };
-  
-  // Función para manejar cambios en la visibilidad de los gráficos
-  const handleChartVisibilityChange = (visibility: ChartVisibility) => {
-    setChartVisibility(visibility);
-  };
-  
-  // Formatear los datos para los gráficos
-  const formattedGranularData = useMemo(() => {
-    if (!granularData || granularData.length === 0) return [];
-    
-    return granularData.map(item => {
-      // Formatear el período según el tipo de agrupación
-      let formattedPeriod = item.periodo;
-      
-      if (groupBy === "hora") {
-        // Si es por hora, mostrar hora en formato 12h
-        const date = new Date(item.fecha_hora);
-        const hour = date.getHours();
-        const amPm = hour >= 12 ? 'PM' : 'AM';
-        const hour12 = hour % 12 || 12;
-        formattedPeriod = `${hour12}${amPm}`;
-      } else if (groupBy === "dia") {
-        // Si es por día, formato corto de fecha
-        const date = new Date(item.fecha_hora);
-        formattedPeriod = formatDate(date, 'dd/MM', { locale: es });
-      } else if (groupBy === "semana") {
-        // Si es por semana, mostrar semana del año
-        formattedPeriod = item.periodo;
-      } else if (groupBy === "mes") {
-        // Si es por mes, mostrar mes abreviado
-        const [year, month] = item.periodo.split('-');
-        const date = new Date(parseInt(year), parseInt(month) - 1);
-        formattedPeriod = formatDate(date, 'MMM yy', { locale: es });
-      }
-      
+  // Calcular métricas generales
+  const conversacionesMetricas = useMemo(() => {
+    if (!conversacionesData || conversacionesData.length === 0) {
       return {
-        periodo: formattedPeriod,
-        fecha_hora: item.fecha_hora,
-        eventos: item.total_eventos,
-        leads: item.total_leads,
-        conversaciones: item.total_conversaciones,
-        score: item.score_promedio
+        totalConversaciones: 0,
+        promedioMensajes: 0,
+        tiempoRespuestaPromedio: 0
       };
-    });
-  }, [granularData, groupBy]);
-
-  // Preparar datos para gráfico de distribución
-  const channelDistributionData = useMemo(() => {
-    if (!channelData || channelData.length === 0) {
-      return [{
-        browser: "Sin datos",
-        visitors: 100,
-        fill: "var(--color-other)"
-      }];
     }
     
-    // Colores para los diferentes canales
-    const channelColors: Record<string, string> = {
-      "WhatsApp": "var(--color-chrome)",
-      "Web": "var(--color-safari)",
-      "Facebook": "var(--color-firefox)",
-      "Instagram": "var(--color-edge)",
-      "Telegram": "var(--color-opera)",
-      "Desconocido": "var(--color-other)"
-    };
-    
-    // Mapear datos de canal a la estructura del gráfico de pie
-    return channelData.map((item) => {
-      // Determinar el color basado en el nombre del canal o usar un color por defecto
-      const color = channelColors[item.name] || "var(--color-other)";
-      
-      return {
-        browser: item.name,
-        visitors: item.value || 0,
-        fill: color
-      };
-    });
-  }, [channelData]);
-
-  // Configuración para el gráfico moderno
-  const chartConfig = {
-    eventos: {
-      label: "Eventos",
-      color: "hsl(var(--chart-1))",
-    },
-    leads: {
-      label: "Leads",
-      color: "hsl(var(--chart-2))",
-    },
-    conversaciones: {
-      label: "Conversaciones",
-      color: "hsl(var(--chart-3))",
-    },
-    score: {
-      label: "Score Promedio",
-      color: "hsl(var(--chart-4))",
-    }
-  } as ChartConfig;
-
-  // Configuración para gráficos de pie
-  const pieChartConfig = {
-    visitors: {
-      label: "Distribución",
-    },
-    chrome: {
-      label: "WhatsApp",
-      color: "hsl(var(--chart-1))",
-    },
-    safari: {
-      label: "Web",
-      color: "hsl(var(--chart-2))",
-    },
-    firefox: {
-      label: "Facebook",
-      color: "hsl(var(--chart-3))",
-    },
-    edge: {
-      label: "Instagram",
-      color: "hsl(var(--chart-4))",
-    },
-    opera: {
-      label: "Telegram",
-      color: "hsl(var(--chart-5))",
-    },
-    other: {
-      label: "Otros",
-      color: "hsl(var(--chart-6), var(--chart-1)))",
-    },
-  } as ChartConfig;
-
-  // Totals for data metrics
-  const totals = useMemo(() => {
-    if (!granularData || granularData.length === 0) {
-      return { eventos: 0, leads: 0, conversaciones: 0, score: 0 };
-    }
+    const totalConversaciones = conversacionesData.reduce((sum, item) => sum + item.total_conversaciones, 0);
+    const promedioMensajes = conversacionesData.reduce((sum, item) => sum + item.mensajes_por_conversacion, 0) / conversacionesData.length;
+    const tiempoRespuestaPromedio = conversacionesData.reduce((sum, item) => sum + item.tiempo_respuesta_promedio_seg, 0) / conversacionesData.length;
     
     return {
-      eventos: granularData.reduce((acc, item) => acc + item.total_eventos, 0),
-      leads: granularData.reduce((acc, item) => acc + item.total_leads, 0),
-      conversaciones: granularData.reduce((acc, item) => acc + item.total_conversaciones, 0),
-      score: granularData.length > 0 
-        ? Math.round(granularData.reduce((acc, item) => acc + item.score_promedio, 0) / granularData.length) 
-        : 0
+      totalConversaciones,
+      promedioMensajes: +promedioMensajes.toFixed(1),
+      tiempoRespuestaPromedio: +(tiempoRespuestaPromedio / 60).toFixed(1) // Convertir a minutos
     };
-  }, [granularData]);
+  }, [conversacionesData]);
 
   // Calcular tendencias
-  const trends = useMemo(() => {
-    if (!granularData || granularData.length < 2) {
+  const conversacionesTendencias = useMemo(() => {
+    if (!conversacionesData || conversacionesData.length < 2) {
       return {
-        eventos: { value: 0, trend: "neutral" as "up" | "down" | "neutral" },
-        leads: { value: 0, trend: "neutral" as "up" | "down" | "neutral" },
         conversaciones: { value: 0, trend: "neutral" as "up" | "down" | "neutral" },
-        score: { value: 0, trend: "neutral" as "up" | "down" | "neutral" }
+        mensajes: { value: 0, trend: "neutral" as "up" | "down" | "neutral" },
+        tiempoRespuesta: { value: 0, trend: "neutral" as "up" | "down" | "neutral" }
       };
     }
     
-    const mitad = Math.floor(granularData.length / 2);
-    const primeraData = granularData.slice(0, mitad);
-    const segundaData = granularData.slice(mitad);
+    const mitad = Math.floor(conversacionesData.length / 2);
+    const primeraData = conversacionesData.slice(0, mitad);
+    const segundaData = conversacionesData.slice(mitad);
     
-    // Función para calcular tendencia
-    const calcularTendencia = (key: string) => {
-      const primerPromedio = primeraData.reduce((acc, item) => acc + item[key], 0) / primeraData.length;
-      const segundoPromedio = segundaData.reduce((acc, item) => acc + item[key], 0) / segundaData.length;
-      
-      if (primerPromedio === 0) return { value: 100, trend: "up" as "up" | "down" | "neutral" };
-      
-      const porcentajeCambio = ((segundoPromedio - primerPromedio) / primerPromedio) * 100;
-      const trend = porcentajeCambio >= 0 ? "up" : "down";
-      
-      return {
-        value: Math.abs(Math.round(porcentajeCambio * 10) / 10),
-        trend
-      };
-    };
+    // Calcular tendencia de conversaciones
+    const primerPromedioConv = primeraData.reduce((acc, item) => acc + item.total_conversaciones, 0) / primeraData.length;
+    const segundoPromedioConv = segundaData.reduce((acc, item) => acc + item.total_conversaciones, 0) / segundaData.length;
+    const porcentajeCambioConv = primerPromedioConv === 0 ? 100 : ((segundoPromedioConv - primerPromedioConv) / primerPromedioConv) * 100;
+    
+    // Calcular tendencia de mensajes por conversación
+    const primerPromedioMsg = primeraData.reduce((acc, item) => acc + item.mensajes_por_conversacion, 0) / primeraData.length;
+    const segundoPromedioMsg = segundaData.reduce((acc, item) => acc + item.mensajes_por_conversacion, 0) / segundaData.length;
+    const porcentajeCambioMsg = primerPromedioMsg === 0 ? 100 : ((segundoPromedioMsg - primerPromedioMsg) / primerPromedioMsg) * 100;
+    
+    // Calcular tendencia de tiempo de respuesta (aquí menos es mejor)
+    const primerPromedioTiempo = primeraData.reduce((acc, item) => acc + item.tiempo_respuesta_promedio_seg, 0) / primeraData.length;
+    const segundoPromedioTiempo = segundaData.reduce((acc, item) => acc + item.tiempo_respuesta_promedio_seg, 0) / segundaData.length;
+    const porcentajeCambioTiempo = primerPromedioTiempo === 0 ? -100 : ((segundoPromedioTiempo - primerPromedioTiempo) / primerPromedioTiempo) * 100;
+    // Para tiempo de respuesta, la tendencia es inversa (menos es mejor)
+    const tiempoTrend = porcentajeCambioTiempo <= 0 ? "up" : "down";
     
     return {
-      eventos: calcularTendencia("total_eventos"),
-      leads: calcularTendencia("total_leads"),
-      conversaciones: calcularTendencia("total_conversaciones"),
-      score: calcularTendencia("score_promedio")
+      conversaciones: {
+        value: Math.abs(Math.round(porcentajeCambioConv * 10) / 10),
+        trend: porcentajeCambioConv >= 0 ? "up" : "down"
+      },
+      mensajes: {
+        value: Math.abs(Math.round(porcentajeCambioMsg * 10) / 10),
+        trend: porcentajeCambioMsg >= 0 ? "up" : "down"
+      },
+      tiempoRespuesta: {
+        value: Math.abs(Math.round(porcentajeCambioTiempo * 10) / 10),
+        trend: tiempoTrend
+      }
     };
-  }, [granularData]);
+  }, [conversacionesData]);
 
-  // Función para obtener un título descriptivo según los filtros actuales
-  const getDashboardTitle = () => {
-    if (timeRange === "today") {
-      return "Dashboard - Datos de hoy";
-    } else if (timeRange === "yesterday") {
-      return "Dashboard - Datos de ayer";
-    } else if (timeRange === "7d") {
-      return "Dashboard - Últimos 7 días";
-    } else if (timeRange === "30d") {
-      return "Dashboard - Últimos 30 días";
-    } else if (timeRange === "90d") {
-      return "Dashboard - Últimos 3 meses";
-    } else if (timeRange === "6m") {
-      return "Dashboard - Últimos 6 meses";
-    } else if (timeRange === "1y") {
-      return "Dashboard - Último año";
-    } else if (timeRange === "custom" && dateRange.from && dateRange.to) {
-      return `Dashboard - Del ${formatDate(dateRange.from, 'PP', { locale: es })} al ${formatDate(dateRange.to, 'PP', { locale: es })}`;
-    } else {
-      return "Dashboard";
+  // Configuración del gráfico
+  const chartConfig = {
+    conversaciones: {
+      label: "Conversaciones",
+      color: "hsl(var(--chart-1))",
+    },
+    mensajes: {
+      label: "Mensajes/Conversación",
+      color: "hsl(var(--chart-2))",
+    },
+    tiempo: {
+      label: "Tiempo Respuesta (min)",
+      color: "hsl(var(--chart-3))",
     }
+  } as ChartConfig;
+
+  // Función para cambiar el rango predefinido
+  const handlePredefinedRangeChange = (value: string) => {
+    setPredefinedRange(value);
+    
+    // Si se selecciona un rango predefinido, limpiar el rango personalizado
+    if (value !== "custom") {
+      setDateRange({ from: undefined, to: undefined });
+    }
+  };
+
+  // Función para manejar la selección de rango personalizado
+  const handleDateRangeChange = (range: DateRange | undefined) => {
+    if (!range) return;
+    
+    setDateRange(range);
+    setPredefinedRange("custom");
   };
 
   // Función para exportar datos
   const handleExportData = async () => {
-    if (!user?.companyId) {
-      toast({
-        title: "Error",
-        description: "No se puede exportar datos sin identificación de empresa",
-        variant: "destructive"
-      });
+    if (conversacionesData.length === 0) {
+      toast.warning("No hay datos para exportar");
       return;
     }
     
-    setExportLoading(true);
-    
     try {
-      // Preparar los datos para exportar
-      const exportData = {
-        generadoEl: new Date().toISOString(),
-        usuario: user.email || "usuario@prometeo.com",
-        empresa: user.companyId,
-        filtros: {
-          periodo: timeRange,
-          canales: selectedChannels.length > 0 ? selectedChannels : "Todos",
-          agrupadoPor: groupBy,
-          incluirHoras: includeHours,
-          rangoHoras: includeHours ? hourRange : null
-        },
-        estadisticas: {
-          totalEventos: totals.eventos,
-          totalLeads: totals.leads,
-          totalConversaciones: totals.conversaciones,
-          scorePromedio: totals.score
-        },
-        datosGranulares: granularData,
-        datosAnaliticos: {
-          tipoEventos: dimensionalData?.tipoEventos || [],
-          distribucionCanales: dimensionalData?.rendimientoCanales || [],
-          rendimientoChatbots: dimensionalData?.rendimientoChatbots || []
-        }
-      };
-
       // Usar dynamic imports para cargar los módulos de exportación
-      const jsPDF = await import('jspdf');
-      // Importar xlsx con su nombre completo para evitar problemas
       const XLSX = await import('xlsx');
       
-      // Crear documento PDF
-      const pdf = new jsPDF.default();
-      
-      // Añadir título y fecha
-      pdf.setFontSize(22);
-      pdf.text("Dashboard Prometeo CRM", 20, 20);
-      
-      pdf.setFontSize(12);
-      pdf.text(`Informe generado el ${new Date().toLocaleDateString('es-ES')} a las ${new Date().toLocaleTimeString('es-ES')}`, 20, 30);
-      pdf.text(`Usuario: ${user.email || "No disponible"}`, 20, 40);
-      
-      // Añadir estadísticas principales
-      pdf.setFontSize(16);
-      pdf.text("Estadísticas Principales", 20, 55);
-      
-      pdf.setFontSize(12);
-      pdf.text(`Total de Eventos: ${totals.eventos}`, 25, 65);
-      pdf.text(`Total de Leads: ${totals.leads}`, 25, 75);
-      pdf.text(`Conversaciones: ${totals.conversaciones}`, 25, 85);
-      pdf.text(`Score Promedio: ${totals.score}`, 25, 95);
-      
-      // Guardar PDF
-      pdf.save("prometeo_dashboard.pdf");
-      
       // Exportar datos a Excel
-      const ws = XLSX.utils.json_to_sheet(granularData || []);
-      const ws2 = XLSX.utils.json_to_sheet(dimensionalData?.tipoEventos || []);
-      
+      const ws = XLSX.utils.json_to_sheet(conversacionesData);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Datos Granulares");
-      XLSX.utils.book_append_sheet(wb, ws2, "Tipos de Eventos");
-      
-      // Si hay datos analíticos, añadirlos también
-      if (dimensionalData?.rendimientoCanales && dimensionalData.rendimientoCanales.length > 0) {
-        const ws3 = XLSX.utils.json_to_sheet(dimensionalData.rendimientoCanales);
-        XLSX.utils.book_append_sheet(wb, ws3, "Rendimiento Canales");
-      }
-      
-      if (dimensionalData?.rendimientoChatbots && dimensionalData.rendimientoChatbots.length > 0) {
-        const ws4 = XLSX.utils.json_to_sheet(dimensionalData.rendimientoChatbots);
-        XLSX.utils.book_append_sheet(wb, ws4, "Rendimiento Chatbots");
-      }
+      XLSX.utils.book_append_sheet(wb, ws, "Conversaciones");
       
       // Escribir el archivo Excel
-      XLSX.writeFile(wb, "prometeo_dashboard.xlsx");
+      XLSX.writeFile(wb, "conversaciones_dashboard.xlsx");
       
-      toast({
-        title: "Exportación completada",
-        description: "Los datos del dashboard se han exportado correctamente",
-        variant: "default"
-      });
+      toast.success("Datos exportados correctamente");
     } catch (error) {
       console.error("Error exportando datos:", error);
-      toast({
-        title: "Error en la exportación",
-        description: "No se pudieron exportar los datos. Inténtalo de nuevo más tarde.",
-        variant: "destructive"
-      });
-    } finally {
-      setExportLoading(false);
+      toast.error("No se pudieron exportar los datos");
     }
   };
 
-  // Definir el tipo de visualización según la agrupación temporal
-  const getChartType = () => {
-    if (groupBy === "hora") {
-      return "barras"; // Barras para datos horarios
-    } else if (groupBy === "dia" || groupBy === "semana") {
-      return "area"; // Área para datos diarios o semanales
-    } else {
-      return "linea"; // Línea para datos mensuales, trimestrales o anuales
-    }
-  };
-
+  // Renderizar el dashboard
   return (
     <div className="space-y-6 py-[14px] px-[21px]">
       <div className="flex flex-col md:flex-row items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">{getDashboardTitle()}</h1>
+          <h1 className="text-3xl font-bold">Dashboard</h1>
           <p className="text-muted-foreground">
-            {groupBy === "hora" ? "Datos desglosados por hora" : 
-             groupBy === "dia" ? "Datos desglosados por día" :
-             groupBy === "semana" ? "Datos desglosados por semana" :
-             groupBy === "mes" ? "Datos desglosados por mes" :
-             groupBy === "trimestre" ? "Datos desglosados por trimestre" :
-             "Datos desglosados por año"}
+            Análisis y métricas de tu plataforma
           </p>
         </div>
       </div>
-      
-      {/* Barra de herramientas moderna con filtros mejorados */}
-      <DashboardToolbar 
-        onFilterChange={handleFilterChange}
-        onChartVisibilityChange={handleChartVisibilityChange}
-        channelOptions={channelOptions}
-        onExportData={handleExportData}
-        defaultTimeRange={timeRange}
-        defaultChartVisibility={chartVisibility}
-        isExporting={exportLoading}
-      />
 
-      {/* Panel principal con datos granulares */}
-      <div className="space-y-6">
-        {/* Tarjetas de KPIs con datos granulares */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Total de eventos
-                  </p>
-                  {isLoadingGranularData ? 
-                    <Skeleton className="h-8 w-16" /> : 
-                    <p className="text-2xl font-bold">{totals.eventos.toLocaleString()}</p>
-                  }
-                </div>
-                <div className={`h-10 w-10 rounded-full flex items-center justify-center ${trends.eventos.trend === "up" ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"}`}>
-                  <BarChart3 className="h-4 w-4" />
-                </div>
-              </div>
-              <div className="mt-4 flex items-center text-xs">
-                {trends.eventos.trend === "up" ? 
-                  <ArrowUpRight className="h-3 w-3 text-green-500 mr-1" /> : 
-                  <ArrowDownRight className="h-3 w-3 text-red-500 mr-1" />
-                }
-                <span className={trends.eventos.trend === "up" ? "text-green-500" : "text-red-500"}>
-                  {trends.eventos.value}%
-                </span>
-                <span className="text-muted-foreground ml-1">vs período anterior</span>
-              </div>
-            </CardContent>
-          </Card>
+      {/* Tabs para las diferentes secciones del dashboard */}
+      <Tabs defaultValue="conversaciones" value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="conversaciones" className="flex items-center gap-2">
+            <MessageSquare className="h-4 w-4" />
+            <span>Conversaciones y mensajes</span>
+          </TabsTrigger>
+          {/* Otras tabs se pueden añadir aquí en el futuro */}
+        </TabsList>
 
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Leads generados
-                  </p>
-                  {isLoadingGranularData ? 
-                    <Skeleton className="h-8 w-16" /> : 
-                    <p className="text-2xl font-bold">{totals.leads.toLocaleString()}</p>
-                  }
-                </div>
-                <div className={`h-10 w-10 rounded-full flex items-center justify-center ${trends.leads.trend === "up" ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"}`}>
-                  <Users className="h-4 w-4" />
-                </div>
-              </div>
-              <div className="mt-4 flex items-center text-xs">
-                {trends.leads.trend === "up" ? 
-                  <ArrowUpRight className="h-3 w-3 text-green-500 mr-1" /> : 
-                  <ArrowDownRight className="h-3 w-3 text-red-500 mr-1" />
-                }
-                <span className={trends.leads.trend === "up" ? "text-green-500" : "text-red-500"}>
-                  {trends.leads.value}%
-                </span>
-                <span className="text-muted-foreground ml-1">vs período anterior</span>
-              </div>
-            </CardContent>
-          </Card>
+        {/* Panel de Conversaciones y Mensajes */}
+        <TabsContent value="conversaciones" className="space-y-4">
+          {/* Barra de herramientas */}
+          <div className="flex flex-wrap md:flex-nowrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Select value={predefinedRange} onValueChange={handlePredefinedRangeChange}>
+                <SelectTrigger className="h-9 w-[180px] bg-background/50">
+                  <SelectValue placeholder="Seleccionar período" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7d">Últimos 7 días</SelectItem>
+                  <SelectItem value="14d">Últimos 14 días</SelectItem>
+                  <SelectItem value="30d">Últimos 30 días</SelectItem>
+                  <SelectItem value="90d">Últimos 90 días</SelectItem>
+                  <SelectItem value="6m">Últimos 6 meses</SelectItem>
+                  <SelectItem value="custom">Personalizado</SelectItem>
+                </SelectContent>
+              </Select>
 
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Conversaciones
-                  </p>
-                  {isLoadingGranularData ? 
-                    <Skeleton className="h-8 w-16" /> : 
-                    <p className="text-2xl font-bold">{totals.conversaciones.toLocaleString()}</p>
-                  }
-                </div>
-                <div className={`h-10 w-10 rounded-full flex items-center justify-center ${trends.conversaciones.trend === "up" ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"}`}>
-                  <MessageSquare className="h-4 w-4" />
-                </div>
-              </div>
-              <div className="mt-4 flex items-center text-xs">
-                {trends.conversaciones.trend === "up" ? 
-                  <ArrowUpRight className="h-3 w-3 text-green-500 mr-1" /> : 
-                  <ArrowDownRight className="h-3 w-3 text-red-500 mr-1" />
-                }
-                <span className={trends.conversaciones.trend === "up" ? "text-green-500" : "text-red-500"}>
-                  {trends.conversaciones.value}%
-                </span>
-                <span className="text-muted-foreground ml-1">vs período anterior</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Score promedio
-                  </p>
-                  {isLoadingGranularData ? 
-                    <Skeleton className="h-8 w-16" /> : 
-                    <p className="text-2xl font-bold">{totals.score}</p>
-                  }
-                </div>
-                <div className={`h-10 w-10 rounded-full flex items-center justify-center ${trends.score.trend === "up" ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"}`}>
-                  <TrendingUp className="h-4 w-4" />
-                </div>
-              </div>
-              <div className="mt-4 flex items-center text-xs">
-                {trends.score.trend === "up" ? 
-                  <ArrowUpRight className="h-3 w-3 text-green-500 mr-1" /> : 
-                  <ArrowDownRight className="h-3 w-3 text-red-500 mr-1" />
-                }
-                <span className={trends.score.trend === "up" ? "text-green-500" : "text-red-500"}>
-                  {trends.score.value}%
-                </span>
-                <span className="text-muted-foreground ml-1">vs período anterior</span>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Gráfico principal con datos granulares */}
-        <Card>
-          <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-0 justify-between">
-            <div>
-              <CardTitle>Actividad {groupBy === "hora" ? "por hora" : groupBy === "dia" ? "diaria" : groupBy === "semana" ? "semanal" : groupBy === "mes" ? "mensual" : groupBy === "trimestre" ? "trimestral" : "anual"}</CardTitle>
-              <CardDescription>
-                Evolución de eventos, leads y conversaciones
-                {timeRange === "today" ? " de hoy" : 
-                 timeRange === "yesterday" ? " de ayer" :
-                 timeRange === "custom" && dateRange.from && dateRange.to ? ` del ${formatDate(dateRange.from, 'PP', { locale: es })} al ${formatDate(dateRange.to, 'PP', { locale: es })}` :
-                 ` en los últimos ${timeRange === "7d" ? "7 días" : 
-                                   timeRange === "30d" ? "30 días" : 
-                                   timeRange === "90d" ? "3 meses" : 
-                                   timeRange === "6m" ? "6 meses" : "12 meses"}`}
-              </CardDescription>
+              {/* Selector de rango personalizado */}
+              {predefinedRange === "custom" && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "h-9 justify-start text-left font-normal",
+                        !dateRange.from && !dateRange.to && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateRange.from && dateRange.to ? (
+                        <>
+                          {format(dateRange.from, "P", { locale: es })} - {" "}
+                          {format(dateRange.to, "P", { locale: es })}
+                        </>
+                      ) : (
+                        <span>Seleccionar fechas</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      initialFocus
+                      mode="range"
+                      defaultMonth={dateRange.from}
+                      selected={dateRange}
+                      onSelect={handleDateRangeChange}
+                      numberOfMonths={2}
+                    />
+                  </PopoverContent>
+                </Popover>
+              )}
             </div>
-            <div className="flex flex-wrap gap-2">
+
+            <div className="flex items-center gap-2">
               <div className="flex rounded-md overflow-hidden border">
-                <Select defaultValue="eventos">
-                  <SelectTrigger className="h-8 px-2 rounded-none min-w-[100px]">
-                    <SelectValue placeholder="Métrica" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="eventos">Eventos</SelectItem>
-                    <SelectItem value="leads">Leads</SelectItem>
-                    <SelectItem value="conversaciones">Conversaciones</SelectItem>
-                    <SelectItem value="score">Score</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Button
+                  variant={chartView === "barras" ? "default" : "ghost"}
+                  size="sm"
+                  className="rounded-none h-9"
+                  onClick={() => setChartView("barras")}
+                >
+                  <BarChart3 className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={chartView === "lineas" ? "default" : "ghost"}
+                  size="sm"
+                  className="rounded-none h-9"
+                  onClick={() => setChartView("lineas")}
+                >
+                  <LineChart className="h-4 w-4" />
+                </Button>
               </div>
+              
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="gap-2 h-9"
+                onClick={handleExportData}
+              >
+                <Download className="h-4 w-4" />
+                <span>Exportar</span>
+              </Button>
             </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            {isLoadingGranularData ? (
-              <div className="flex items-center justify-center h-[350px]">
-                <div className="flex flex-col items-center gap-2">
-                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
-                  <p className="text-sm text-muted-foreground">Cargando datos...</p>
-                </div>
-              </div>
-            ) : formattedGranularData.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-[350px]">
-                <LayoutDashboard className="h-12 w-12 text-muted-foreground mb-2" />
-                <p className="text-sm text-muted-foreground">No hay datos para el período seleccionado</p>
-              </div>
-            ) : (
-              <ChartContainer config={chartConfig} className="h-[350px] w-full">
-                {getChartType() === "area" ? (
-                  <AreaChart data={formattedGranularData}>
-                    <defs>
-                      <linearGradient id="colorEventos" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0.1}/>
-                      </linearGradient>
-                      <linearGradient id="colorLeads" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(var(--chart-2))" stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor="hsl(var(--chart-2))" stopOpacity={0.1}/>
-                      </linearGradient>
-                      <linearGradient id="colorConversaciones" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(var(--chart-3))" stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor="hsl(var(--chart-3))" stopOpacity={0.1}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.3} />
-                    <XAxis 
-                      dataKey="periodo" 
-                      axisLine={false}
-                      tickLine={false}
-                      tickMargin={8}
-                    />
-                    <YAxis 
-                      axisLine={false}
-                      tickLine={false}
-                      tickMargin={8}
-                      yAxisId="left"
-                    />
-                    <YAxis 
-                      axisLine={false}
-                      tickLine={false}
-                      tickMargin={8}
-                      orientation="right"
-                      yAxisId="right"
-                      domain={[0, 100]}
-                    />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Legend />
-                    <Area
-                      yAxisId="left"
-                      type="monotone"
-                      dataKey="eventos"
-                      name="Eventos"
-                      stroke="hsl(var(--chart-1))"
-                      fill="url(#colorEventos)"
-                      strokeWidth={2}
-                    />
-                    <Area
-                      yAxisId="left"
-                      type="monotone"
-                      dataKey="leads"
-                      name="Leads"
-                      stroke="hsl(var(--chart-2))"
-                      fill="url(#colorLeads)"
-                      strokeWidth={2}
-                    />
-                    <Area
-                      yAxisId="left"
-                      type="monotone"
-                      dataKey="conversaciones"
-                      name="Conversaciones"
-                      stroke="hsl(var(--chart-3))"
-                      fill="url(#colorConversaciones)"
-                      strokeWidth={2}
-                    />
-                    <Line
-                      yAxisId="right"
-                      type="monotone"
-                      dataKey="score"
-                      name="Score"
-                      stroke="hsl(var(--chart-4))"
-                      strokeWidth={2}
-                      dot={true}
-                    />
-                  </AreaChart>
-                ) : getChartType() === "barras" ? (
-                  <BarChart data={formattedGranularData}>
-                    <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.3} />
-                    <XAxis 
-                      dataKey="periodo" 
-                      axisLine={false}
-                      tickLine={false}
-                      tickMargin={8}
-                    />
-                    <YAxis 
-                      axisLine={false}
-                      tickLine={false}
-                      tickMargin={8}
-                      yAxisId="left"
-                    />
-                    <YAxis 
-                      axisLine={false}
-                      tickLine={false}
-                      tickMargin={8}
-                      orientation="right"
-                      yAxisId="right"
-                      domain={[0, 100]}
-                    />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Legend />
-                    <Bar
-                      yAxisId="left"
-                      dataKey="eventos"
-                      name="Eventos"
-                      fill="hsl(var(--chart-1))"
-                      radius={[4, 4, 0, 0]}
-                    />
-                    <Bar
-                      yAxisId="left"
-                      dataKey="leads"
-                      name="Leads"
-                      fill="hsl(var(--chart-2))"
-                      radius={[4, 4, 0, 0]}
-                    />
-                    <Bar
-                      yAxisId="left"
-                      dataKey="conversaciones"
-                      name="Conversaciones"
-                      fill="hsl(var(--chart-3))"
-                      radius={[4, 4, 0, 0]}
-                    />
-                    <Line
-                      yAxisId="right"
-                      type="monotone"
-                      dataKey="score"
-                      name="Score"
-                      stroke="hsl(var(--chart-4))"
-                      strokeWidth={2}
-                      dot={true}
-                    />
-                  </BarChart>
-                ) : (
-                  <LineChart data={formattedGranularData}>
-                    <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.3} />
-                    <XAxis 
-                      dataKey="periodo" 
-                      axisLine={false}
-                      tickLine={false}
-                      tickMargin={8}
-                    />
-                    <YAxis 
-                      axisLine={false}
-                      tickLine={false}
-                      tickMargin={8}
-                      yAxisId="left"
-                    />
-                    <YAxis 
-                      axisLine={false}
-                      tickLine={false}
-                      tickMargin={8}
-                      orientation="right"
-                      yAxisId="right"
-                      domain={[0, 100]}
-                    />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Legend />
-                    <Line
-                      yAxisId="left"
-                      type="monotone"
-                      dataKey="eventos"
-                      name="Eventos"
-                      stroke="hsl(var(--chart-1))"
-                      strokeWidth={2}
-                      dot={true}
-                      activeDot={{ r: 6 }}
-                    />
-                    <Line
-                      yAxisId="left"
-                      type="monotone"
-                      dataKey="leads"
-                      name="Leads"
-                      stroke="hsl(var(--chart-2))"
-                      strokeWidth={2}
-                      dot={true}
-                      activeDot={{ r: 6 }}
-                    />
-                    <Line
-                      yAxisId="left"
-                      type="monotone"
-                      dataKey="conversaciones"
-                      name="Conversaciones"
-                      stroke="hsl(var(--chart-3))"
-                      strokeWidth={2}
-                      dot={true}
-                      activeDot={{ r: 6 }}
-                    />
-                    <Line
-                      yAxisId="right"
-                      type="monotone"
-                      dataKey="score"
-                      name="Score"
-                      stroke="hsl(var(--chart-4))"
-                      strokeWidth={2}
-                      dot={true}
-                      activeDot={{ r: 6 }}
-                    />
-                  </LineChart>
-                )}
-              </ChartContainer>
-            )}
-          </CardContent>
-        </Card>
+          </div>
 
-        {/* Gráficos de distribución */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {chartVisibility.distributionChart && (
+          {/* Tarjetas de KPIs */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Card>
-              <CardHeader>
-                <CardTitle>Distribución por canal</CardTitle>
-                <CardDescription>Leads por canal de adquisición</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {isLoadingChannelData ? (
-                  <div className="flex items-center justify-center h-[250px]">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Conversaciones
+                    </p>
+                    {isLoadingConversaciones ? 
+                      <Skeleton className="h-8 w-16" /> : 
+                      <p className="text-2xl font-bold">{conversacionesMetricas.totalConversaciones.toLocaleString()}</p>
+                    }
                   </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height={250}>
-                    <PieChart>
-                      <Pie
-                        data={channelDistributionData}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="visitors"
-                        nameKey="browser"
-                      >
-                        {channelDistributionData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.fill} />
-                        ))}
-                      </Pie>
-                      <ChartTooltip />
-                      <Legend />
-                    </PieChart>
-                  </ResponsiveContainer>
-                )}
+                  <div className={`h-10 w-10 rounded-full flex items-center justify-center ${conversacionesTendencias.conversaciones.trend === "up" ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"}`}>
+                    <MessageSquare className="h-4 w-4" />
+                  </div>
+                </div>
+                <div className="mt-4 flex items-center text-xs">
+                  {conversacionesTendencias.conversaciones.trend === "up" ? 
+                    <ArrowUpRight className="h-3 w-3 text-green-500 mr-1" /> : 
+                    <ArrowDownRight className="h-3 w-3 text-red-500 mr-1" />
+                  }
+                  <span className={conversacionesTendencias.conversaciones.trend === "up" ? "text-green-500" : "text-red-500"}>
+                    {conversacionesTendencias.conversaciones.value}%
+                  </span>
+                  <span className="text-muted-foreground ml-1">vs período anterior</span>
+                </div>
               </CardContent>
             </Card>
-          )}
 
-          {/* Tipos de eventos */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Tipos de eventos</CardTitle>
-              <CardDescription>Distribución por tipo de interacción</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isLoadingDimensionalData ? (
-                <div className="flex items-center justify-center h-[250px]">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Mensajes por conversación
+                    </p>
+                    {isLoadingConversaciones ? 
+                      <Skeleton className="h-8 w-16" /> : 
+                      <p className="text-2xl font-bold">{conversacionesMetricas.promedioMensajes.toLocaleString()}</p>
+                    }
+                  </div>
+                  <div className={`h-10 w-10 rounded-full flex items-center justify-center ${conversacionesTendencias.mensajes.trend === "up" ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"}`}>
+                    <Users className="h-4 w-4" />
+                  </div>
                 </div>
-              ) : !dimensionalData || dimensionalData.tipoEventos.length === 0 ? (
-                <div className="flex items-center justify-center h-[250px]">
-                  <p className="text-sm text-muted-foreground">No hay datos disponibles</p>
+                <div className="mt-4 flex items-center text-xs">
+                  {conversacionesTendencias.mensajes.trend === "up" ? 
+                    <ArrowUpRight className="h-3 w-3 text-green-500 mr-1" /> : 
+                    <ArrowDownRight className="h-3 w-3 text-red-500 mr-1" />
+                  }
+                  <span className={conversacionesTendencias.mensajes.trend === "up" ? "text-green-500" : "text-red-500"}>
+                    {conversacionesTendencias.mensajes.value}%
+                  </span>
+                  <span className="text-muted-foreground ml-1">vs período anterior</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Tiempo de respuesta
+                    </p>
+                    {isLoadingConversaciones ? 
+                      <Skeleton className="h-8 w-16" /> : 
+                      <p className="text-2xl font-bold">{conversacionesMetricas.tiempoRespuestaPromedio.toLocaleString()} min</p>
+                    }
+                  </div>
+                  <div className={`h-10 w-10 rounded-full flex items-center justify-center ${conversacionesTendencias.tiempoRespuesta.trend === "up" ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"}`}>
+                    <Clock className="h-4 w-4" />
+                  </div>
+                </div>
+                <div className="mt-4 flex items-center text-xs">
+                  {conversacionesTendencias.tiempoRespuesta.trend === "up" ? 
+                    <ArrowUpRight className="h-3 w-3 text-green-500 mr-1" /> : 
+                    <ArrowDownRight className="h-3 w-3 text-red-500 mr-1" />
+                  }
+                  <span className={conversacionesTendencias.tiempoRespuesta.trend === "up" ? "text-green-500" : "text-red-500"}>
+                    {conversacionesTendencias.tiempoRespuesta.value}%
+                  </span>
+                  <span className="text-muted-foreground ml-1">vs período anterior</span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Gráfico principal */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Evolución de conversaciones</CardTitle>
+                <CardDescription>
+                  {predefinedRange === "custom" && dateRange.from && dateRange.to ? 
+                    `Desde el ${format(dateRange.from, "d 'de' MMMM", { locale: es })} hasta el ${format(dateRange.to, "d 'de' MMMM", { locale: es })}` : 
+                    `Últimos ${predefinedRange === "7d" ? "7" : 
+                              predefinedRange === "14d" ? "14" : 
+                              predefinedRange === "30d" ? "30" : 
+                              predefinedRange === "90d" ? "90" : 
+                              "180"} días`
+                  }
+                </CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              {isLoadingConversaciones ? (
+                <div className="flex items-center justify-center h-[350px]">
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
+                    <p className="text-sm text-muted-foreground">Cargando datos...</p>
+                  </div>
+                </div>
+              ) : conversacionesData.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-[350px]">
+                  <MessageSquare className="h-12 w-12 text-muted-foreground mb-2" />
+                  <p className="text-sm text-muted-foreground">No hay datos para el período seleccionado</p>
                 </div>
               ) : (
-                <ResponsiveContainer width="100%" height={250}>
-                  <BarChart
-                    layout="vertical"
-                    data={dimensionalData.tipoEventos.slice(0, 6)}
-                    margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} opacity={0.3} />
-                    <XAxis type="number" />
-                    <YAxis 
-                      dataKey="categoria" 
-                      type="category" 
-                      scale="point" 
-                      width={120}
-                      tickFormatter={(value) => value.length > 15 ? `${value.substring(0, 15)}...` : value}
-                    />
-                    <ChartTooltip />
-                    <Bar dataKey="valor" radius={[0, 4, 4, 0]}>
-                      {dimensionalData.tipoEventos.slice(0, 6).map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color || `hsl(var(--chart-${index + 1}))`} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+                <ChartContainer config={chartConfig} className="h-[350px]">
+                  {chartView === "barras" ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={conversacionesData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis
+                          dataKey="fecha"
+                          tickLine={false}
+                          axisLine={false}
+                          tickMargin={8}
+                        />
+                        <YAxis 
+                          yAxisId="left"
+                          axisLine={false}
+                          tickLine={false}
+                          tickMargin={8}
+                        />
+                        <YAxis 
+                          yAxisId="right"
+                          orientation="right"
+                          axisLine={false}
+                          tickLine={false}
+                          tickMargin={8}
+                        />
+                        <Tooltip content={<ChartTooltipContent />} />
+                        <Legend />
+                        <Bar
+                          yAxisId="left"
+                          dataKey="total_conversaciones"
+                          name="Conversaciones"
+                          fill="hsl(var(--chart-1))"
+                          radius={[4, 4, 0, 0]}
+                        />
+                        <Bar
+                          yAxisId="left"
+                          dataKey="mensajes_por_conversacion"
+                          name="Mensajes/Conv"
+                          fill="hsl(var(--chart-2))"
+                          radius={[4, 4, 0, 0]}
+                        />
+                        <Bar
+                          yAxisId="right"
+                          dataKey="tiempo_respuesta_promedio_min"
+                          name="Tiempo Resp (min)"
+                          fill="hsl(var(--chart-3))"
+                          radius={[4, 4, 0, 0]}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={conversacionesData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis
+                          dataKey="fecha"
+                          tickLine={false}
+                          axisLine={false}
+                          tickMargin={8}
+                        />
+                        <YAxis 
+                          yAxisId="left"
+                          axisLine={false}
+                          tickLine={false}
+                          tickMargin={8}
+                        />
+                        <YAxis 
+                          yAxisId="right"
+                          orientation="right"
+                          axisLine={false}
+                          tickLine={false}
+                          tickMargin={8}
+                        />
+                        <Tooltip content={<ChartTooltipContent />} />
+                        <Legend />
+                        <Line
+                          yAxisId="left"
+                          type="monotone"
+                          dataKey="total_conversaciones"
+                          name="Conversaciones"
+                          stroke="hsl(var(--chart-1))"
+                          strokeWidth={2}
+                          dot={true}
+                          activeDot={{ r: 6 }}
+                        />
+                        <Line
+                          yAxisId="left"
+                          type="monotone"
+                          dataKey="mensajes_por_conversacion"
+                          name="Mensajes/Conv"
+                          stroke="hsl(var(--chart-2))"
+                          strokeWidth={2}
+                          dot={true}
+                          activeDot={{ r: 6 }}
+                        />
+                        <Line
+                          yAxisId="right"
+                          type="monotone"
+                          dataKey="tiempo_respuesta_promedio_min"
+                          name="Tiempo Resp (min)"
+                          stroke="hsl(var(--chart-3))"
+                          strokeWidth={2}
+                          dot={true}
+                          activeDot={{ r: 6 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  )}
+                </ChartContainer>
               )}
             </CardContent>
           </Card>
-        </div>
 
-        {/* Rendimiento de chatbots */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Rendimiento de chatbots</CardTitle>
-            <CardDescription>Comparativa de rendimiento entre chatbots</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoadingDimensionalData ? (
-              <div className="flex items-center justify-center h-[300px]">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          {/* Tabla de datos */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Datos detallados</CardTitle>
+              <CardDescription>
+                Métricas diarias de conversaciones
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-md border">
+                <div className="overflow-auto max-h-[400px]">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-muted/50">
+                        <th className="p-2 text-left font-medium">Fecha</th>
+                        <th className="p-2 text-left font-medium">Conversaciones</th>
+                        <th className="p-2 text-left font-medium">Mensajes/Conversación</th>
+                        <th className="p-2 text-left font-medium">Tiempo Respuesta (min)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {isLoadingConversaciones ? (
+                        <tr>
+                          <td colSpan={4} className="p-4 text-center">
+                            <div className="flex items-center justify-center gap-2">
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                              <span className="text-sm text-muted-foreground">Cargando datos...</span>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : conversacionesData.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="p-4 text-center">
+                            <span className="text-sm text-muted-foreground">No hay datos para el período seleccionado</span>
+                          </td>
+                        </tr>
+                      ) : (
+                        conversacionesData.map((item, index) => (
+                          <tr key={index} className={index % 2 === 0 ? "bg-muted/20" : ""}>
+                            <td className="p-2">{item.fecha}</td>
+                            <td className="p-2">{item.total_conversaciones}</td>
+                            <td className="p-2">{item.mensajes_por_conversacion.toFixed(1)}</td>
+                            <td className="p-2">{(item.tiempo_respuesta_promedio_seg / 60).toFixed(1)}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            ) : !dimensionalData || dimensionalData.rendimientoChatbots.length === 0 ? (
-              <div className="flex items-center justify-center h-[300px]">
-                <p className="text-sm text-muted-foreground">No hay datos disponibles</p>
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={dimensionalData.rendimientoChatbots}>
-                  <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.3} />
-                  <XAxis 
-                    dataKey="categoria" 
-                    axisLine={false}
-                    tickLine={false}
-                    tickMargin={8}
-                    height={60}
-                    interval={0}
-                    tick={(props) => {
-                      const { x, y, payload } = props;
-                      return (
-                        <g transform={`translate(${x},${y})`}>
-                          <text 
-                            x={0} 
-                            y={0} 
-                            dy={16} 
-                            textAnchor="middle" 
-                            fill="#666" 
-                            fontSize={12}
-                            width={120}
-                          >
-                            {payload.value.length > 12 ? `${payload.value.substring(0, 12)}...` : payload.value}
-                          </text>
-                        </g>
-                      );
-                    }}
-                  />
-                  <YAxis 
-                    axisLine={false}
-                    tickLine={false}
-                    tickMargin={8}
-                  />
-                  <ChartTooltip />
-                  <Legend />
-                  <Bar 
-                    dataKey="valor" 
-                    name="Interacciones"
-                    radius={[4, 4, 0, 0]}
-                  >
-                    {dimensionalData.rendimientoChatbots.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
