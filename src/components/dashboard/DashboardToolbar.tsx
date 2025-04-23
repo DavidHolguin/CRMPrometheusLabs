@@ -1,16 +1,18 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   Calendar,
   Download,
   FileSpreadsheet,
-  FileText, // Cambiamos FilePdf por FileText que sí existe en lucide-react
+  FileText,
   Filter, 
   LineChart,
   Search, 
   BarChart,
   ChevronDown,
   X,
-  Sliders
+  Sliders,
+  Clock,
+  Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,15 +33,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 
 // Tipo para el rango de fechas personalizado que usamos en nuestra aplicación
 export type DateRange = {
@@ -48,7 +41,7 @@ export type DateRange = {
 };
 
 // Tiempos predefinidos para selección rápida
-export type TimeRange = "7d" | "30d" | "90d" | "6m" | "1y" | "custom";
+export type TimeRange = "7d" | "30d" | "90d" | "6m" | "1y" | "custom" | "today" | "yesterday";
 
 // Tipos de visualización de gráficos
 export type ChartVisibility = {
@@ -58,24 +51,33 @@ export type ChartVisibility = {
   distributionChart: boolean;
 };
 
+// Tipo para agrupación temporal
+export type GroupByTime = "hora" | "dia" | "semana" | "mes" | "trimestre" | "año";
+
 // Opciones de filtrado para el dashboard
 export interface FilterOptions {
   timeRange: TimeRange;
   dateRange: DateRange;
-  groupBy?: "day" | "week" | "month";
+  groupBy?: GroupByTime;
   channels?: string[];
   stages?: string[];
+  includeHours?: boolean;
+  hourRange?: {
+    start: number;
+    end: number;
+  };
 }
 
 interface DashboardToolbarProps {
   onFilterChange?: (filters: FilterOptions) => void;
   onChartVisibilityChange?: (visibility: ChartVisibility) => void;
   activeChannels?: string[];
-  onExportData?: (format: "csv" | "pdf", includeCharts: boolean) => void;
+  onExportData?: () => void;
   timeRangeOptions?: Array<{value: TimeRange, label: string}>;
   channelOptions?: Array<{value: string, label: string}>;
   defaultTimeRange?: TimeRange;
   defaultChartVisibility?: ChartVisibility;
+  isExporting?: boolean;
 }
 
 export function DashboardToolbar({
@@ -90,6 +92,8 @@ export function DashboardToolbar({
     { value: "6m", label: "6 meses" },
     { value: "1y", label: "1 año" },
     { value: "custom", label: "Personalizado" },
+    { value: "today", label: "Hoy" },
+    { value: "yesterday", label: "Ayer" },
   ],
   channelOptions = [],
   defaultTimeRange = "30d",
@@ -98,7 +102,8 @@ export function DashboardToolbar({
     evolutionChart: true,
     monthlyComparison: true,
     distributionChart: true
-  }
+  },
+  isExporting = false
 }: DashboardToolbarProps) {
   // Estado para manejar filtros
   const [timeRange, setTimeRange] = useState<TimeRange>(defaultTimeRange);
@@ -106,14 +111,36 @@ export function DashboardToolbar({
   const [selectedChannels, setSelectedChannels] = useState<string[]>([]);
   const [chartVisibility, setChartVisibility] = useState<ChartVisibility>(defaultChartVisibility);
   const [searchQuery, setSearchQuery] = useState("");
-  const [showExportDialog, setShowExportDialog] = useState(false);
-  const [exportFormat, setExportFormat] = useState<"csv" | "pdf">("csv");
-  const [includeCharts, setIncludeCharts] = useState(true);
+  const [groupBy, setGroupBy] = useState<GroupByTime>("dia");
+  const [includeHours, setIncludeHours] = useState(false);
+  const [hourRange, setHourRange] = useState({ start: 0, end: 23 });
   
   // Contador de filtros activos
   const activeFiltersCount = 
     (timeRange !== defaultTimeRange ? 1 : 0) + 
-    (selectedChannels.length > 0 ? 1 : 0);
+    (selectedChannels.length > 0 ? 1 : 0) +
+    (includeHours ? 1 : 0) + 
+    (groupBy !== "dia" ? 1 : 0);
+  
+  // Efecto para configurar valores iniciales basados en timeRange
+  useEffect(() => {
+    if (timeRange === "today" || timeRange === "yesterday") {
+      setIncludeHours(true);
+      setGroupBy("hora");
+    } else if (timeRange === "7d") {
+      setGroupBy("dia");
+      setIncludeHours(false);
+    } else if (timeRange === "30d" || timeRange === "90d") {
+      setGroupBy("dia");
+      setIncludeHours(false);
+    } else if (timeRange === "6m") {
+      setGroupBy("semana");
+      setIncludeHours(false);
+    } else if (timeRange === "1y") {
+      setGroupBy("mes");
+      setIncludeHours(false);
+    }
+  }, [timeRange]);
   
   // Manejar cambios en el rango de tiempo
   const handleTimeRangeChange = (value: TimeRange) => {
@@ -124,11 +151,21 @@ export function DashboardToolbar({
       setDateRange({ from: undefined, to: undefined });
     }
     
+    // Ajustar rango de horas para hoy
+    if (value === "today") {
+      setIncludeHours(true);
+      setGroupBy("hora");
+    }
+    
     // Notificar cambio
     if (onFilterChange) {
       onFilterChange({
         timeRange: value,
-        dateRange: value === "custom" ? dateRange : { from: undefined, to: undefined }
+        dateRange: value === "custom" ? dateRange : { from: undefined, to: undefined },
+        groupBy,
+        channels: selectedChannels,
+        includeHours: value === "today" || value === "yesterday" || includeHours,
+        hourRange: includeHours ? hourRange : undefined
       });
     }
   };
@@ -148,9 +185,75 @@ export function DashboardToolbar({
       if (onFilterChange) {
         onFilterChange({
           timeRange: "custom",
-          dateRange: range
+          dateRange: range,
+          groupBy,
+          channels: selectedChannels,
+          includeHours,
+          hourRange: includeHours ? hourRange : undefined
         });
       }
+    }
+  };
+  
+  // Manejar cambios en la agrupación temporal
+  const handleGroupByChange = (value: GroupByTime) => {
+    setGroupBy(value);
+    
+    // Si se selecciona hora, activar includeHours
+    if (value === "hora") {
+      setIncludeHours(true);
+    }
+    
+    // Notificar cambio
+    if (onFilterChange) {
+      onFilterChange({
+        timeRange,
+        dateRange: timeRange === "custom" ? dateRange : { from: undefined, to: undefined },
+        groupBy: value,
+        channels: selectedChannels,
+        includeHours: value === "hora" || includeHours,
+        hourRange: (value === "hora" || includeHours) ? hourRange : undefined
+      });
+    }
+  };
+  
+  // Manejar cambios en la inclusión de horas
+  const handleIncludeHoursChange = (include: boolean) => {
+    setIncludeHours(include);
+    
+    // Si se activan las horas y el grupo no es por hora, ajustar
+    if (include && groupBy !== "hora" && timeRange === "today") {
+      setGroupBy("hora");
+    }
+    
+    // Notificar cambio
+    if (onFilterChange) {
+      onFilterChange({
+        timeRange,
+        dateRange: timeRange === "custom" ? dateRange : { from: undefined, to: undefined },
+        groupBy: include && timeRange === "today" ? "hora" : groupBy,
+        channels: selectedChannels,
+        includeHours: include,
+        hourRange: include ? hourRange : undefined
+      });
+    }
+  };
+  
+  // Manejar cambios en el rango de horas
+  const handleHourRangeChange = (start: number, end: number) => {
+    const newRange = { start, end };
+    setHourRange(newRange);
+    
+    // Notificar cambio
+    if (onFilterChange && includeHours) {
+      onFilterChange({
+        timeRange,
+        dateRange: timeRange === "custom" ? dateRange : { from: undefined, to: undefined },
+        groupBy,
+        channels: selectedChannels,
+        includeHours,
+        hourRange: newRange
+      });
     }
   };
   
@@ -169,20 +272,21 @@ export function DashboardToolbar({
   
   // Manejar la selección de canales
   const handleChannelToggle = (channel: string) => {
-    setSelectedChannels(prev => 
-      prev.includes(channel)
-        ? prev.filter(c => c !== channel)
-        : [...prev, channel]
-    );
+    const newChannels = selectedChannels.includes(channel)
+      ? selectedChannels.filter(c => c !== channel)
+      : [...selectedChannels, channel];
+      
+    setSelectedChannels(newChannels);
     
     // Notificar cambio
     if (onFilterChange) {
       onFilterChange({
         timeRange,
         dateRange: timeRange === "custom" ? dateRange : { from: undefined, to: undefined },
-        channels: selectedChannels.includes(channel)
-          ? selectedChannels.filter(c => c !== channel)
-          : [...selectedChannels, channel]
+        groupBy,
+        channels: newChannels,
+        includeHours,
+        hourRange: includeHours ? hourRange : undefined
       });
     }
   };
@@ -193,28 +297,26 @@ export function DashboardToolbar({
     setDateRange({ from: undefined, to: undefined });
     setSelectedChannels([]);
     setSearchQuery("");
+    setGroupBy("dia");
+    setIncludeHours(false);
+    setHourRange({ start: 0, end: 23 });
     
     // Notificar cambio
     if (onFilterChange) {
       onFilterChange({
         timeRange: defaultTimeRange,
         dateRange: { from: undefined, to: undefined },
-        channels: []
+        groupBy: "dia",
+        channels: [],
+        includeHours: false,
+        hourRange: undefined
       });
     }
   };
   
-  // Manejar la exportación de datos
-  const handleExport = () => {
-    if (onExportData) {
-      onExportData(exportFormat, includeCharts);
-    }
-    setShowExportDialog(false);
-  };
-  
   return (
-    <div className="flex items-center justify-between w-full py-2 px-3 bg-background/95 backdrop-blur-sm border-b sticky top-0 z-20">
-      <div className="flex items-center gap-3 flex-1">
+    <div className="flex items-center justify-between w-full py-2 px-3 bg-background/95 backdrop-blur-sm border-b sticky top-0 z-20 flex-wrap gap-2">
+      <div className="flex items-center gap-3 flex-1 flex-wrap">
         {/* Selector de rango de tiempo */}
         <div className="w-[160px]">
           <Select value={timeRange} onValueChange={handleTimeRangeChange}>
@@ -266,6 +368,86 @@ export function DashboardToolbar({
           </Popover>
         )}
         
+        {/* Selector de agrupación temporal */}
+        <div className="w-[160px]">
+          <Select value={groupBy} onValueChange={(val) => handleGroupByChange(val as GroupByTime)}>
+            <SelectTrigger className="h-9 border-primary/20 bg-background/50">
+              <SelectValue placeholder="Agrupar por" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="hora">Por hora</SelectItem>
+              <SelectItem value="dia">Por día</SelectItem>
+              <SelectItem value="semana">Por semana</SelectItem>
+              <SelectItem value="mes">Por mes</SelectItem>
+              <SelectItem value="trimestre">Por trimestre</SelectItem>
+              <SelectItem value="año">Por año</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        
+        {/* Selector de rango de horas (visible solo si includeHours es true) */}
+        {(includeHours || groupBy === "hora") && (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className="h-9 justify-start text-left font-normal"
+              >
+                <Clock className="mr-2 h-4 w-4" />
+                <span>{hourRange.start}:00 - {hourRange.end}:00</span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-4" align="start">
+              <div className="space-y-4">
+                <h4 className="font-medium">Rango de horas</h4>
+                <div className="flex gap-2 items-center">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs text-muted-foreground">Desde</span>
+                    <Select 
+                      value={hourRange.start.toString()}
+                      onValueChange={(val) => handleHourRangeChange(parseInt(val), hourRange.end)}
+                    >
+                      <SelectTrigger className="w-[80px] h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 24 }).map((_, i) => (
+                          <SelectItem key={i} value={i.toString()}>
+                            {i}:00
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <span className="text-muted-foreground">a</span>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs text-muted-foreground">Hasta</span>
+                    <Select 
+                      value={hourRange.end.toString()}
+                      onValueChange={(val) => handleHourRangeChange(hourRange.start, parseInt(val))}
+                    >
+                      <SelectTrigger className="w-[80px] h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 24 }).map((_, i) => (
+                          <SelectItem 
+                            key={i} 
+                            value={i.toString()}
+                            disabled={i < hourRange.start}
+                          >
+                            {i}:00
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+        )}
+        
         {/* Búsqueda */}
         <div className="relative w-[200px] md:w-[280px]">
           <Search className="h-4 w-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -303,6 +485,17 @@ export function DashboardToolbar({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-[240px]">
+            <DropdownMenuLabel>Opciones de filtrado</DropdownMenuLabel>
+            
+            <DropdownMenuCheckboxItem
+              checked={includeHours}
+              onCheckedChange={(checked) => handleIncludeHoursChange(!!checked)}
+            >
+              Incluir filtros por hora
+            </DropdownMenuCheckboxItem>
+            
+            <DropdownMenuSeparator />
+            
             <DropdownMenuLabel>Filtrar por canal</DropdownMenuLabel>
             
             {channelOptions.length > 0 ? (
@@ -381,83 +574,25 @@ export function DashboardToolbar({
         </DropdownMenu>
         
         {/* Exportar datos */}
-        <Dialog open={showExportDialog} onOpenChange={setShowExportDialog}>
-          <DialogTrigger asChild>
-            <Button variant="outline" size="sm" className="h-9 gap-1">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="h-9 gap-1"
+          onClick={onExportData}
+          disabled={isExporting}
+        >
+          {isExporting ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <span>Exportando...</span>
+            </>
+          ) : (
+            <>
               <Download className="h-3.5 w-3.5" />
               <span>Exportar</span>
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Exportar datos del dashboard</DialogTitle>
-              <DialogDescription>
-                Selecciona el formato y las opciones para exportar tus datos.
-              </DialogDescription>
-            </DialogHeader>
-            
-            <div className="grid gap-4 py-4">
-              <div className="space-y-1">
-                <h4 className="font-medium text-sm">Formato</h4>
-                <div className="flex gap-4 mt-2">
-                  <div 
-                    className={cn(
-                      "flex flex-col items-center justify-center p-4 border rounded-lg cursor-pointer transition-all",
-                      exportFormat === "csv" 
-                        ? "border-primary bg-primary/5" 
-                        : "hover:border-primary/50"
-                    )}
-                    onClick={() => setExportFormat("csv")}
-                  >
-                    <FileSpreadsheet className={cn(
-                      "h-8 w-8 mb-2",
-                      exportFormat === "csv" ? "text-primary" : "text-muted-foreground"
-                    )} />
-                    <span className={exportFormat === "csv" ? "font-medium" : ""}>CSV</span>
-                  </div>
-                  
-                  <div 
-                    className={cn(
-                      "flex flex-col items-center justify-center p-4 border rounded-lg cursor-pointer transition-all",
-                      exportFormat === "pdf" 
-                        ? "border-primary bg-primary/5" 
-                        : "hover:border-primary/50"
-                    )}
-                    onClick={() => setExportFormat("pdf")}
-                  >
-                    <FileText className={cn(
-                      "h-8 w-8 mb-2",
-                      exportFormat === "pdf" ? "text-primary" : "text-muted-foreground"
-                    )} />
-                    <span className={exportFormat === "pdf" ? "font-medium" : ""}>PDF</span>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="includeCharts"
-                  checked={includeCharts}
-                  onChange={(e) => setIncludeCharts(e.target.checked)}
-                  className="rounded border-gray-300 text-primary focus:ring-primary"
-                />
-                <label htmlFor="includeCharts" className="text-sm font-medium">
-                  Incluir gráficos en la exportación
-                </label>
-              </div>
-            </div>
-            
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowExportDialog(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleExport}>
-                Exportar
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </>
+          )}
+        </Button>
       </div>
     </div>
   );
