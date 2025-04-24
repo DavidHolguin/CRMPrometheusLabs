@@ -1,8 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Lead } from '@/hooks/useLeads';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -20,23 +19,27 @@ import {
   ArrowUpRight,
   Star,
   Bot,
-  LineChart,
   Settings,
   Gauge,
   Activity,
   Send,
-  CalendarIcon
+  CalendarIcon,
+  TrendingUp,
+  AlertCircle,
+  CheckCircle2,
+  ThumbsUp,
+  ThumbsDown,
+  BarChart2
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Separator } from '@/components/ui/separator';
-import { Card, CardContent } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
-import { format, subDays } from 'date-fns';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { format, subDays, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog,
   DialogContent,
@@ -68,6 +71,28 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+
+// Importación para gráficos
+import {
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  Tooltip as RechartTooltip,
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+} from "recharts";
+
+// Tipos para los datos de historial
+interface ScoreHistoryItem {
+  created_at: string;
+  score_nuevo: number;
+  fecha_formateada?: string;
+}
 
 interface LeadDetailSidebarProps {
   selectedLead: Lead | null;
@@ -116,26 +141,23 @@ const LeadDetailSidebar: React.FC<LeadDetailSidebarProps> = ({
   leadConversations
 }) => {
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [scoreValue, setScoreValue] = useState(selectedLead?.score || 0);
-  const [isEditingScore, setIsEditingScore] = useState(false);
   const [textMessageOpen, setTextMessageOpen] = useState(false);
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [calendarDialogOpen, setCalendarDialogOpen] = useState(false);
   
-  // Forms
+  // Estado para históricos
+  const [scoreHistory, setScoreHistory] = useState<ScoreHistoryItem[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
+  
+  // Forms para los diferentes formularios
   const messageForm = useForm<z.infer<typeof messageFormSchema>>({
     resolver: zodResolver(messageFormSchema),
-    defaultValues: {
-      message: "",
-    },
+    defaultValues: { message: "" }
   });
   
   const emailForm = useForm<z.infer<typeof emailFormSchema>>({
     resolver: zodResolver(emailFormSchema),
-    defaultValues: {
-      subject: "",
-      body: "",
-    },
+    defaultValues: { subject: "", body: "" }
   });
   
   const calendarForm = useForm<z.infer<typeof calendarFormSchema>>({
@@ -145,8 +167,40 @@ const LeadDetailSidebar: React.FC<LeadDetailSidebarProps> = ({
       date: format(new Date(), "yyyy-MM-dd"),
       time: format(new Date(), "HH:mm"),
       notes: "",
-    },
+    }
   });
+  
+  // Obtener el historial de score del lead
+  useEffect(() => {
+    const fetchScoreHistory = async () => {
+      if (!selectedLead?.id) return;
+      
+      setLoadingHistory(true);
+      try {
+        const { data, error } = await supabase
+          .from('view_lead_score_history')
+          .select('*')
+          .eq('lead_id', selectedLead.id)
+          .order('created_at', { ascending: true });
+          
+        if (error) throw error;
+        
+        // Formatear las fechas para mostrar en el gráfico
+        const formattedData = data?.map(item => ({
+          ...item,
+          fecha_formateada: format(new Date(item.created_at), "dd MMM", { locale: es })
+        })) || [];
+        
+        setScoreHistory(formattedData);
+      } catch (error) {
+        console.error('Error al cargar el historial de score:', error);
+      } finally {
+        setLoadingHistory(false);
+      }
+    };
+
+    fetchScoreHistory();
+  }, [selectedLead?.id]);
   
   // Handlers for form submission
   const handleMessageSubmit = (data: z.infer<typeof messageFormSchema>) => {
@@ -175,26 +229,6 @@ const LeadDetailSidebar: React.FC<LeadDetailSidebarProps> = ({
     setCalendarDialogOpen(false);
     calendarForm.reset();
   };
-  
-  // Datos simulados para los gráficos históricos
-  const generateHistoricData = () => {
-    const today = new Date();
-    const data = [];
-    
-    for (let i = 14; i >= 0; i--) {
-      const date = subDays(today, i);
-      const value = Math.floor(Math.random() * 15) + 3;
-      data.push({
-        date,
-        value
-      });
-    }
-    
-    return data;
-  };
-  
-  const historicInteractions = generateHistoricData();
-  const historicMessages = generateHistoricData();
 
   if (!selectedLead) {
     return (
@@ -219,7 +253,7 @@ const LeadDetailSidebar: React.FC<LeadDetailSidebarProps> = ({
   };
 
   // Calcular el porcentaje de engagement basado en el score
-  const scorePercentage = scoreValue;
+  const scorePercentage = selectedLead.score || 0;
   
   // Determinar el color del score
   const getScoreColor = (score: number) => {
@@ -230,9 +264,9 @@ const LeadDetailSidebar: React.FC<LeadDetailSidebarProps> = ({
   
   // Determinar la temperatura basada en el score
   const getTemperature = (score: number) => {
-    if (score >= 70) return { label: "Hot", color: "bg-rose-500" };
-    if (score >= 40) return { label: "Warm", color: "bg-amber-500" };
-    return { label: "Cold", color: "bg-blue-500" };
+    if (score >= 70) return { label: "Hot", color: "bg-rose-500", textColor: "text-rose-500" };
+    if (score >= 40) return { label: "Warm", color: "bg-amber-500", textColor: "text-amber-500" };
+    return { label: "Cold", color: "bg-blue-500", textColor: "text-blue-500" };
   };
   
   const temperature = getTemperature(scorePercentage);
@@ -241,21 +275,43 @@ const LeadDetailSidebar: React.FC<LeadDetailSidebarProps> = ({
   const conversationCount = leadConversations?.length || 0;
   const messageCount = selectedLead.message_count || 0;
   
-  // Manejar cambio de score
-  const handleScoreChange = (value: number[]) => {
-    setScoreValue(value[0]);
+  // Calcular nivel de satisfacción (simulado - normalmente vendría de un análisis de sentimiento)
+  const satisfactionLevel = selectedLead.ultima_evaluacion_llm?.sentimiento || Math.floor(Math.random() * 30) + 70;
+  const qualificationLevel = selectedLead.probabilidad_cierre || Math.floor(Math.random() * 40) + 60;
+  
+  // Generar datos para gráfico de tendencia si no hay historial
+  const generateTrendData = () => {
+    const today = new Date();
+    const data = [];
+    
+    for (let i = 10; i >= 0; i--) {
+      const date = subDays(today, i);
+      // Crear una tendencia simulada que termine en el score actual
+      const baseScore = Math.max(scorePercentage - 15, 10);
+      const increment = (scorePercentage - baseScore) / 10;
+      const dayScore = Math.round(baseScore + (10 - i) * increment);
+      
+      data.push({
+        created_at: format(date, "yyyy-MM-dd'T'HH:mm:ss"),
+        score_nuevo: dayScore,
+        fecha_formateada: format(date, "dd MMM", { locale: es })
+      });
+    }
+    
+    return data;
   };
   
-  const handleScoreSubmit = () => {
-    // Aquí iría la lógica para actualizar el score en la base de datos
-    toast({
-      title: "Score actualizado",
-      description: `Se ha actualizado el score a ${scoreValue}`,
-    });
-    setIsEditingScore(false);
-  };
+  // Usar datos reales o simulados según disponibilidad
+  const chartData = scoreHistory.length > 1 ? scoreHistory : generateTrendData();
   
-  const maxValue = Math.max(...historicInteractions.map(d => d.value));
+  // Calcular temperatura histórica (simulada)
+  const temperatureHistory = chartData.map(item => {
+    const temperatureData = getTemperature(item.score_nuevo);
+    return {
+      ...item,
+      temperatura: temperatureData.label
+    };
+  });
   
   return (
     <aside className="w-90 border-l border-border bg-gradient-to-b from-slate-950 to-slate-900 flex flex-col h-full">
@@ -587,223 +643,339 @@ const LeadDetailSidebar: React.FC<LeadDetailSidebarProps> = ({
         <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
           <ScrollArea className="flex-1">
             <TabsContent value="dashboard" className="m-0 p-0">
-              <div className="p-4 space-y-6">
-                {/* Panel de score con interactividad */}
+              <div className="p-4 space-y-4">
+                {/* Gráfico principal de score */}
                 <div className="relative">
                   <div className="absolute -inset-2 rounded-xl bg-gradient-to-r from-indigo-500/20 via-purple-500/20 to-pink-500/20 opacity-50 blur-lg"></div>
                   <Card className="relative overflow-hidden border-0 bg-gradient-to-b from-slate-900 to-slate-950">
-                    <CardContent className="p-5">
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="text-sm font-semibold text-white flex items-center">
-                          <Gauge className="h-4 w-4 mr-1.5 text-indigo-400" />
-                          Calificación del Lead
-                        </h4>
-                        <button 
-                          onClick={() => setIsEditingScore(!isEditingScore)}
-                          className="h-7 w-7 rounded-full flex items-center justify-center bg-slate-800 hover:bg-slate-700 transition-colors"
-                        >
-                          <Settings className="h-4 w-4 text-slate-300" />
-                        </button>
+                    <CardHeader className="pb-2">
+                      <div className="flex justify-between items-center">
+                        <CardTitle className="text-sm font-semibold text-white flex items-center">
+                          <TrendingUp className="h-4 w-4 mr-1.5 text-indigo-400" />
+                          Evolución del Score
+                        </CardTitle>
+                        <Badge className={cn(
+                          "px-2", 
+                          scorePercentage >= 70 ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : 
+                          scorePercentage >= 40 ? "bg-amber-500/20 text-amber-400 border-amber-500/30" : 
+                          "bg-rose-500/20 text-rose-400 border-rose-500/30"
+                        )}>
+                          {scorePercentage}/100
+                        </Badge>
                       </div>
-                      
-                      <div className="flex justify-center relative">
-                        <div className="relative h-32 w-32">
-                          <svg className="h-32 w-32 -rotate-90 transform" viewBox="0 0 36 36">
-                            <circle
-                              cx="18"
-                              cy="18"
-                              r="16"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              className="text-slate-800"
-                            ></circle>
-                            <circle
-                              cx="18"
-                              cy="18"
-                              r="16"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2.5"
-                              strokeDasharray="100"
-                              strokeDashoffset={100 - scorePercentage}
-                              className={cn(
-                                scorePercentage >= 70 ? "text-emerald-500" :
-                                scorePercentage >= 40 ? "text-amber-500" :
-                                "text-rose-500"
-                              )}
-                            ></circle>
-                          </svg>
-                          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
-                            <span className={cn("text-3xl font-bold", getScoreColor(scorePercentage))}>
-                              {scorePercentage}
-                            </span>
-                            <p className="text-xs text-slate-400 mt-1">/ 100</p>
+                    </CardHeader>
+                    <CardContent className="px-0 pt-0 pb-2">
+                      <div className="h-44">
+                        {loadingHistory ? (
+                          <div className="h-full w-full flex items-center justify-center">
+                            <p className="text-sm text-slate-500">Cargando datos...</p>
                           </div>
-                        </div>
-                        
-                        <div className="absolute right-0 bottom-0 flex items-center gap-2">
-                          <Badge className={`${temperature.color} text-white`}>
-                            {temperature.label}
-                          </Badge>
-                        </div>
+                        ) : chartData.length > 0 ? (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart 
+                              data={chartData} 
+                              margin={{ top: 20, right: 10, left: -20, bottom: 0 }}
+                            >
+                              <defs>
+                                <linearGradient id="scoreGradient" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="5%" stopColor="#8f6ed5" stopOpacity={0.8}/>
+                                  <stop offset="95%" stopColor="#8f6ed5" stopOpacity={0.2}/>
+                                </linearGradient>
+                              </defs>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#333" />
+                              <XAxis 
+                                dataKey="fecha_formateada" 
+                                tick={{ fill: '#94a3b8', fontSize: 10 }} 
+                                axisLine={{ stroke: '#333' }}
+                                tickLine={false}
+                                minTickGap={20}
+                              />
+                              <YAxis 
+                                domain={[0, 100]}
+                                tick={{ fill: '#94a3b8', fontSize: 10 }}
+                                axisLine={false}
+                                tickLine={false}
+                              />
+                              <RechartTooltip 
+                                content={({ active, payload, label }) => {
+                                  if (active && payload && payload.length) {
+                                    return (
+                                      <div className="bg-slate-900 p-2 border border-slate-700 rounded shadow-md">
+                                        <p className="text-xs text-slate-300">{`${label}`}</p>
+                                        <p className="text-xs font-bold text-indigo-400">
+                                          {`Score: ${payload[0].value}`}
+                                        </p>
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                }}
+                              />
+                              <Line
+                                type="monotone"
+                                dataKey="score_nuevo"
+                                stroke="#8f6ed5"
+                                strokeWidth={2.5}
+                                dot={false}
+                                activeDot={{ r: 6, fill: '#8f6ed5', stroke: '#fff', strokeWidth: 2 }}
+                              />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <div className="h-full w-full flex items-center justify-center">
+                            <p className="text-sm text-slate-500">No hay datos de score disponibles</p>
+                          </div>
+                        )}
                       </div>
-                      
-                      {isEditingScore && (
-                        <div className="mt-3 space-y-3">
-                          <Slider
-                            defaultValue={[scorePercentage]}
-                            max={100}
-                            step={1}
-                            onValueChange={handleScoreChange}
-                            className="py-4"
-                          />
-                          <div className="flex gap-2">
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              className="flex-1 bg-slate-900 border-slate-800 hover:bg-slate-800 text-slate-300"
-                              onClick={() => setIsEditingScore(false)}
-                            >
-                              Cancelar
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white"
-                              onClick={handleScoreSubmit}
-                            >
-                              Guardar
-                            </Button>
-                          </div>
-                        </div>
-                      )}
                     </CardContent>
                     <div className="absolute inset-x-0 bottom-0 h-0.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
                   </Card>
                 </div>
-                
-                {/* Tarjeta de estadísticas y métricas */}
+
+                {/* Gráfico de temperatura histórica */}
                 <div className="relative">
-                  <div className="absolute -inset-2 rounded-xl bg-gradient-to-r from-cyan-500/20 via-sky-500/20 to-blue-500/20 opacity-50 blur-lg"></div>
+                  <div className="absolute -inset-2 rounded-xl bg-gradient-to-r from-blue-500/20 via-sky-500/20 to-cyan-500/20 opacity-50 blur-lg"></div>
                   <Card className="relative overflow-hidden border-0 bg-gradient-to-b from-slate-900 to-slate-950">
-                    <CardContent className="p-5">
-                      <h4 className="text-sm font-semibold text-white flex items-center mb-4">
-                        <BarChart3 className="h-4 w-4 mr-1.5 text-cyan-400" />
-                        Métricas de Actividad
-                      </h4>
-                      
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="rounded-lg bg-slate-900/50 p-3">
-                          <p className="text-xs font-medium text-slate-400">Mensajes totales</p>
-                          <div className="flex items-end justify-between mt-1">
-                            <p className="text-xl font-bold text-white">{messageCount}</p>
-                            <span className="text-xs font-medium text-emerald-500">+12.3%</span>
-                          </div>
-                        </div>
-                        
-                        <div className="rounded-lg bg-slate-900/50 p-3">
-                          <p className="text-xs font-medium text-slate-400">Conversaciones</p>
-                          <div className="flex items-end justify-between mt-1">
-                            <p className="text-xl font-bold text-white">{conversationCount}</p>
-                            <span className="text-xs font-medium text-emerald-500">+8.1%</span>
-                          </div>
-                        </div>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-semibold text-white flex items-center">
+                        <Gauge className="h-4 w-4 mr-1.5 text-sky-400" />
+                        Historial de Temperatura
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="px-0 pt-0 pb-2">
+                      <div className="h-36">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart
+                            data={temperatureHistory}
+                            margin={{ top: 20, right: 10, left: -20, bottom: 0 }}
+                          >
+                            <defs>
+                              <linearGradient id="tempColorHot" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8}/>
+                                <stop offset="95%" stopColor="#ef4444" stopOpacity={0.2}/>
+                              </linearGradient>
+                              <linearGradient id="tempColorWarm" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.8}/>
+                                <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.2}/>
+                              </linearGradient>
+                              <linearGradient id="tempColorCold" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.2}/>
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#333" />
+                            <XAxis 
+                              dataKey="fecha_formateada" 
+                              tick={{ fill: '#94a3b8', fontSize: 10 }} 
+                              axisLine={{ stroke: '#333' }}
+                              tickLine={false}
+                              minTickGap={20}
+                            />
+                            <YAxis 
+                              domain={[0, 100]}
+                              tick={{ fill: '#94a3b8', fontSize: 10 }}
+                              axisLine={false}
+                              tickLine={false}
+                            />
+                            <RechartTooltip 
+                              content={({ active, payload, label }) => {
+                                if (active && payload && payload.length) {
+                                  const temp = getTemperature(payload[0].payload.score_nuevo);
+                                  return (
+                                    <div className="bg-slate-900 p-2 border border-slate-700 rounded shadow-md">
+                                      <p className="text-xs text-slate-300">{`${label}`}</p>
+                                      <p className={`text-xs font-bold ${temp.textColor}`}>
+                                        {`Temperatura: ${temp.label}`}
+                                      </p>
+                                      <p className="text-xs text-slate-300">
+                                        {`Score: ${payload[0].payload.score_nuevo}`}
+                                      </p>
+                                    </div>
+                                  );
+                                }
+                                return null;
+                              }}
+                            />
+                            <Area
+                              type="monotone"
+                              dataKey="score_nuevo"
+                              stroke="#60a5fa"
+                              fill="url(#tempColorCold)"
+                              fillOpacity={1}
+                              activeDot={{ r: 6, fill: '#60a5fa', stroke: '#fff', strokeWidth: 2 }}
+                            />
+                          </AreaChart>
+                        </ResponsiveContainer>
                       </div>
                       
-                      <div className="mt-4 h-24 overflow-hidden rounded-lg bg-slate-900/50 p-3">
-                        <div className="flex justify-between items-end h-full">
-                          {historicInteractions.slice(-10).map((item, i) => {
-                            const heightPercent = (item.value / maxValue) * 100;
-                            return (
-                              <div key={i} className="w-2.5 rounded-sm bg-cyan-500/30 group">
-                                <div 
-                                  className="w-full rounded-sm bg-cyan-500 transition-all duration-300 group-hover:opacity-100 opacity-80"
-                                  style={{ height: `${heightPercent}%` }}
-                                ></div>
-                              </div>
-                            );
-                          })}
+                      {/* Leyenda de temperaturas */}
+                      <div className="flex justify-center gap-4 pt-2 px-3">
+                        <div className="flex items-center gap-1">
+                          <div className="h-2.5 w-2.5 rounded-full bg-rose-500"></div>
+                          <span className="text-xs text-slate-400">Hot</span>
                         </div>
-                      </div>
-                      
-                      <div className="mt-2 flex items-center justify-between text-xs text-slate-400">
-                        <div>{formatShortDate(historicInteractions[0].date)}</div>
-                        <div>Actividad histórica</div>
-                        <div>{formatShortDate(historicInteractions[historicInteractions.length-1].date)}</div>
+                        <div className="flex items-center gap-1">
+                          <div className="h-2.5 w-2.5 rounded-full bg-amber-500"></div>
+                          <span className="text-xs text-slate-400">Warm</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <div className="h-2.5 w-2.5 rounded-full bg-blue-500"></div>
+                          <span className="text-xs text-slate-400">Cold</span>
+                        </div>
                       </div>
                     </CardContent>
-                    <div className="absolute inset-x-0 bottom-0 h-0.5 bg-gradient-to-r from-cyan-500 via-sky-500 to-blue-500"></div>
+                    <div className="absolute inset-x-0 bottom-0 h-0.5 bg-gradient-to-r from-blue-500 via-sky-500 to-cyan-500"></div>
                   </Card>
                 </div>
                 
-                {/* Tarjeta de eventos clave */}
-                <div className="relative">
-                  <div className="absolute -inset-2 rounded-xl bg-gradient-to-r from-emerald-500/20 via-teal-500/20 to-green-500/20 opacity-50 blur-lg"></div>
-                  <Card className="relative overflow-hidden border-0 bg-gradient-to-b from-slate-900 to-slate-950">
-                    <CardContent className="p-5">
-                      <h4 className="text-sm font-semibold text-white flex items-center mb-4">
-                        <Activity className="h-4 w-4 mr-1.5 text-emerald-400" />
-                        Eventos Recientes
-                      </h4>
-                      
-                      <div className="space-y-3">
-                        {/* Evento 1 */}
-                        <div className="flex items-start gap-3">
-                          <div className="flex flex-col items-center">
-                            <div className="bg-slate-900 text-emerald-500 text-xs font-medium rounded px-2 py-1">
-                              {format(new Date(), "MMM", { locale: es })}
-                            </div>
-                            <div className="text-white font-bold text-lg">
-                              {format(new Date(), "dd")}
-                            </div>
-                            <div className="text-xs text-slate-400">
-                              {format(new Date(), "E", { locale: es })}
+                {/* Tarjetas de métricas - Satisfacción y Cualificación */}
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Tarjeta de Satisfacción */}
+                  <div className="relative">
+                    <div className="absolute -inset-2 rounded-xl bg-gradient-to-r from-emerald-500/20 via-teal-500/20 to-green-500/20 opacity-50 blur-lg"></div>
+                    <Card className="relative overflow-hidden border-0 bg-gradient-to-b from-slate-900 to-slate-950">
+                      <CardContent className="p-4">
+                        <div className="flex flex-col">
+                          <div className="flex justify-between items-center">
+                            <h3 className="text-xs font-medium text-slate-400 flex items-center gap-1.5">
+                              <ThumbsUp className="h-3.5 w-3.5 text-emerald-400" />
+                              Satisfacción
+                            </h3>
+                            <span className={`text-lg font-bold ${satisfactionLevel >= 70 ? 'text-emerald-500' : satisfactionLevel >= 40 ? 'text-amber-500' : 'text-rose-500'}`}>
+                              {satisfactionLevel}%
+                            </span>
+                          </div>
+                          
+                          <div className="mt-3 w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
+                            <div 
+                              className={`h-full rounded-full ${
+                                satisfactionLevel >= 70 ? 'bg-emerald-500' : 
+                                satisfactionLevel >= 40 ? 'bg-amber-500' : 
+                                'bg-rose-500'
+                              }`}
+                              style={{ width: `${satisfactionLevel}%` }}
+                            >
+                              <div className="h-full w-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/25 to-transparent"></div>
                             </div>
                           </div>
                           
-                          <div className="flex-1 bg-slate-900/50 rounded-lg p-3">
-                            <div className="flex justify-between items-start mb-1">
-                              <div className="font-medium text-sm text-white">Primera interacción</div>
-                              <Badge variant="outline" className="text-[10px] bg-slate-800 border-slate-700 text-slate-300">
-                                {format(new Date(), "HH:mm")}
+                          <div className="mt-3 flex justify-center items-center">
+                            {satisfactionLevel >= 70 ? (
+                              <Badge className="gap-1 bg-emerald-500/20 text-emerald-400 border-emerald-500/30">
+                                <CheckCircle2 className="h-3 w-3" />
+                                Excelente
                               </Badge>
-                            </div>
-                            <p className="text-xs text-slate-400">El lead inició conversación a través del canal de WhatsApp</p>
+                            ) : satisfactionLevel >= 40 ? (
+                              <Badge className="gap-1 bg-amber-500/20 text-amber-400 border-amber-500/30">
+                                <AlertCircle className="h-3 w-3" />
+                                Promedio
+                              </Badge>
+                            ) : (
+                              <Badge className="gap-1 bg-rose-500/20 text-rose-400 border-rose-500/30">
+                                <ThumbsDown className="h-3 w-3" />
+                                Bajo
+                              </Badge>
+                            )}
                           </div>
                         </div>
-                        
-                        {/* Evento 2 */}
-                        <div className="flex items-start gap-3">
-                          <div className="flex flex-col items-center">
-                            <div className="bg-slate-900 text-emerald-500 text-xs font-medium rounded px-2 py-1">
-                              {format(subDays(new Date(), 1), "MMM", { locale: es })}
-                            </div>
-                            <div className="text-white font-bold text-lg">
-                              {format(subDays(new Date(), 1), "dd")}
-                            </div>
-                            <div className="text-xs text-slate-400">
-                              {format(subDays(new Date(), 1), "E", { locale: es })}
-                            </div>
+                      </CardContent>
+                      <div className="absolute inset-x-0 bottom-0 h-0.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-green-500"></div>
+                    </Card>
+                  </div>
+
+                  {/* Tarjeta de Cualificación */}
+                  <div className="relative">
+                    <div className="absolute -inset-2 rounded-xl bg-gradient-to-r from-violet-500/20 via-purple-500/20 to-fuchsia-500/20 opacity-50 blur-lg"></div>
+                    <Card className="relative overflow-hidden border-0 bg-gradient-to-b from-slate-900 to-slate-950">
+                      <CardContent className="p-4">
+                        <div className="flex flex-col">
+                          <div className="flex justify-between items-center">
+                            <h3 className="text-xs font-medium text-slate-400 flex items-center gap-1.5">
+                              <BarChart2 className="h-3.5 w-3.5 text-violet-400" />
+                              Cualificación
+                            </h3>
+                            <span className={`text-lg font-bold ${qualificationLevel >= 70 ? 'text-violet-500' : qualificationLevel >= 40 ? 'text-amber-500' : 'text-rose-500'}`}>
+                              {qualificationLevel}%
+                            </span>
                           </div>
                           
-                          <div className="flex-1 bg-slate-900/50 rounded-lg p-3">
-                            <div className="flex justify-between items-start mb-1">
-                              <div className="font-medium text-sm text-white">Actualización de score</div>
-                              <Badge variant="outline" className="text-[10px] bg-slate-800 border-slate-700 text-slate-300">
-                                {format(subDays(new Date(), 1), "HH:mm")}
-                              </Badge>
-                            </div>
-                            <div className="text-xs text-slate-400 flex items-center gap-2">
-                              <span>50</span>
-                              <ArrowUpRight className="h-3 w-3 text-emerald-500" />
-                              <span className="text-emerald-500">75</span>
-                            </div>
+                          {/* Gráfico de barras mini */}
+                          <div className="mt-2 flex items-end justify-center gap-0.5 h-10">
+                            {[0.4, 0.6, 0.5, 0.7, 0.8, qualificationLevel/100].map((value, idx) => (
+                              <div 
+                                key={idx} 
+                                className={`w-3 rounded-t-sm ${
+                                  idx === 5 
+                                    ? (qualificationLevel >= 70 ? 'bg-violet-500' : qualificationLevel >= 40 ? 'bg-amber-500' : 'bg-rose-500')
+                                    : 'bg-slate-700'
+                                }`}
+                                style={{ height: `${value * 100}%` }}
+                              ></div>
+                            ))}
+                          </div>
+                          
+                          <div className="mt-3 flex justify-center items-center">
+                            <Badge className="gap-1 bg-violet-500/20 text-violet-400 border-violet-500/30">
+                              {qualificationLevel >= 70 ? 'Altamente cualificado' : 
+                               qualificationLevel >= 50 ? 'Cualificado' : 
+                               'Requiere cualificación'}
+                            </Badge>
                           </div>
                         </div>
-                      </div>
-                    </CardContent>
-                    <div className="absolute inset-x-0 bottom-0 h-0.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-green-500"></div>
-                  </Card>
+                      </CardContent>
+                      <div className="absolute inset-x-0 bottom-0 h-0.5 bg-gradient-to-r from-violet-500 via-purple-500 to-fuchsia-500"></div>
+                    </Card>
+                  </div>
+                </div>
+                
+                {/* Otras métricas */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="rounded-xl bg-slate-900/60 border border-slate-800 p-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-slate-400">Conversaciones</span>
+                      <Badge variant="outline" className="border-slate-700 bg-slate-800 text-slate-200">
+                        {conversationCount}
+                      </Badge>
+                    </div>
+                    <div className="mt-2 flex justify-between items-center">
+                      <span className="text-xs text-slate-400">Mensajes</span>
+                      <Badge variant="outline" className="border-slate-700 bg-slate-800 text-slate-200">
+                        {messageCount}
+                      </Badge>
+                    </div>
+                    <div className="mt-2 flex justify-between items-center">
+                      <span className="text-xs text-slate-400">Días en etapa</span>
+                      <Badge variant="outline" className="border-slate-700 bg-slate-800 text-slate-200">
+                        {selectedLead.dias_en_etapa_actual || 0}
+                      </Badge>
+                    </div>
+                  </div>
+                  
+                  <div className="rounded-xl bg-slate-900/60 border border-slate-800 p-3">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xs text-slate-400">Etapa</span>
+                      <Badge
+                        style={{ 
+                          backgroundColor: selectedLead.stage_color || "#6366f1",
+                          color: "white"
+                        }}
+                      >
+                        {selectedLead.stage_name || "Sin etapa"}
+                      </Badge>
+                    </div>
+                    <div className="mt-2 flex justify-between items-center">
+                      <span className="text-xs text-slate-400">Probabilidad</span>
+                      <Badge variant="outline" className="border-slate-700 bg-slate-800 text-slate-200">
+                        {selectedLead.probabilidad_cierre || 0}%
+                      </Badge>
+                    </div>
+                    <div className="mt-2 flex justify-between items-center">
+                      <span className="text-xs text-slate-400">Canal</span>
+                      <Badge variant="outline" className="border-slate-700 bg-slate-800 text-slate-200 truncate max-w-[120px]">
+                        {selectedLead.canal_origen || "Desconocido"}
+                      </Badge>
+                    </div>
+                  </div>
                 </div>
               </div>
             </TabsContent>
