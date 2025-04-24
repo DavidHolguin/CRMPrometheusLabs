@@ -192,7 +192,7 @@ const LeadsList = ({
     });
 
   return (
-    <div className="w-80 border-r flex flex-col h-full">
+    <div className="w-100 border-r flex flex-col h-full">
       <div className="p-4 border-b bg-card/50 space-y-3">
         <div className="flex gap-2">
           <div className="relative flex-1">
@@ -268,9 +268,7 @@ const LeadsList = ({
           </DropdownMenu>
         </div>
         
-        <div className="text-xs text-muted-foreground">
-          Ordenando por: {getSortOrderLabel()}
-        </div>
+       
       </div>
 
       <ScrollArea className="flex-1">

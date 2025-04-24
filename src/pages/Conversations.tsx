@@ -329,6 +329,11 @@ const ConversationsPage = () => {
       
       toast.success(toggleStatus ? 'Chatbot activado' : 'Chatbot desactivado');
       
+      // Actualizar el estado local inmediatamente
+      if (selectedConversation) {
+        selectedConversation.chatbot_activo = toggleStatus;
+      }
+      
       // Esperar un momento y luego actualizar los datos
       setTimeout(() => {
         refetchLeadsDetalle();
