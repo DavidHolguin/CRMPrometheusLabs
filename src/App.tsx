@@ -25,6 +25,7 @@ import Canales from "./pages/Canales";
 import EntrenamientoIA from "./pages/EntrenamientoIA";
 import PerfilEmpresa from "./pages/PerfilEmpresa";
 import ChatbotConfig from "./pages/ChatbotConfig";
+import ImageOptimization from "./pages/ImageOptimization";
 
 // Admin pages
 import AdminAgentes from "./pages/admin/AdminAgentes";
@@ -95,6 +96,7 @@ const App = () => {
           <Route path="entrenamiento-ia" element={<EntrenamientoIA />} />
           <Route path="perfil-empresa" element={<PerfilEmpresa />} />
           <Route path="settings" element={<Dashboard />} />
+          <Route path="image-optimization" element={<ImageOptimization />} />
 
           {/* Marketing routes */}
           <Route path="marketing">
