@@ -1,9 +1,8 @@
-// filepath: c:\Users\Juliana\Videos\laboratorio prometeo\crmPrometeoFront\src\components\conversations\LeadCardModern.tsx
 import React from "react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { CanalIcon } from "@/components/canales/CanalIcon";
-import { MessageSquare, User } from "lucide-react";
+import { MessageSquare, User, Flame } from "lucide-react";
 
 interface LeadCardModernProps {
   lead: {
@@ -138,7 +137,7 @@ export const LeadCardModern = ({
         {isHot && (
           <>
             <div
-              className="absolute -left-16 -top-16 h-32 w-32 rounded-full bg-gradient-to-br from-red-500/20 to-orange-400/10 blur-2xl transition-all duration-500 group-hover:scale-150 group-hover:opacity-70"
+              className="absolute -left-16 -top-16 h-32 w-32 rounded-full bg-gradient-to-br from-emerald-500/20 to-emerald-400/10 blur-2xl transition-all duration-500 group-hover:scale-150 group-hover:opacity-70"
             ></div>
             <div
               className="absolute -right-16 -bottom-16 h-32 w-32 rounded-full bg-gradient-to-br from-teal-500/20 to-emerald-500/0 blur-2xl transition-all duration-500 group-hover:scale-150 group-hover:opacity-70"
@@ -147,108 +146,81 @@ export const LeadCardModern = ({
         )}
 
         <div className="relative p-4 cursor-pointer" onClick={onClick}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="relative">
-                <div
-                  className={cn(
-                    "absolute -inset-1 rounded-xl bg-gradient-to-r opacity-30 blur-sm transition-opacity duration-300 group-hover:opacity-40",
-                    isHot ? "from-red-500 to-orange-500" :
-                    lead.temperatura_actual === 'Warm' ? "from-amber-500 to-yellow-500" :
-                    lead.temperatura_actual === 'Cold' ? "from-blue-500 to-cyan-500" :
-                    "from-emerald-500 to-teal-500"
-                  )}
-                ></div>
-                <div className="relative flex h-12 w-12 items-center justify-center rounded-xl bg-slate-900">
+          <div className="flex items-start gap-4">
+            {/* Avatar del lead */}
+            <div className="relative">
+              <div
+                className={cn(
+                  "absolute -inset-1 rounded-xl bg-gradient-to-r opacity-30 blur-sm transition-opacity duration-300 group-hover:opacity-40",
+                  isHot ? "from-emerald-500 to-teal-500" :
+                  lead.temperatura_actual === 'Warm' ? "from-amber-500 to-yellow-500" :
+                  lead.temperatura_actual === 'Cold' ? "from-blue-500 to-cyan-500" :
+                  "from-emerald-500 to-teal-500"
+                )}
+              ></div>
+              <div className="relative flex h-12 w-12 items-center justify-center rounded-xl bg-slate-900">
+                {isHot ? (
+                  <Flame className="text-emerald-500" size={20} />
+                ) : (
                   <span className={cn(
                     "text-lg font-medium",
-                    isHot ? "text-red-500" :
+                    lead.lead_score && lead.lead_score >= 70 ? "text-emerald-500" :
                     lead.temperatura_actual === 'Warm' ? "text-amber-500" :
                     lead.temperatura_actual === 'Cold' ? "text-blue-500" :
                     "text-emerald-500"
                   )}>
                     {getInitials(leadName)}
                   </span>
-                  
-                  {/* Icono del canal en posición absoluta en la esquina inferior derecha - SIEMPRE VISIBLE */}
-                  <div 
-                    className="absolute -bottom-1.5 -right-1.5 rounded-full border-2 border-slate-950 flex items-center justify-center"
-                    style={{ 
-                      backgroundColor: lead.canal_color || '#6b7280',
-                      width: '20px',
-                      height: '20px',
-                      overflow: 'hidden'
-                    }}
+                )}
+              </div>
+            </div>
+
+            {/* Información principal del lead */}
+            <div className="flex-grow">
+              <h3 className="font-semibold text-white">{leadName}</h3>
+              
+              <div className="flex flex-wrap gap-2 mt-1.5">
+                {/* Canal Badge */}
+                <div 
+                  className="flex items-center rounded-md px-1.5 py-0.5 border"
+                  style={{ 
+                    backgroundColor: 'rgba(30, 41, 59, 0.8)',
+                    borderColor: lead.canal_color || '#6b7280'
+                  }}
+                >
+                  <span 
+                    className="text-xs font-medium"
+                    style={{ color: lead.canal_color || '#94a3b8' }}
                   >
-                    {lead.canal_logo ? (
+                    {lead.canal_nombre || 'Web'}
+                  </span>
+                </div>
+                
+                {/* Avatar del agente asignado con nombre - Separado en dos elementos */}
+                <div className="flex items-center gap-2 rounded-md px-1.5 py-0.5 bg-slate-800/50 border border-slate-700/50 h-[22px]">
+                  <div className="h-4 w-4 rounded-full overflow-hidden bg-slate-700 flex items-center justify-center flex-shrink-0">
+                    {lead.avatar_asignado ? (
                       <img 
-                        src={lead.canal_logo} 
-                        alt={lead.canal_nombre || 'Canal'} 
-                        className="h-full w-full object-contain"
+                        src={lead.avatar_asignado} 
+                        alt={lead.nombre_asignado || 'Agente'} 
+                        className="h-full w-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).onerror = null;
+                          (e.target as HTMLImageElement).src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>';
+                        }}
                       />
                     ) : (
-                      <CanalIcon 
-                        tipo={lead.canal_id ? getCanalType() : "default"} 
-                        size={12} 
-                        color="#ffffff" 
-                      />
+                      <User className="h-2.5 w-2.5 text-slate-400" />
                     )}
                   </div>
-                </div>
-              </div>
-
-              <div className="flex-grow">
-                <h3 className="font-semibold text-white">{leadName}</h3>
-                
-                <div className="flex flex-wrap gap-1.5 mt-1.5">
-                  {/* Score - Siempre visible */}
-                  <div className={`flex items-center rounded-md px-1.5 py-0.5 ${scoreColors.bg}`}>
-                    <span className={`text-xs font-medium ${scoreColors.text}`}>
-                      Score: {lead.lead_score || 0}%
-                    </span>
-                  </div>
-                  
-                  {/* Canal Badge - Siempre visible */}
-                  <div 
-                    className="flex items-center rounded-md px-1.5 py-0.5 border"
-                    style={{ 
-                      backgroundColor: 'rgba(30, 41, 59, 0.8)',
-                      borderColor: lead.canal_color || '#6b7280'
-                    }}
-                  >
-                    <span 
-                      className="text-xs font-medium"
-                      style={{ color: lead.canal_color || '#94a3b8' }}
-                    >
-                      {lead.canal_nombre || 'Web'}
-                    </span>
-                  </div>
-                  
-                  {/* Avatar del agente asignado con nombre - Siempre visible */}
-                  <div className="flex items-center gap-1 rounded-md px-1.5 py-0.5 bg-slate-800/50 border border-slate-700/50 h-[22px]">
-                    <div className="h-4 w-4 rounded-full overflow-hidden bg-slate-700 flex items-center justify-center flex-shrink-0">
-                      {lead.avatar_asignado ? (
-                        <img 
-                          src={lead.avatar_asignado} 
-                          alt={lead.nombre_asignado || 'Agente'} 
-                          className="h-full w-full object-cover"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).onerror = null;
-                            (e.target as HTMLImageElement).src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>';
-                          }}
-                        />
-                      ) : (
-                        <User className="h-2.5 w-2.5 text-slate-400" />
-                      )}
-                    </div>
-                    <span className="text-xs text-slate-300 truncate max-w-[60px]">
-                      {lead.nombre_asignado ? lead.nombre_asignado.split(' ')[0] : 'Sin asignar'}
-                    </span>
-                  </div>
+                  <span className="text-xs text-slate-300 truncate max-w-[60px]">
+                    {lead.nombre_asignado ? lead.nombre_asignado.split(' ')[0] : 'Sin asignar'}
+                  </span>
                 </div>
               </div>
             </div>
 
+            {/* Sección de fecha y score alineados a la derecha */}
             <div className="flex flex-col items-end gap-1">
               {/* Fecha con resaltado si hay mensajes sin leer */}
               <span className={cn(
@@ -257,6 +229,13 @@ export const LeadCardModern = ({
               )}>
                 {formatDate(lead.ultima_actualizacion)}
               </span>
+              
+              {/* Score - Ahora debajo de la fecha */}
+              <div className={`flex items-center rounded-md px-1.5 py-0.5 ${scoreColors.bg}`}>
+                <span className={`text-xs font-medium ${scoreColors.text}`}>
+                  {lead.lead_score || 0}%
+                </span>
+              </div>
               
               {/* Badge de mensajes sin leer */}
               {hasUnread && (
@@ -269,13 +248,6 @@ export const LeadCardModern = ({
               )}
             </div>
           </div>
-
-          {/* Último mensaje recibido */}
-          {lead.ultimo_mensaje_contenido && (
-            <div className="mt-2 line-clamp-1 text-xs text-slate-400">
-              <span className="font-medium text-slate-300">Último mensaje:</span> {lead.ultimo_mensaje_contenido}
-            </div>
-          )}
 
           {/* Tags del lead */}
           {lead.lead?.tags && lead.lead.tags.length > 0 && (
