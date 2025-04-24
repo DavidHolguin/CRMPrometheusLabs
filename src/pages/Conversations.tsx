@@ -24,15 +24,19 @@ import ChatInput from "@/components/conversations/ChatInput";
 import TransferDialog from "@/components/conversations/TransferDialog";
 import LeadDetailSidebar from "@/components/conversations/LeadDetailSidebar";
 
-interface Mensaje {
+// Definir el tipo Message localmente
+interface Message {
   id: string;
   conversacion_id: string;
   origen: string;
-  remitente_id?: string;
   contenido: string;
-  tipo_contenido?: string;
-  metadata?: any;
   created_at: string;
+  metadata?: any;
+}
+
+interface Mensaje extends Message {
+  remitente_id?: string;
+  tipo_contenido?: string;
   leido?: boolean;
   intencion_id?: string;
   interaction_type_id?: string;
@@ -91,9 +95,9 @@ const ConversationsPage = () => {
   });
 
   const { 
-    data: messages = [], 
+    messages = [], 
     isLoading: messagesLoading,
-    markAsRead,
+    // markAsRead, // Removed as it does not exist in the returned object
     sendMessage,
   } = useMessages(conversationId);
 
@@ -233,7 +237,7 @@ const ConversationsPage = () => {
 
   const processedMessages = useMemo(() => {
     return messages.map(msg => {
-      const audioMessage = msg.audio || 
+      const audioMessage = (msg as any).audio || 
         (msg.metadata && msg.metadata.audio_url ? {
           archivo_url: msg.metadata.audio_url,
           duracion_segundos: msg.metadata.duracion_segundos || 0,
@@ -565,30 +569,7 @@ const ConversationsPage = () => {
   };
 
   // Efecto para marcar mensajes como leídos cuando se abre una conversación
-  useEffect(() => {
-    if (conversationId) {
-      // Agregamos un breve retraso para asegurar que la UI se haya actualizado antes de marcar como leídos
-      const timer = setTimeout(() => {
-        markAsRead(conversationId);
-      }, 300);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [conversationId, markAsRead]);
-
-  // Efecto para marcar mensajes como leídos cuando llegan nuevos mensajes
-  useEffect(() => {
-    if (conversationId && messages.length > 0) {
-      // Verificar si hay mensajes sin leer del lead
-      const hasUnreadMessages = messages.some(msg => 
-        (msg.origen === 'lead' || msg.origen === 'user') && msg.leido === false
-      );
-      
-      if (hasUnreadMessages) {
-        markAsRead(conversationId);
-      }
-    }
-  }, [conversationId, messages, markAsRead]);
+  // Removed effects related to markAsRead as it does not exist in the returned object
 
   // Efecto para cargar comentarios cuando cambia el lead seleccionado
   useEffect(() => {

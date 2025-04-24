@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, forwardRef, ButtonHTMLAttributes } from 'react';
 import { Lead } from '@/hooks/useLeads';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -126,6 +126,26 @@ const calendarFormSchema = z.object({
   time: z.string().min(1, "La hora es requerida"),
   notes: z.string().optional(),
 });
+
+// Definir la interfaz de props para ActionButton
+interface ActionButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  className?: string;
+}
+
+// Componente de botón personalizado con forwardRef para resolver el problema de refs
+const ActionButton = forwardRef<HTMLButtonElement, ActionButtonProps>(({ children, className, ...props }, ref) => (
+  <Button
+    ref={ref}
+    variant="outline" 
+    size="sm"
+    className={`flex-1 h-9 gap-1 bg-slate-900 hover:bg-slate-800 border-slate-800 ${className || ''}`}
+    {...props}
+  >
+    {children}
+  </Button>
+));
+
+ActionButton.displayName = 'ActionButton';
 
 const LeadDetailSidebar: React.FC<LeadDetailSidebarProps> = ({
   selectedLead,
@@ -346,296 +366,6 @@ const LeadDetailSidebar: React.FC<LeadDetailSidebarProps> = ({
             >
               {temperature.label} • {scorePercentage}
             </Badge>
-          </div>
-          
-          {/* Botones de acción */}
-          <div className="mt-3 flex justify-between gap-1">
-            <TooltipProvider>
-              {/* Botón de llamada */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className="flex-1 h-9 gap-1 bg-slate-900 hover:bg-slate-800 border-slate-800"
-                    asChild
-                  >
-                    <a 
-                      href={`tel:${selectedLead.telefono?.replace(/\D/g, '') || ''}`}
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                    >
-                      <Phone className="h-4 w-4 text-emerald-400" />
-                      <span className="text-xs">Llamar</span>
-                    </a>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Llamar a {selectedLead.telefono || "contacto"}</p>
-                </TooltipContent>
-              </Tooltip>
-              
-              {/* Botón de mensaje */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Popover open={textMessageOpen} onOpenChange={setTextMessageOpen}>
-                    <PopoverTrigger asChild>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        className="flex-1 h-9 gap-1 bg-slate-900 hover:bg-slate-800 border-slate-800"
-                      >
-                        <MessageSquare className="h-4 w-4 text-sky-400" />
-                        <span className="text-xs">Mensaje</span>
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-80 p-0" align="center">
-                      <div className="bg-slate-900 p-4 rounded-t-md border-b border-slate-800">
-                        <h3 className="text-sm font-medium text-white">Enviar mensaje</h3>
-                        <p className="text-xs text-slate-400">A: {selectedLead.telefono || "Sin teléfono"}</p>
-                      </div>
-                      <div className="p-4 bg-slate-950">
-                        <Form {...messageForm}>
-                          <form onSubmit={messageForm.handleSubmit(handleMessageSubmit)} className="space-y-3">
-                            <FormField
-                              control={messageForm.control}
-                              name="message"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormControl>
-                                    <Textarea 
-                                      placeholder="Escribe tu mensaje..." 
-                                      className="resize-none bg-slate-900 border-slate-800 text-white"
-                                      {...field} 
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <div className="flex justify-end">
-                              <Button 
-                                type="submit" 
-                                size="sm" 
-                                className="bg-sky-600 hover:bg-sky-500 text-white flex gap-1 items-center"
-                              >
-                                <Send className="h-3.5 w-3.5" />
-                                Enviar
-                              </Button>
-                            </div>
-                          </form>
-                        </Form>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Enviar mensaje SMS</p>
-                </TooltipContent>
-              </Tooltip>
-              
-              {/* Botón de correo */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Dialog open={emailDialogOpen} onOpenChange={setEmailDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        className="flex-1 h-9 gap-1 bg-slate-900 hover:bg-slate-800 border-slate-800"
-                      >
-                        <Mail className="h-4 w-4 text-indigo-400" />
-                        <span className="text-xs">Email</span>
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="bg-slate-950 border-slate-800 text-white">
-                      <DialogHeader>
-                        <DialogTitle>Enviar correo electrónico</DialogTitle>
-                        <DialogDescription className="text-slate-400">
-                          Para: {selectedLead.email || "Sin correo electrónico"}
-                        </DialogDescription>
-                      </DialogHeader>
-                      <Form {...emailForm}>
-                        <form onSubmit={emailForm.handleSubmit(handleEmailSubmit)} className="space-y-4">
-                          <FormField
-                            control={emailForm.control}
-                            name="subject"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-white">Asunto</FormLabel>
-                                <FormControl>
-                                  <Input 
-                                    placeholder="Asunto del correo..." 
-                                    className="bg-slate-900 border-slate-800 text-white"
-                                    {...field} 
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={emailForm.control}
-                            name="body"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-white">Mensaje</FormLabel>
-                                <FormControl>
-                                  <Textarea 
-                                    placeholder="Cuerpo del correo..." 
-                                    className="resize-none bg-slate-900 border-slate-800 text-white h-32"
-                                    {...field} 
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <DialogFooter>
-                            <Button 
-                              type="button" 
-                              variant="outline"
-                              className="bg-slate-900 border-slate-800 text-white"
-                              onClick={() => setEmailDialogOpen(false)}
-                            >
-                              Cancelar
-                            </Button>
-                            <Button 
-                              type="submit" 
-                              className="bg-indigo-600 hover:bg-indigo-500 text-white"
-                            >
-                              Enviar correo
-                            </Button>
-                          </DialogFooter>
-                        </form>
-                      </Form>
-                    </DialogContent>
-                  </Dialog>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Enviar correo electrónico</p>
-                </TooltipContent>
-              </Tooltip>
-              
-              {/* Botón de calendario */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Dialog open={calendarDialogOpen} onOpenChange={setCalendarDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        className="flex-1 h-9 gap-1 bg-slate-900 hover:bg-slate-800 border-slate-800"
-                      >
-                        <CalendarIcon className="h-4 w-4 text-violet-400" />
-                        <span className="text-xs">Agendar</span>
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="bg-slate-950 border-slate-800 text-white">
-                      <DialogHeader>
-                        <DialogTitle>Agendar evento</DialogTitle>
-                        <DialogDescription className="text-slate-400">
-                          Crear evento con {selectedLead.nombre} {selectedLead.apellido}
-                        </DialogDescription>
-                      </DialogHeader>
-                      <Form {...calendarForm}>
-                        <form onSubmit={calendarForm.handleSubmit(handleCalendarSubmit)} className="space-y-4">
-                          <FormField
-                            control={calendarForm.control}
-                            name="title"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-white">Título</FormLabel>
-                                <FormControl>
-                                  <Input 
-                                    placeholder="Título del evento..." 
-                                    className="bg-slate-900 border-slate-800 text-white"
-                                    {...field} 
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <div className="grid grid-cols-2 gap-4">
-                            <FormField
-                              control={calendarForm.control}
-                              name="date"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-white">Fecha</FormLabel>
-                                  <FormControl>
-                                    <Input 
-                                      type="date" 
-                                      className="bg-slate-900 border-slate-800 text-white"
-                                      {...field} 
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={calendarForm.control}
-                              name="time"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-white">Hora</FormLabel>
-                                  <FormControl>
-                                    <Input 
-                                      type="time" 
-                                      className="bg-slate-900 border-slate-800 text-white"
-                                      {...field} 
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </div>
-                          <FormField
-                            control={calendarForm.control}
-                            name="notes"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-white">Notas</FormLabel>
-                                <FormControl>
-                                  <Textarea 
-                                    placeholder="Notas adicionales..." 
-                                    className="resize-none bg-slate-900 border-slate-800 text-white h-20"
-                                    {...field} 
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <DialogFooter>
-                            <Button 
-                              type="button" 
-                              variant="outline"
-                              className="bg-slate-900 border-slate-800 text-white"
-                              onClick={() => setCalendarDialogOpen(false)}
-                            >
-                              Cancelar
-                            </Button>
-                            <Button 
-                              type="submit" 
-                              className="bg-violet-600 hover:bg-violet-500 text-white"
-                            >
-                              Guardar evento
-                            </Button>
-                          </DialogFooter>
-                        </form>
-                      </Form>
-                    </DialogContent>
-                  </Dialog>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Agendar evento</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
           </div>
         </div>
 
@@ -1173,7 +903,7 @@ const LeadDetailSidebar: React.FC<LeadDetailSidebarProps> = ({
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <Avatar className="h-6 w-6">
-                                <AvatarFallback className="text-xs bg-slate-800 text-slate-300">
+                                <AvatarFallback className="bg-slate-800 text-slate-300">
                                   {comment.user?.full_name?.[0] || "U"}
                                 </AvatarFallback>
                               </Avatar>

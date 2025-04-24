@@ -3,7 +3,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { Analytics } from '@vercel/analytics/react';
+// Importar correctamente la versión de Analytics para entornos sin Next.js
+import { inject } from '@vercel/analytics';
 
 // Pages
 import Login from "./pages/auth/Login";
@@ -53,6 +54,8 @@ const App = () => {
   // Fix for hydration issues
   useEffect(() => {
     setMounted(true);
+    // Inicializar Vercel Analytics
+    inject();
   }, []);
 
   if (!mounted) {
@@ -124,7 +127,6 @@ const App = () => {
       </Routes>
       <Toaster />
       <Sonner />
-      <Analytics />
     </TooltipProvider>
   );
 };
