@@ -3,7 +3,7 @@ import React from "react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { CanalIcon } from "@/components/canales/CanalIcon";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, User } from "lucide-react";
 
 interface LeadCardModernProps {
   lead: {
@@ -14,8 +14,16 @@ interface LeadCardModernProps {
     ultima_actualizacion: string;
     total_mensajes_sin_leer: number;
     ultimo_mensaje?: string;
+    ultimo_mensaje_contenido?: string;
     temperatura_actual?: string; // Cambiado de temperatura a temperatura_actual para usar el campo de vista_leads_completa
     canal_origen?: string; // ID del canal de origen
+    canal_nombre?: string;
+    canal_logo?: string;
+    canal_color?: string;
+    asignado_a?: string;
+    nombre_asignado?: string;
+    avatar_asignado?: string;
+    canal_id?: string; // Added canal_id to fix the error
     conversations: Array<{
       id: string;
       canal_id: string;
@@ -106,9 +114,15 @@ export const LeadCardModern = ({
     }
   };
 
-  const canalOrigen = lead.canal_origen ? getChannelInfo(lead.canal_origen) : 
-                      latestConversation?.canal_id ? getChannelInfo(latestConversation.canal_id) : 
-                      getChannelInfo(null);
+  // Obtener tipo de canal para el ícono si no se provee directamente en la API
+  const getCanalType = () => {
+    if (lead.canal_id) {
+      const canal = canales.find(c => c.id === lead.canal_id);
+      return canal ? canal.tipo.toLowerCase() : "default";
+    }
+    return "default";
+  };
+  
   const scoreColors = getScoreColor();
   
   return (
@@ -155,27 +169,81 @@ export const LeadCardModern = ({
                   )}>
                     {getInitials(leadName)}
                   </span>
+                  
+                  {/* Icono del canal en posición absoluta en la esquina inferior derecha - SIEMPRE VISIBLE */}
+                  <div 
+                    className="absolute -bottom-1.5 -right-1.5 rounded-full border-2 border-slate-950 flex items-center justify-center"
+                    style={{ 
+                      backgroundColor: lead.canal_color || '#6b7280',
+                      width: '20px',
+                      height: '20px',
+                      overflow: 'hidden'
+                    }}
+                  >
+                    {lead.canal_logo ? (
+                      <img 
+                        src={lead.canal_logo} 
+                        alt={lead.canal_nombre || 'Canal'} 
+                        className="h-full w-full object-contain"
+                      />
+                    ) : (
+                      <CanalIcon 
+                        tipo={lead.canal_id ? getCanalType() : "default"} 
+                        size={12} 
+                        color="#ffffff" 
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
 
-              <div>
+              <div className="flex-grow">
                 <h3 className="font-semibold text-white">{leadName}</h3>
-                <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                  {/* Score - Ahora muestra texto "Score: X%" sin icono */}
+                
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  {/* Score - Siempre visible */}
                   <div className={`flex items-center rounded-md px-1.5 py-0.5 ${scoreColors.bg}`}>
                     <span className={`text-xs font-medium ${scoreColors.text}`}>
                       Score: {lead.lead_score || 0}%
                     </span>
                   </div>
                   
-                  {/* Canal Badge con logo más prominente */}
-                  <div className="flex items-center rounded-md px-1.5 py-0.5 bg-slate-800/80">
-                    <CanalIcon 
-                      tipo={canalOrigen.type} 
-                      size={14} 
-                      className="text-slate-300" 
-                    />
-                    <span className="text-xs text-slate-300 ml-1">{canalOrigen.name}</span>
+                  {/* Canal Badge - Siempre visible */}
+                  <div 
+                    className="flex items-center rounded-md px-1.5 py-0.5 border"
+                    style={{ 
+                      backgroundColor: 'rgba(30, 41, 59, 0.8)',
+                      borderColor: lead.canal_color || '#6b7280'
+                    }}
+                  >
+                    <span 
+                      className="text-xs font-medium"
+                      style={{ color: lead.canal_color || '#94a3b8' }}
+                    >
+                      {lead.canal_nombre || 'Web'}
+                    </span>
+                  </div>
+                  
+                  {/* Avatar del agente asignado con nombre - Siempre visible */}
+                  <div className="flex items-center gap-1 rounded-md px-1.5 py-0.5 bg-slate-800/50 border border-slate-700/50 h-[22px]">
+                    <div className="h-4 w-4 rounded-full overflow-hidden bg-slate-700 flex items-center justify-center flex-shrink-0">
+                      {lead.avatar_asignado ? (
+                        <img 
+                          src={lead.avatar_asignado} 
+                          alt={lead.nombre_asignado || 'Agente'} 
+                          className="h-full w-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).onerror = null;
+                            (e.target as HTMLImageElement).src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>';
+                          }}
+                        />
+                      ) : (
+                        <User className="h-2.5 w-2.5 text-slate-400" />
+                      )}
+                    </div>
+                    <span className="text-xs text-slate-300 truncate max-w-[60px]">
+                      {lead.nombre_asignado ? lead.nombre_asignado.split(' ')[0] : 'Sin asignar'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -190,20 +258,6 @@ export const LeadCardModern = ({
                 {formatDate(lead.ultima_actualizacion)}
               </span>
               
-              {/* Total de mensajes - resaltado si hay sin leer */}
-              <div className="flex items-center">
-                <MessageSquare className={cn(
-                  "h-3 w-3 mr-1",
-                  hasUnread ? "text-emerald-400" : "text-slate-400"
-                )} />
-                <span className={cn(
-                  "text-xs",
-                  hasUnread ? "text-emerald-400 font-medium" : "text-slate-400"
-                )}>
-                  {totalMessages}
-                </span>
-              </div>
-              
               {/* Badge de mensajes sin leer */}
               {hasUnread && (
                 <span
@@ -215,6 +269,13 @@ export const LeadCardModern = ({
               )}
             </div>
           </div>
+
+          {/* Último mensaje recibido */}
+          {lead.ultimo_mensaje_contenido && (
+            <div className="mt-2 line-clamp-1 text-xs text-slate-400">
+              <span className="font-medium text-slate-300">Último mensaje:</span> {lead.ultimo_mensaje_contenido}
+            </div>
+          )}
 
           {/* Tags del lead */}
           {lead.lead?.tags && lead.lead.tags.length > 0 && (
@@ -253,5 +314,3 @@ export const LeadCardModern = ({
     </div>
   );
 };
-
-export default LeadCardModern;

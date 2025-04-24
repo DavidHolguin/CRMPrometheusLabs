@@ -28,6 +28,7 @@ interface LeadsListProps {
   onFilterChange?: (filters: {
     sortOrder: SortOrder;
   }) => void;
+  onSearch?: (query: string) => void;
 }
 
 type SortOrder = 'date_desc' | 'date_asc' | 'score_desc' | 'score_asc' | 'messages_desc' | 'messages_asc' | 'unread_desc';
@@ -40,12 +41,15 @@ const LeadsList = ({
   canales,
   user,
   initialFilters,
-  onFilterChange
+  onFilterChange,
+  onSearch
 }: LeadsListProps) => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOrder, setSortOrder] = useState<SortOrder>(initialFilters?.sortOrder || 'date_desc');
-  const [fullLeadData, setFullLeadData] = useState<Record<string, any>>({});
+  const [leadsData, setLeadsData] = useState<any[]>([]);
+  const [isLoadingLeadsData, setIsLoadingLeadsData] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Llamar a onFilterChange solo cuando cambie sortOrder
   useEffect(() => {
@@ -56,36 +60,92 @@ const LeadsList = ({
     }
   }, [sortOrder, onFilterChange]);
 
+  // Cargar datos de leads directamente desde vista_leads_detalle_empresa
   useEffect(() => {
-    const fetchLeadCompleteData = async () => {
-      if (groupedConversations.length === 0) return;
+    const fetchLeadsData = async () => {
+      // Usar companyId (que viene del campo empresa_id en profiles)
+      const empresaId = user?.companyId || user?.empresa_id;
+      
+      // Log para depuración
+      console.log("Datos de usuario:", {
+        userId: user?.id,
+        companyId: user?.companyId,
+        empresa_id: user?.empresa_id,
+        empresaId: empresaId
+      });
+      
+      if (!empresaId) {
+        console.error("No se encontró ID de empresa para el usuario. Detalles:", user);
+        setError("No se encontró ID de empresa para el usuario. Puede ser necesario cerrar sesión y volver a iniciar.");
+        setIsLoadingLeadsData(false);
+        return;
+      }
       
       try {
-        const leadIds = groupedConversations.map(group => group.lead_id);
+        setIsLoadingLeadsData(true);
+        setError(null);
+        
+        console.log(`Consultando vista_leads_detalle_empresa para empresa ${empresaId}`);
         
         const { data, error } = await supabase
-          .from('vista_leads_completa')
+          .from('vista_leads_detalle_empresa')
           .select('*')
-          .in('lead_id', leadIds);
+          .eq('empresa_id', empresaId)
+          .order('ultima_interaccion', { ascending: false })
+          .limit(50); // Limitar resultados para mejor rendimiento
           
         if (error) {
-          console.error('Error fetching complete lead data:', error);
+          console.error('Error fetching leads data:', error);
+          setError(`Error al cargar los datos: ${error.message}`);
+          setIsLoadingLeadsData(false);
           return;
         }
         
-        const leadsMap: Record<string, any> = {};
-        data?.forEach(lead => {
-          leadsMap[lead.lead_id] = lead;
+        console.log(`Obtenidos ${data?.length || 0} leads de la vista`);
+        
+        if (!data || data.length === 0) {
+          console.log("No se encontraron datos de leads");
+          setLeadsData([]);
+          setIsLoadingLeadsData(false);
+          return;
+        }
+        
+        // Agrupar conversaciones por lead_id para manejar múltiples conversaciones por lead
+        const leadsMap = new Map();
+        
+        data.forEach(lead => {
+          if (!leadsMap.has(lead.lead_id)) {
+            leadsMap.set(lead.lead_id, {
+              ...lead,
+              conversations: []
+            });
+          }
+          
+          // Agregar conversación al lead
+          if (lead.conversacion_id) {
+            const leadData = leadsMap.get(lead.lead_id);
+            leadData.conversations.push({
+              id: lead.conversacion_id,
+              ultimo_mensaje: lead.conversacion_ultimo_mensaje,
+              canal_id: lead.canal_id
+            });
+          }
         });
         
-        setFullLeadData(leadsMap);
-      } catch (error) {
-        console.error('Error loading complete lead data:', error);
+        const processedLeadsData = Array.from(leadsMap.values());
+        console.log(`Procesados ${processedLeadsData.length} leads únicos`);
+        
+        setLeadsData(processedLeadsData);
+      } catch (error: any) {
+        console.error('Error loading leads data:', error);
+        setError(`Error al procesar los datos: ${error.message || 'Error desconocido'}`);
+      } finally {
+        setIsLoadingLeadsData(false);
       }
     };
     
-    fetchLeadCompleteData();
-  }, [groupedConversations]);
+    fetchLeadsData();
+  }, [user]);
 
   const getSortOrderLabel = () => {
     switch(sortOrder) {
@@ -100,9 +160,9 @@ const LeadsList = ({
     }
   };
 
-  const processedConversations = groupedConversations
-    .filter(group => {
-      const leadName = `${group.lead_nombre || ''} ${group.lead_apellido || ''}`.toLowerCase();
+  const processedLeads = leadsData
+    .filter(lead => {
+      const leadName = `${lead.nombre_lead || ''} ${lead.apellido_lead || ''}`.toLowerCase();
       const matchesSearch = searchTerm ? leadName.includes(searchTerm.toLowerCase()) : true;
       
       return matchesSearch;
@@ -110,23 +170,24 @@ const LeadsList = ({
     .sort((a, b) => {
       switch(sortOrder) {
         case 'date_desc':
-          return new Date(b.ultima_actualizacion).getTime() - new Date(a.ultima_actualizacion).getTime();
+          return new Date(b.ultima_interaccion).getTime() - new Date(a.ultima_interaccion).getTime();
         case 'date_asc':
-          return new Date(a.ultima_actualizacion).getTime() - new Date(b.ultima_actualizacion).getTime();
+          return new Date(a.ultima_interaccion).getTime() - new Date(b.ultima_interaccion).getTime();
         case 'score_desc':
           return (b.lead_score || 0) - (a.lead_score || 0);
         case 'score_asc':
           return (a.lead_score || 0) - (b.lead_score || 0);
         case 'messages_desc':
-          return (b.conversations.reduce((acc: number, conv: any) => acc + (conv.message_count || 0), 0)) - 
-                 (a.conversations.reduce((acc: number, conv: any) => acc + (conv.message_count || 0), 0));
+          // Para simplificar, asumimos que el número de mensajes no está disponible en la vista
+          return 0;
         case 'messages_asc':
-          return (a.conversations.reduce((acc: number, conv: any) => acc + (conv.message_count || 0), 0)) - 
-                 (b.conversations.reduce((acc: number, conv: any) => acc + (conv.message_count || 0), 0));
+          // Para simplificar, asumimos que el número de mensajes no está disponible en la vista
+          return 0;
         case 'unread_desc':
-          return (b.total_mensajes_sin_leer || 0) - (a.total_mensajes_sin_leer || 0);
+          // Para simplificar, asumimos que los mensajes no leídos no están disponibles en la vista
+          return 0;
         default:
-          return new Date(b.ultima_actualizacion).getTime() - new Date(a.ultima_actualizacion).getTime();
+          return new Date(b.ultima_interaccion).getTime() - new Date(a.ultima_interaccion).getTime();
       }
     });
 
@@ -139,7 +200,10 @@ const LeadsList = ({
             <Input
               placeholder="Buscar lead..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                if (onSearch) onSearch(e.target.value);
+              }}
               className="pl-8"
             />
           </div>
@@ -210,49 +274,109 @@ const LeadsList = ({
       </div>
 
       <ScrollArea className="flex-1">
-        {isLoading ? (
+        {isLoadingLeadsData || isLoading ? (
           <div className="p-4 text-center">
             <div className="flex items-center justify-center gap-2">
               <div className="animate-spin h-4 w-4 border-2 border-primary rounded-full border-t-transparent" />
               <p className="text-muted-foreground">Cargando conversaciones...</p>
             </div>
           </div>
-        ) : processedConversations.length === 0 ? (
+        ) : error ? (
+          <div className="p-4 text-center">
+            <p className="text-destructive">Error: {error}</p>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="mt-2"
+              onClick={() => {
+                setIsLoadingLeadsData(true);
+                setError(null);
+                // Intentar cargar los datos nuevamente
+                const fetchData = async () => {
+                  try {
+                    const { data, error } = await supabase
+                      .from('vista_leads_detalle_empresa')
+                      .select('*')
+                      .eq('empresa_id', user?.empresa_id || '')
+                      .order('ultima_interaccion', { ascending: false })
+                      .limit(50);
+                      
+                    if (error) throw error;
+                    
+                    const leadsMap = new Map();
+                    data?.forEach(lead => {
+                      if (!leadsMap.has(lead.lead_id)) {
+                        leadsMap.set(lead.lead_id, { ...lead, conversations: [] });
+                      }
+                      if (lead.conversacion_id) {
+                        leadsMap.get(lead.lead_id).conversations.push({
+                          id: lead.conversacion_id,
+                          ultimo_mensaje: lead.conversacion_ultimo_mensaje,
+                          canal_id: lead.canal_id
+                        });
+                      }
+                    });
+                    setLeadsData(Array.from(leadsMap.values()));
+                  } catch (err: any) {
+                    setError(`Error al reintentar: ${err.message || 'Error desconocido'}`);
+                  } finally {
+                    setIsLoadingLeadsData(false);
+                  }
+                };
+                fetchData();
+              }}
+            >
+              Reintentar
+            </Button>
+          </div>
+        ) : processedLeads.length === 0 ? (
           <div className="p-4 text-center">
             <p className="text-muted-foreground">No hay conversaciones que coincidan con la búsqueda.</p>
           </div>
         ) : (
           <div className="py-2">
-            {processedConversations.map((group) => {
-              const completeLeadData = fullLeadData[group.lead_id] || {};
-              
+            {processedLeads.map((lead) => {
               const leadData = {
-                lead_id: group.lead_id,
-                lead_nombre: group.lead_nombre,
-                lead_apellido: group.lead_apellido,
-                lead_score: group.lead_score,
-                ultima_actualizacion: group.ultima_actualizacion,
-                total_mensajes_sin_leer: group.total_mensajes_sin_leer,
-                ultimo_mensaje: group.ultimo_mensaje,
-                temperatura_actual: completeLeadData?.temperatura_actual || 
-                                   group.temperatura_actual ||
-                                   (group.lead_score >= 70 ? 'Hot' : 
-                                   (group.lead_score >= 40 ? 'Warm' : 'Cold')),
-                canal_origen: completeLeadData?.canal_id || group.canal_origen || group.conversations[0]?.canal_id,
-                conversations: group.conversations,
-                lead: group.lead
+                lead_id: lead.lead_id,
+                lead_nombre: lead.nombre_lead,
+                lead_apellido: lead.apellido_lead,
+                lead_score: lead.lead_score,
+                ultima_actualizacion: lead.ultima_interaccion,
+                total_mensajes_sin_leer: 0, // No disponible en la vista, podría añadirse
+                ultimo_mensaje_contenido: lead.ultimo_mensaje_contenido,
+                temperatura_actual: lead.lead_score >= 70 ? 'Hot' : (lead.lead_score >= 40 ? 'Warm' : 'Cold'),
+                
+                // Información del canal
+                canal_id: lead.canal_id,
+                canal_nombre: lead.canal_nombre,
+                canal_logo: lead.canal_logo,
+                canal_color: lead.canal_color,
+                
+                // Información del agente asignado
+                asignado_a: lead.asignado_a,
+                nombre_asignado: lead.nombre_asignado,
+                avatar_asignado: lead.avatar_asignado,
+                
+                conversations: lead.conversations || [{
+                  id: lead.conversacion_id,
+                  ultimo_mensaje: lead.conversacion_ultimo_mensaje
+                }],
+                lead: {
+                  id: lead.lead_id,
+                  asignado_a: lead.asignado_a
+                }
               };
               
               return (
                 <LeadCardModern 
-                  key={group.lead_id}
+                  key={lead.lead_id}
                   lead={leadData}
                   canales={canales}
-                  isSelected={selectedLeadId === group.lead_id}
+                  isSelected={selectedLeadId === lead.lead_id}
                   onClick={() => {
-                    setSelectedLeadId(group.lead_id);
-                    if (group.conversations.length > 0) {
-                      navigate(`/dashboard/conversations/${group.conversations[0].id}`);
+                    setSelectedLeadId(lead.lead_id);
+                    if (lead.conversacion_id) {
+                      navigate(`/dashboard/conversations/${lead.conversacion_id}`);
                     }
                   }}
                 />
@@ -263,8 +387,8 @@ const LeadsList = ({
       </ScrollArea>
 
       <div className="p-2 border-t text-xs text-muted-foreground text-center">
-        {processedConversations.length} 
-        {processedConversations.length === 1 ? ' lead encontrado' : ' leads encontrados'}
+        {processedLeads.length} 
+        {processedLeads.length === 1 ? ' lead encontrado' : ' leads encontrados'}
       </div>
     </div>
   );

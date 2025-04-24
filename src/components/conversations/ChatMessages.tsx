@@ -115,8 +115,8 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
     const bubbleClass = isLead ? 'user-bubble' : (isChatbot ? 'bot-bubble' : 'agent-bubble');
     const leadName = selectedLead ? `${selectedLead.nombre || ''} ${selectedLead.apellido || ''}`.trim() : 'Usuario';
     
-    // Crear una clave verdaderamente única usando prefijos según el tipo de mensaje
-    const messageKey = `${senderType}-${msg.id || `idx-${index}`}-${Date.now()}`;
+    // Crear una clave verdaderamente única usando el ID del mensaje o un índice estable
+    const messageKey = `${senderType}-${msg.id || `idx-${index}`}`;
     
     return (
       <div 

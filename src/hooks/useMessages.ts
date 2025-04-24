@@ -70,10 +70,11 @@ export function useMessages(conversationId: string | undefined) {
     if (channelRef.current) {
       console.log("Removing existing channel subscription");
       supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
     }
     
-    // Create new channel with improved configuration - added timestamp to make the channel name unique
-    const channelName = `messages-${conversationId}-${Date.now()}`;
+    // Create new channel with stable name (sin timestamp)
+    const channelName = `messages-${conversationId}`;
     console.log(`Creating new channel: ${channelName}`);
     
     const channel = supabase

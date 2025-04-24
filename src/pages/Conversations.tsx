@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 
 // Hooks
-import { useConversations } from "@/hooks/useConversations";
+import { useLeadsDetalle } from "@/hooks/useLeadsDetalle"; // Nuevo hook
 import { useMessages } from "@/hooks/useMessages";
 import { useCanales } from "@/hooks/useCanales";
 import { usePipelines } from "@/hooks/usePipelines";
@@ -62,7 +62,8 @@ const ConversationsPage = () => {
   const [isTransferring, setIsTransferring] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
   const [isReleasing, setIsReleasing] = useState(false);
-  
+  const [searchQuery, setSearchQuery] = useState<string>("");
+
   // Filtros de búsqueda que obtenemos de la URL
   const searchParams = new URLSearchParams(location.search);
   const filterUnreadOnly = searchParams.get('unread') === 'true';
@@ -79,11 +80,15 @@ const ConversationsPage = () => {
     isLoading: stagesLoading
   } = usePipelines();
 
+  // Reemplazamos useConversations por useLeadsDetalle
   const { 
-    data: conversationsData = [],
-    isLoading: conversationsLoading, 
-    refetch: refetchConversations
-  } = useConversations();
+    data: leadsDetalleData = [],
+    isLoading: leadsDetalleLoading, 
+    refetch: refetchLeadsDetalle
+  } = useLeadsDetalle({
+    limit: 50,
+    busqueda: searchQuery
+  });
 
   const { 
     data: messages = [], 
@@ -92,75 +97,125 @@ const ConversationsPage = () => {
     sendMessage,
   } = useMessages(conversationId);
 
+  // Transformamos los datos de leadsDetalleData al formato que espera el componente
   const conversations = useMemo(() => {
-    return conversationsData;
-  }, [conversationsData]);
+    return leadsDetalleData.map(lead => ({
+      id: lead.conversacion_id,
+      lead_id: lead.lead_id,
+      ultimo_mensaje: lead.conversacion_ultimo_mensaje,
+      created_at: lead.lead_creado_en,
+      canal_id: lead.canal_id || '',
+      estado: lead.lead_estado || '',
+      chatbot_id: '', // No tenemos esta información en la nueva vista
+      chatbot_activo: false, // Añadimos esta propiedad con un valor predeterminado
+      lead: {
+        id: lead.lead_id,
+        nombre: lead.nombre_lead || 'Usuario',
+        apellido: lead.apellido_lead || '',
+        email: lead.email_lead,
+        telefono: lead.telefono_lead,
+        score: lead.lead_score,
+        asignado_a: lead.asignado_a,
+        tags: [], // No tenemos tags en la nueva vista, habría que cargar por separado si se necesitan
+        created_at: lead.lead_creado_en || '', // Añadimos created_at
+        updated_at: lead.lead_actualizado_en || '' // Añadimos updated_at
+      },
+      unread_count: 0, // No tenemos esta información en la nueva vista, habría que cargar por separado
+      message_count: 0, // No tenemos esta información en la nueva vista, habría que cargar por separado
+      canal_nombre: lead.canal_nombre,
+      canal_color: lead.canal_color,
+      ultimo_mensaje_contenido: lead.ultimo_mensaje_contenido || ''
+    }));
+  }, [leadsDetalleData]);
   
   const groupedConversations = useMemo(() => {
     const grouped: Record<string, any> = {};
-    conversations.forEach((conv) => {
-      const leadId = conv.lead_id;
+    leadsDetalleData.forEach((lead) => {
+      const leadId = lead.lead_id;
       if (!grouped[leadId]) {
-        const leadTags = conv.lead?.tags || [];
-        const asignadoA = conv.lead?.asignado_a;
-        const agenteName = conv.lead?.agente_nombre || '';
-        const agentEmail = conv.lead?.agente_email || '';
-        const agentAvatar = conv.lead?.agente_avatar || '';
-
         grouped[leadId] = {
           lead_id: leadId,
-          lead_nombre: conv.lead?.nombre || 'Usuario',
-          lead_apellido: conv.lead?.apellido,
-          lead_email: conv.lead?.email,
-          lead_telefono: conv.lead?.telefono,
-          lead_score: conv.lead?.score,
-          temperatura_actual: conv.lead?.temperatura_actual || (conv.lead?.score && conv.lead?.score >= 70 ? 'Hot' : (conv.lead?.score && conv.lead?.score >= 40 ? 'Warm' : 'Cold')),
+          lead_nombre: lead.nombre_lead || 'Usuario',
+          lead_apellido: lead.apellido_lead || '',
+          lead_email: lead.email_lead,
+          lead_telefono: lead.telefono_lead,
+          lead_score: lead.lead_score,
+          temperatura_actual: (lead.lead_score && lead.lead_score >= 70 ? 'Hot' : (lead.lead_score && lead.lead_score >= 40 ? 'Warm' : 'Cold')),
           lead: {
-            ...conv.lead,
-            asignado_a: asignadoA || null,
-            agente_nombre: agenteName,
-            agente_email: agentEmail,
-            agente_avatar: agentAvatar,
-            tags: leadTags
+            id: leadId,
+            nombre: lead.nombre_lead || 'Usuario',
+            apellido: lead.apellido_lead || '',
+            email: lead.email_lead,
+            telefono: lead.telefono_lead,
+            score: lead.lead_score,
+            asignado_a: lead.asignado_a || null,
+            tags: [] // No tenemos tags en la nueva vista
           },
           conversations: [],
-          total_mensajes_sin_leer: 0,
-          ultima_actualizacion: conv.ultimo_mensaje || conv.created_at,
+          total_mensajes_sin_leer: 0, // No tenemos esta información en la nueva vista
+          ultima_actualizacion: lead.ultima_interaccion || lead.lead_creado_en,
         };
       }
       
       grouped[leadId].conversations.push({
-        id: conv.id,
-        canal_id: conv.canal_id,
-        canal_nombre: canales.find(c => c.id === conv.canal_id)?.nombre || conv.canal_nombre,
-        canal_tipo: canales.find(c => c.id === conv.canal_id)?.tipo || conv.canal_tipo,
-        canal_identificador: conv.canal_identificador,
-        chatbot_id: conv.chatbot_id,
-        chatbot_activo: conv.chatbot_activo || false,
-        chatbot_nombre: conv.chatbot?.nombre,
-        chatbot_avatar_url: conv.chatbot?.avatar_url,
-        estado: conv.estado,
-        ultimo_mensaje: conv.ultimo_mensaje || conv.created_at,
-        unread_count: conv.unread_count || 0,
-        message_count: conv.message_count || 0,
-        created_at: conv.created_at,
+        id: lead.conversacion_id,
+        canal_id: lead.canal_id,
+        canal_nombre: lead.canal_nombre || 'N/A',
+        canal_tipo: 'web', // Suponemos web por defecto
+        canal_identificador: lead.canal_id,
+        chatbot_id: null, // No tenemos esta información en la nueva vista
+        chatbot_activo: false, // No tenemos esta información en la nueva vista
+        estado: lead.lead_estado || 'activo',
+        ultimo_mensaje: lead.conversacion_ultimo_mensaje || lead.lead_creado_en,
+        unread_count: 0, // No tenemos esta información en la nueva vista
+        message_count: 0, // No tenemos esta información en la nueva vista
+        created_at: lead.lead_creado_en,
       });
       
-      grouped[leadId].total_mensajes_sin_leer += (conv.unread_count || 0);
-      
-      if (new Date(conv.ultimo_mensaje || conv.created_at) > new Date(grouped[leadId].ultima_actualizacion)) {
-        grouped[leadId].ultima_actualizacion = conv.ultimo_mensaje || conv.created_at;
+      if (lead.ultima_interaccion && new Date(lead.ultima_interaccion) > new Date(grouped[leadId].ultima_actualizacion)) {
+        grouped[leadId].ultima_actualizacion = lead.ultima_interaccion;
       }
     });
     
     return Object.values(grouped).sort((a, b) => 
       new Date(b.ultima_actualizacion).getTime() - new Date(a.ultima_actualizacion).getTime()
     );
-  }, [conversations, canales]);
+  }, [leadsDetalleData]);
 
   const selectedConversation = useMemo(() => {
-    return conversations.find(conv => conv.id === conversationId);
-  }, [conversations, conversationId]);
+    if (!conversationId) return null;
+    const convo = conversations.find(conv => conv.id === conversationId);
+    // Si no encontramos la conversación, pero tenemos el ID, buscamos en leadsDetalleData
+    if (!convo && conversationId) {
+      const lead = leadsDetalleData.find(lead => lead.conversacion_id === conversationId);
+      if (lead) {
+        return {
+          id: lead.conversacion_id,
+          lead_id: lead.lead_id,
+          ultimo_mensaje: lead.conversacion_ultimo_mensaje,
+          created_at: lead.lead_creado_en,
+          canal_id: lead.canal_id || '',
+          estado: lead.lead_estado || '',
+          chatbot_id: '',
+          chatbot_activo: false,
+          canal_nombre: lead.canal_nombre,
+          lead: {
+            id: lead.lead_id,
+            nombre: lead.nombre_lead || 'Usuario',
+            apellido: lead.apellido_lead || '',
+            email: lead.email_lead || '',
+            telefono: lead.telefono_lead || '',
+            created_at: lead.lead_creado_en || '',
+            updated_at: lead.lead_actualizado_en || '',
+            score: lead.lead_score || 0,
+            asignado_a: lead.asignado_a || null,
+            tags: [] // Assuming tags are not available in this context
+          }
+        };
+      }
+    }
+    return convo;
+  }, [conversations, conversationId, leadsDetalleData]);
 
   const selectedLead = useMemo(() => {
     if (selectedLeadId) {
@@ -276,7 +331,7 @@ const ConversationsPage = () => {
       
       // Esperar un momento y luego actualizar los datos
       setTimeout(() => {
-        refetchConversations();
+        refetchLeadsDetalle();
       }, 300);
       
     } catch (error) {
@@ -382,7 +437,7 @@ const ConversationsPage = () => {
       }
       
       toast.success('Etapa actualizada');
-      refetchConversations();
+      refetchLeadsDetalle();
       
     } catch (error) {
       console.error('Error updating lead stage:', error);
@@ -404,7 +459,7 @@ const ConversationsPage = () => {
       }
       
       toast.success(`Puntuación actualizada a ${score}`);
-      refetchConversations();
+      refetchLeadsDetalle();
       
     } catch (error) {
       console.error('Error updating lead score:', error);
@@ -429,7 +484,7 @@ const ConversationsPage = () => {
       toast.success('Lead asignado correctamente');
       
       setTimeout(async () => {
-        await refetchConversations();
+        await refetchLeadsDetalle();
         if (selectedLeadId) {
           const { data: updatedLeadData } = await supabase
             .from('vista_lead_completa')
@@ -468,7 +523,7 @@ const ConversationsPage = () => {
       }
       
       toast.success('Asignación liberada correctamente');
-      refetchConversations();
+      refetchLeadsDetalle();
       
     } catch (error) {
       console.error('Error releasing lead assignment:', error);
@@ -493,7 +548,7 @@ const ConversationsPage = () => {
       }
       
       toast.success('Lead transferido correctamente');
-      refetchConversations();
+      refetchLeadsDetalle();
       setTransferDialogOpen(false);
       
     } catch (error) {
@@ -550,7 +605,7 @@ const ConversationsPage = () => {
           table: 'leads',
           filter: `asignado_a=is.not.null`
         }, 
-        () => refetchConversations()
+        () => refetchLeadsDetalle()
       )
       .on('postgres_changes', 
         {
@@ -559,14 +614,14 @@ const ConversationsPage = () => {
           table: 'leads',
           filter: `asignado_a=is.null`
         }, 
-        () => refetchConversations()
+        () => refetchLeadsDetalle()
       )
       .subscribe();
     
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [refetchConversations, user?.companyId]);
+  }, [refetchLeadsDetalle, user?.companyId]);
 
   const handleSendMessage = async (messageText: string) => {
     if (!messageText.trim() || !conversationId) return;
@@ -616,7 +671,7 @@ const ConversationsPage = () => {
   return (
     <div className="flex h-[calc(100vh-4rem)] overflow-hidden bg-background text-foreground">
       <LeadsList 
-        isLoading={conversationsLoading}
+        isLoading={leadsDetalleLoading}
         groupedConversations={groupedConversations}
         selectedLeadId={selectedLeadId}
         setSelectedLeadId={(leadId) => {
@@ -641,6 +696,7 @@ const ConversationsPage = () => {
         user={user}
         initialFilters={{ sortOrder: sortOrder as any }}
         onFilterChange={handleFilterChange}
+        onSearch={(query) => setSearchQuery(query)}
       />
 
       <main className="flex-1 flex flex-col h-full border-l border-r border-border">

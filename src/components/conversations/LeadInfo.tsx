@@ -27,56 +27,28 @@ const LeadInfo: React.FC<LeadInfoProps> = ({
   handleReleaseAssignment,
   openTransferDialog
 }) => {
-  // Detectar si hay un nombre de agente incluso si no hay asignado_a
+  // Simplificar: usar prioritariamente los campos de la vista vista_leads_detalle_empresa
   const hasAgentName = Boolean(
-    selectedLead?.agente_nombre || 
-    selectedLead?.usuario_asignado?.nombre || 
-    selectedLead?.profile_full_name
+    selectedLead?.nombre_asignado || 
+    selectedLead?.agente_nombre
   );
 
-  // Determinar si está asignado a otro agente (con o sin ID)
   const isAssignedToCurrentUser = selectedLead?.asignado_a === user?.id;
-  const isAssignedToOtherAgent = (selectedLead?.asignado_a && selectedLead.asignado_a !== user?.id) || 
-                                (!selectedLead?.asignado_a && hasAgentName);
-  const isUnassigned = !selectedLead?.asignado_a && !hasAgentName;
+  const isAssignedToOtherAgent = Boolean(selectedLead?.asignado_a && selectedLead?.asignado_a !== user?.id);
+  const isUnassigned = !selectedLead?.asignado_a;
 
-  // Función mejorada para obtener la información del agente desde múltiples posibles fuentes
+  // Función simplificada para obtener la información del agente
+  // Usa principalmente la información de nombre_asignado, email_asignado y avatar_asignado
   const getAssignedAgentInfo = () => {
     if (!selectedLead?.asignado_a && !hasAgentName) return null;
     
-    // Si tiene nombre de agente pero no asignado_a, usar ese nombre
-    if (selectedLead?.agente_nombre) {
-      return {
-        nombre: selectedLead.agente_nombre,
-        email: selectedLead?.agente_email || '',
-        avatar_url: selectedLead?.agente_avatar || ''
-      };
-    }
-    
-    // Intentar obtener el nombre del agente de varias posibles fuentes
-    const agentName = selectedLead?.usuario_asignado?.nombre ||
-                     selectedLead?.profile_full_name ||
-                     (selectedLead?.profile?.full_name) ||
-                     `Agente (ID: ${selectedLead?.asignado_a ? selectedLead.asignado_a.substring(0, 6) + '...' : 'N/A'})`;
-    
-    // Intentar obtener el email del agente
-    const agentEmail = selectedLead?.usuario_asignado?.email ||
-                      selectedLead?.agente_email ||
-                      selectedLead?.profile_email || '';
-    
-    // Intentar obtener el avatar del agente
-    const agentAvatar = selectedLead?.usuario_asignado?.avatar_url ||
-                       selectedLead?.agente_avatar ||
-                       selectedLead?.profile_avatar_url || '';
-    
     return {
-      nombre: agentName,
-      email: agentEmail,
-      avatar_url: agentAvatar
+      nombre: selectedLead?.nombre_asignado || selectedLead?.agente_nombre || `Agente (${selectedLead?.asignado_a?.substring(0, 6) || 'N/A'})`,
+      email: selectedLead?.email_asignado || selectedLead?.agente_email || '',
+      avatar_url: selectedLead?.avatar_asignado || selectedLead?.agente_avatar || ''
     };
   };
   
-  // Obtener información del agente asignado
   const assignedAgent = getAssignedAgentInfo();
   
   // Función para obtener las iniciales del agente
@@ -89,20 +61,6 @@ const LeadInfo: React.FC<LeadInfoProps> = ({
       .toUpperCase()
       .substring(0, 2);
   };
-  
-  // Agregar log para depuración
-  console.log("Información del agente en LeadInfo:", {
-    leadId: selectedLead?.id,
-    asignadoA: selectedLead?.asignado_a,
-    agentInfo: assignedAgent,
-    originalData: {
-      agente_nombre: selectedLead?.agente_nombre,
-      usuario_asignado: selectedLead?.usuario_asignado
-    },
-    hasAgentName,
-    isAssignedToOtherAgent,
-    isUnassigned
-  });
 
   return (
     <ScrollArea className="flex-1 p-4">
@@ -114,26 +72,26 @@ const LeadInfo: React.FC<LeadInfoProps> = ({
             <div className="flex flex-col">
               <span className="text-muted-foreground text-xs">Nombre</span>
               <span className="font-medium">
-                {selectedLead?.nombre ? `${selectedLead.nombre} ${selectedLead.apellido || ''}`.trim() : 'N/A'}
+                {selectedLead?.nombre_lead ? `${selectedLead.nombre_lead} ${selectedLead.apellido_lead || ''}`.trim() : 'N/A'}
               </span>
             </div>
             <div className="flex flex-col">
               <span className="text-muted-foreground text-xs">Email</span>
-              <span className="font-medium">{selectedLead?.email || 'N/A'}</span>
+              <span className="font-medium">{selectedLead?.email_lead || 'N/A'}</span>
             </div>
             <div className="flex flex-col">
               <span className="text-muted-foreground text-xs">Teléfono</span>
-              <span className="font-medium">{selectedLead?.telefono || 'N/A'}</span>
+              <span className="font-medium">{selectedLead?.telefono_lead || 'N/A'}</span>
             </div>
             <div className="flex flex-col">
               <span className="text-muted-foreground text-xs">Score</span>
               <div className="flex items-center">
                 <Badge 
-                  variant={selectedLead?.score && selectedLead.score > 70 ? "default" : 
-                        (selectedLead?.score && selectedLead.score > 40 ? "secondary" : "outline")}
+                  variant={selectedLead?.lead_score && selectedLead.lead_score > 70 ? "default" : 
+                        (selectedLead?.lead_score && selectedLead.lead_score > 40 ? "secondary" : "outline")}
                   className="px-1.5 py-0 h-5"
                 >
-                  {selectedLead?.score || 0}
+                  {selectedLead?.lead_score || 0}
                 </Badge>
               </div>
             </div>
