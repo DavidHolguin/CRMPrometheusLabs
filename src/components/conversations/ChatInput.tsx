@@ -1,25 +1,62 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Send, Smile } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { EmojiPicker } from "./EmojiPicker";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ChatInputProps {
-  onSendMessage: (message: string) => Promise<void>;
+  onSendMessage: (message: string, chatbotCanalId?: string) => Promise<void>;
+  chatbotId?: string;
   disabled?: boolean;
 }
 
-const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled }) => {
+const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, chatbotId, disabled }) => {
   const [message, setMessage] = useState("");
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+  const [chatbotCanalId, setChatbotCanalId] = useState<string | undefined>(undefined);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // ID del canal web
+  const CANAL_WEB_ID = "13956803-a8ca-4087-8050-e3c98eafa4bd";
+
+  useEffect(() => {
+    if (chatbotId) {
+      fetchChatbotCanalId();
+    }
+  }, [chatbotId]);
+
+  const fetchChatbotCanalId = async () => {
+    if (!chatbotId) return;
+
+    try {
+      // Consulta para obtener el ID específico de la relación entre el chatbot y el canal web
+      const { data, error } = await supabase
+        .from("chatbot_canales")
+        .select("id")
+        .eq("chatbot_id", chatbotId)
+        .eq("canal_id", CANAL_WEB_ID)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Error al obtener chatbot_canal_id:", error);
+      } else if (data) {
+        console.log(`Chatbot canal ID encontrado: ${data.id}`);
+        setChatbotCanalId(data.id);
+      } else {
+        console.log("No se encontró una relación de canal web para este chatbot");
+      }
+    } catch (err) {
+      console.error("Error en la consulta de chatbot_canal_id:", err);
+    }
+  };
 
   const handleSendMessage = async () => {
     if (!message.trim() || disabled) return;
     
     try {
-      await onSendMessage(message);
+      await onSendMessage(message, chatbotCanalId);
       setMessage("");
       if (textareaRef.current) {
         textareaRef.current.style.height = "auto";

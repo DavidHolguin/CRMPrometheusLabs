@@ -628,11 +628,15 @@ const ConversationsPage = () => {
     };
   }, [refetchLeadsDetalle, user?.companyId]);
 
-  const handleSendMessage = async (messageText: string) => {
+  const handleSendMessage = async (messageText: string, chatbotCanalId?: string) => {
     if (!messageText.trim() || !conversationId) return;
     
     try {
-      await sendMessage(messageText);
+      // Si tenemos chatbotCanalId, lo pasamos como parámetro adicional
+      if (chatbotCanalId) {
+        console.log(`Enviando mensaje con chatbot_canal_id: ${chatbotCanalId}`);
+      }
+      await sendMessage(messageText, chatbotCanalId);
     } catch (error) {
       console.error("Error al enviar mensaje:", error);
       toast.error("No se pudo enviar el mensaje. Intente de nuevo.");
@@ -726,6 +730,7 @@ const ConversationsPage = () => {
             <ChatInput 
               onSendMessage={handleSendMessage} 
               disabled={!conversationId}
+              chatbotId={selectedConversation?.chatbot_id}
             />
             </>
         ) : (

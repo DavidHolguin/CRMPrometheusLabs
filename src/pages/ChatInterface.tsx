@@ -300,7 +300,7 @@ const ChatInterface = () => {
           // entre mensajes de texto y audios
           conversacion_id: conversationId || undefined,
           session_id: sessionId, // Agregamos session_id para consistencia con los mensajes de texto
-          canal_id: canalId,
+ 
           canal_identificador: canalIdentificador,
           audio_base64: base64data,
           formato_audio: "webm",
@@ -817,7 +817,7 @@ const ChatInterface = () => {
       
       // Obtenemos el canal_id del chatbot para Web Chat específicamente
       const CANAL_WEB_ID = "13956803-a8ca-4087-8050-e3c98eafa4bd";
-      let canalId = CANAL_WEB_ID; // Valor predeterminado
+      let chatbotCanalId; // Para almacenar el ID específico de la relación chatbot-canal
       let canalIdentificador = window.location.href;
       
       try {
@@ -838,11 +838,12 @@ const ChatInterface = () => {
           
           if (canalWebFound) {
             console.log(`Canal Web encontrado con ID: ${canalWebFound.id}`);
-            // Usamos el canal encontrado
+            // Aquí guardamos el ID específico de la relación, que es el chatbot_canal_id
+            chatbotCanalId = canalWebFound.id;
           } else {
             // Si no existe un canal específicamente web, usar el primer canal disponible
-            console.log(`Canal Web no encontrado, usando el primer canal disponible: ${canalesData[0].canal_id}`);
-            canalId = canalesData[0].canal_id;
+            console.log(`Canal Web no encontrado, usando el primer canal disponible: ${canalesData[0].id}`);
+            chatbotCanalId = canalesData[0].id;
           }
         }
       } catch (canalError) {
@@ -863,24 +864,22 @@ const ChatInterface = () => {
         timestamp: new Date().toISOString()
       };
       
+      // Creamos el objeto de solicitud solo con los campos requeridos según la API
       const apiRequest = {
-        empresa_id: empresaId,
-        chatbot_id: chatbotId,
-        mensaje: messageContent,
-        session_id: sessionId,
-        lead_id: leadId || null,
-        canal_id: canalId,
+        chatbot_canal_id: chatbotCanalId,
         canal_identificador: canalIdentificador,
+        mensaje: messageContent,
+        lead_id: leadId || null,
         metadata: metadata,
         conversacion_id: conversationId // Enviar el ID de conversación si existe
       };
       
-      console.log("Enviando mensaje a la API (datos simplificados):", {
+      console.log("Enviando mensaje a la API con formato simplificado:", {
         ...apiRequest,
         metadata: { ...metadata, browser: "[browser_info]" } // Simplificamos la información del navegador en los logs
       });
       
-      // Corregimos la ruta de la API según la documentación proporcionada
+      // Usando el endpoint correcto según la documentación
       const response = await fetch(`${apiEndpoint}/api/v1/message`, {
         method: 'POST',
         headers: {

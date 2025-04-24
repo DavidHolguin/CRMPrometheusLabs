@@ -33,7 +33,9 @@ export function AgenteCard({
 }: AgenteCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const getInitials = (name: string) => {
+  const getInitials = (name: string | null | undefined) => {
+    if (!name) return "XX"; // Valor predeterminado si no hay nombre
+    
     return name
       .split(" ")
       .map((n) => n[0])

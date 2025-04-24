@@ -95,6 +95,8 @@ export function useChatbotUpdate(id: string) {
           .from('chatbot_contextos')
           .insert({
             chatbot_id: id,
+            tipo: "principal", // Añadimos el campo obligatorio "tipo"
+            contenido: "Contexto principal", // También añadimos contenido básico
             ...data
           });
           

@@ -44,6 +44,24 @@ export interface Message {
   empresa_id?: string;
 }
 
+// Interfaz para el payload del mensaje
+interface MessagePayload {
+  agent_id: string;
+  mensaje: string;
+  conversation_id: string;
+  lead_id: string;
+  channel_id: string;
+  channel_identifier: string;
+  chatbot_id: string;
+  empresa_id: string;
+  deactivate_chatbot: boolean;
+  metadata: {
+    agent_name: string;
+    department: string;
+  };
+  chatbot_canal_id?: string; // Añadimos esta propiedad como opcional
+}
+
 export function useMessages(conversationId: string | undefined) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -280,9 +298,9 @@ export function useMessages(conversationId: string | undefined) {
     },
   });
 
-  // Enviar mensaje utilizando el endpoint /api/v1/agent/message
+  // Enviar mensaje utilizando el endpoint /api/v1/message
   const sendMessageMutation = useMutation({
-    mutationFn: async (content: string) => {
+    mutationFn: async ({ content, chatbotCanalId }: { content: string, chatbotCanalId?: string }) => {
       if (!conversationId || !user?.id) {
         throw new Error("Falta información para enviar mensaje");
       }
@@ -334,16 +352,33 @@ export function useMessages(conversationId: string | undefined) {
         }
       }
 
-      console.log("Enviando mensaje al endpoint:", {
+      // Preparar el payload para la API usando la interfaz definida
+      const payload: MessagePayload = {
         agent_id: user.id,
         mensaje: content,
         conversation_id: conversationId,
         lead_id: leadId,
-        channel_id: canalId,
-        channel_identifier: canalIdentifier,
-        chatbot_id: chatbotId,
-        empresa_id: empresaId
-      });
+        channel_id: canalId || "",
+        channel_identifier: canalIdentifier || "",
+        chatbot_id: chatbotId || "",
+        empresa_id: empresaId,
+        deactivate_chatbot: false, // Por defecto no desactivamos el chatbot
+        metadata: {
+          agent_name: user.name || "Agente",
+          department: "Ventas"
+        }
+      };
+
+      // Si tenemos el chatbot_canal_id, lo agregamos al payload
+      if (chatbotCanalId) {
+        console.log(`Usando chatbot_canal_id: ${chatbotCanalId}`);
+        payload.chatbot_canal_id = chatbotCanalId;
+      } else {
+        // Este campo es requerido por el endpoint, así que avisamos si no lo tenemos
+        console.error("Error: chatbot_canal_id es requerido pero no fue proporcionado");
+      }
+      
+      console.log("Enviando mensaje al endpoint:", payload);
       
       // URL base del API
       const apiEndpoint = "https://web-production-01457.up.railway.app";
@@ -354,21 +389,7 @@ export function useMessages(conversationId: string | undefined) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          agent_id: user.id,
-          mensaje: content,
-          conversation_id: conversationId,
-          lead_id: leadId,
-          channel_id: canalId,
-          channel_identifier: canalIdentifier,
-          chatbot_id: chatbotId,
-          empresa_id: empresaId,
-          deactivate_chatbot: false, // Por defecto no desactivamos el chatbot
-          metadata: {
-            agent_name: user.name || "Agente",
-            department: "Ventas"
-          }
-        })
+        body: JSON.stringify(payload)
       });
       
       if (!response.ok) {
@@ -427,7 +448,8 @@ export function useMessages(conversationId: string | undefined) {
     ...messagesQuery,
     markAsRead: markAsReadMutation.mutate,
     isMarkingAsRead: markAsReadMutation.isPending,
-    sendMessage: sendMessageMutation.mutate,
+    sendMessage: (content: string, chatbotCanalId?: string) => 
+      sendMessageMutation.mutate({ content, chatbotCanalId }),
     isSending: sendMessageMutation.isPending,
   };
 }
