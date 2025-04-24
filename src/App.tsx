@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { Analytics } from '@vercel/analytics/react';
 
 // Pages
 import Login from "./pages/auth/Login";
@@ -123,6 +124,7 @@ const App = () => {
       </Routes>
       <Toaster />
       <Sonner />
+      <Analytics />
     </TooltipProvider>
   );
 };
