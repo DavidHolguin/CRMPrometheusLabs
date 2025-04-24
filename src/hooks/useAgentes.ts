@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { supabaseAdmin } from "@/integrations/supabase/adminClient";
+import { getSupabaseClient } from "@/integrations/supabase/client";
+import { getSupabaseAdminClient } from "@/integrations/supabase/adminClient";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 
@@ -22,6 +22,8 @@ export function useAgentes() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [isUploading, setIsUploading] = useState(false);
+  const supabase = getSupabaseClient();
+  const supabaseAdmin = getSupabaseAdminClient();
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["agentes", user?.companyId],

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { getSupabaseClient } from '@/integrations/supabase/client';
 import { User, Session } from '@supabase/supabase-js';
 
 // Tipos
@@ -35,6 +35,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<UserWithMeta | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const supabase = getSupabaseClient();
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -368,7 +369,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .select('id')
         .eq('tipo', 'website')
         .maybeSingle();
-        
+      
       if (channelError) {
         console.error("Error fetching website channel:", channelError);
       } else if (channelData) {
@@ -526,38 +527,43 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       toast({
         title: "Configuración completada",
-        description: "¡Ahora puedes comenzar a utilizar todas las funciones!"
+        description: "Has completado la configuración inicial"
       });
       
       return Promise.resolve();
     } catch (error) {
-      console.error("Error in setOnboardingCompleted:", error);
+      console.error("Error marking onboarding as completed:", error);
       return Promise.reject(error);
     }
   };
-
-  const value = {
-    user,
-    session,
-    isLoading,
-    login,
-    loginWithGoogle,
-    register,
-    logout,
-    updateUser,
-    setOnboardingCompleted,
-    createCompany,
-    saveServices,
-    createChatbot
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        session,
+        isLoading,
+        login,
+        loginWithGoogle,
+        register,
+        logout,
+        updateUser,
+        setOnboardingCompleted,
+        createCompany,
+        saveServices,
+        createChatbot
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
+// Hook para usar el contexto de autenticación
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error('useAuth debe ser usado dentro de un AuthProvider');
   }
   return context;
 };

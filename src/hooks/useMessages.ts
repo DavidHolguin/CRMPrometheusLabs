@@ -1,97 +1,53 @@
-import { useAuth } from "@/context/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
+import { getSupabaseClient } from "@/integrations/supabase/client";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 
 export interface Message {
   id: string;
   conversacion_id: string;
   contenido: string;
+  contenido_sanitizado?: string;
   origen: string;
   created_at: string;
-  leido: boolean;
-  remitente_id: string | null;
   metadata?: any;
-  tipo_contenido?: string;
-  // Campos adicionales de la vista
-  mensaje_id?: string;
-  mensaje_fecha?: string;
-  mensaje_origen?: string;
-  mensaje_remitente_id?: string;
-  mensaje_contenido?: string;
-  mensaje_tipo?: string;
-  mensaje_metadata?: any;
-  mensaje_score_impacto?: number;
-  mensaje_leido?: boolean;
-  remitente_nombre?: string;
-  audio_url?: string;
-  audio_duracion?: number;
-  audio_transcripcion?: string;
-  // Campos para información del lead
-  lead_nombre?: string;
-  lead_apellido?: string;
-  // Campo para audio
-  audio?: {
-    archivo_url: string;
-    duracion_segundos: number;
-    transcripcion?: string;
-  };
-  // Campos para canal y lead
-  lead_id?: string;
-  canal_id?: string;
-  canal_identificador?: string;
-  chatbot_id?: string;
-  empresa_id?: string;
-}
-
-// Interfaz para el payload del mensaje
-interface MessagePayload {
-  agent_id: string;
-  mensaje: string;
-  conversation_id: string;
-  lead_id: string;
-  channel_id: string;
-  channel_identifier: string;
-  chatbot_id: string;
-  empresa_id: string;
-  deactivate_chatbot: boolean;
-  metadata: {
-    agent_name: string;
-    department: string;
-  };
-  chatbot_canal_id?: string; // Añadimos esta propiedad como opcional
 }
 
 export function useMessages(conversationId: string | undefined) {
-  const { user } = useAuth();
   const queryClient = useQueryClient();
-  const channelRef = useRef<any>(null);
+  const supabase = getSupabaseClient();
   
-  // Clean up realtime listener when component unmounts or conversationId changes
-  useEffect(() => {
-    return () => {
-      if (channelRef.current) {
-        console.log(`Cleaning up realtime subscription for conversation: ${conversationId}`);
-        supabase.removeChannel(channelRef.current);
-        channelRef.current = null;
+  // Query para cargar mensajes
+  const { 
+    data: messages = [], 
+    isLoading,
+    error
+  } = useQuery({
+    queryKey: ["messages", conversationId],
+    queryFn: async (): Promise<Message[]> => {
+      if (!conversationId) {
+        return [];
       }
-    };
-  }, [conversationId]);
-  
-  // Set up real-time listener for messages
+      
+      const { data, error } = await supabase
+        .from("mensajes")
+        .select("*")
+        .eq("conversacion_id", conversationId)
+        .order("created_at", { ascending: true });
+        
+      if (error) {
+        console.error("Error cargando mensajes:", error);
+        throw error;
+      }
+      
+      return data as Message[];
+    },
+    enabled: !!conversationId,
+  });
+
+  // Suscripción en tiempo real a nuevos mensajes
   useEffect(() => {
     if (!conversationId) return;
     
-    console.log(`Setting up enhanced realtime subscription for conversation: ${conversationId}`);
-    
-    // Remove existing channel if there is one
-    if (channelRef.current) {
-      console.log("Removing existing channel subscription");
-      supabase.removeChannel(channelRef.current);
-      channelRef.current = null;
-    }
-    
-    // Create new channel with stable name (sin timestamp)
     const channelName = `messages-${conversationId}`;
     console.log(`Creating new channel: ${channelName}`);
     
@@ -119,337 +75,73 @@ export function useMessages(conversationId: string | undefined) {
             // Check if the message already exists to avoid duplicates
             const messageExists = currentMessages.some(msg => msg.id === payload.new.id);
             
-            if (messageExists) {
-              console.log("Message already exists in cache, skipping update");
-              return;
+            if (!messageExists) {
+              console.log("Adding new message to cache");
+              queryClient.setQueryData(["messages", conversationId], [...currentMessages, payload.new]);
             }
-            
-            console.log("Adding new message to cache:", payload.new);
-            console.log("Message origin:", payload.new.origen);
-            
-            // Add the message to the cache
-            queryClient.setQueryData(["messages", conversationId], [...currentMessages, payload.new as Message]);
-            
-            // Force refetch to ensure we've got the latest state
-            queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
-            
-            // Also invalidate conversations to refresh the list
-            queryClient.invalidateQueries({ queryKey: ["conversations"] });
           }
           
           // Handle UPDATE events
-          else if (payload.eventType === 'UPDATE') {
+          if (payload.eventType === 'UPDATE') {
             console.log("Processing UPDATE event for message:", payload.new);
             
-            queryClient.setQueryData(["messages", conversationId], (oldData: Message[] = []) => {
-              return oldData.map(msg => 
-                msg.id === payload.new.id ? { ...msg, ...payload.new as Message } : msg
-              );
-            });
+            // Get current messages from cache
+            const currentMessages = queryClient.getQueryData<Message[]>(["messages", conversationId]) || [];
+            
+            // Replace the updated message
+            const updatedMessages = currentMessages.map(msg => 
+              msg.id === payload.new.id ? payload.new : msg
+            );
+            
+            queryClient.setQueryData(["messages", conversationId], updatedMessages);
           }
         }
       )
       .subscribe((status) => {
-        console.log(`Enhanced realtime subscription status for conversation ${conversationId}: ${status}`);
-        
-        // Force refetch on successful subscription to ensure we have latest data
-        if (status === 'SUBSCRIBED') {
-          console.log("Channel successfully subscribed, fetching latest messages");
-          queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
-        }
+        console.log(`Realtime subscription status for messages: ${status}`);
       });
-    
-    // Save channel reference for cleanup
-    channelRef.current = channel;
-    
+      
+    // Cleanup function
+    return () => {
+      console.log(`Removing channel: ${channelName}`);
+      supabase.removeChannel(channel);
+    };
   }, [conversationId, queryClient]);
-  
-  const messagesQuery = useQuery({
-    queryKey: ["messages", conversationId],
-    queryFn: async (): Promise<Message[]> => {
-      if (!conversationId) {
-        return [];
-      }
+
+  // Función para enviar un mensaje
+  const sendMessage = async (content: string, metadata?: any) => {
+    if (!conversationId) return null;
+    
+    try {
+      const newMessage = {
+        conversacion_id: conversationId,
+        contenido: content,
+        origen: 'agente', // Asumiendo que el contexto de uso es para un agente
+        metadata
+      };
       
-      console.log(`Fetching messages for conversation: ${conversationId}`);
-      
-      // Usar la vista para obtener mensajes con datos enriquecidos
       const { data, error } = await supabase
-        .from("vista_lead_conversaciones_mensajes")
-        .select("*")
-        .eq("conversacion_id", conversationId)
-        .order("mensaje_fecha", { ascending: true });
-      
+        .from('mensajes')
+        .insert(newMessage)
+        .select()
+        .single();
+        
       if (error) {
-        console.error("Error obteniendo mensajes:", error);
+        console.error("Error al enviar mensaje:", error);
         throw error;
       }
       
-      console.log(`Found ${data?.length || 0} messages for conversation ${conversationId}`);
-      
-      // Mapear los datos de la vista al formato esperado por la aplicación
-      const mappedMessages: Message[] = data?.map(item => {
-        // Crear objeto de audio si existe información de audio
-        const audioData = item.audio_url ? {
-          archivo_url: item.audio_url,
-          duracion_segundos: item.audio_duracion || 0,
-          transcripcion: item.audio_transcripcion
-        } : undefined;
-        
-        return {
-          id: item.mensaje_id,
-          conversacion_id: item.conversacion_id,
-          contenido: item.mensaje_contenido,
-          origen: item.mensaje_origen,
-          created_at: item.mensaje_fecha,
-          leido: item.mensaje_leido,
-          remitente_id: item.mensaje_remitente_id,
-          metadata: item.mensaje_metadata,
-          tipo_contenido: item.mensaje_tipo,
-          remitente_nombre: item.remitente_nombre,
-          lead_nombre: item.lead_nombre,
-          lead_apellido: item.lead_apellido,
-          // Información de audio en formato compatible con el componente
-          audio: audioData,
-          audio_url: item.audio_url,
-          audio_duracion: item.audio_duracion,
-          audio_transcripcion: item.audio_transcripcion,
-          // Información adicional necesaria para el envío de mensajes
-          lead_id: item.lead_id,
-          canal_id: item.canal_id,
-          canal_identificador: item.canal_identificador,
-          chatbot_id: item.chatbot_id,
-          empresa_id: item.empresa_id
-        };
-      }) || [];
-      
-      return mappedMessages;
-    },
-    enabled: !!conversationId,
-    refetchInterval: 5000, // Maintain a 5-second refresh as backup
-    staleTime: 1000, // Mark data as stale quickly to encourage refetches
-  });
-
-  // Mark messages as read
-  const markAsReadMutation = useMutation({
-    mutationFn: async (conversationId: string) => {
-      console.log("Marcando mensajes como leídos para conversación:", conversationId);
-      
-      try {
-        // Primero, obtener el ID del lead asociado a esta conversación
-        const { data: convData, error: convError } = await supabase
-          .from("conversaciones")
-          .select("lead_id")
-          .eq("id", conversationId)
-          .single();
-        
-        if (convError) {
-          console.error("Error obteniendo lead_id de la conversación:", convError);
-          throw convError;
-        }
-        
-        const leadId = convData?.lead_id;
-        if (!leadId) {
-          console.error("No se encontró lead_id para la conversación:", conversationId);
-          throw new Error("Lead ID no encontrado");
-        }
-        
-        // Marcar todos los mensajes del lead/usuario como leídos
-        const { error } = await supabase
-          .from("mensajes")
-          .update({ leido: true })
-          .eq("conversacion_id", conversationId)
-          .in("origen", ["lead", "user"])
-          .is("leido", false);
-        
-        if (error) {
-          console.error("Error marcando mensajes como leídos:", error);
-          throw error;
-        }
-
-        // También actualizar la función RPC que actualiza los contadores en la vista vista_leads_completa
-        // Esta función necesita ser creada en Supabase si no existe
-        const { error: rpcError } = await supabase
-          .rpc('actualizar_contadores_mensajes_no_leidos', {
-            p_lead_id: leadId
-          });
-
-        if (rpcError) {
-          console.error("Error actualizando contadores en vista_leads_completa:", rpcError);
-          // No lanzar error aquí para no interrumpir el flujo principal
-        }
-
-        console.log("Mensajes marcados como leídos correctamente");
-        return { success: true, leadId };
-      } catch (error) {
-        console.error("Error en markAsRead:", error);
-        throw error;
-      }
-    },
-    onSuccess: (data) => {
-      // Invalidate related queries to refresh data
-      queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
-      queryClient.invalidateQueries({ queryKey: ["conversations"] });
-      
-      // También invalidar la consulta de leads para actualizar los contadores en la interfaz
-      if (data?.leadId) {
-        queryClient.invalidateQueries({ queryKey: ["leads"] });
-      }
-    },
-  });
-
-  // Enviar mensaje utilizando el endpoint /api/v1/message
-  const sendMessageMutation = useMutation({
-    mutationFn: async ({ content, chatbotCanalId }: { content: string, chatbotCanalId?: string }) => {
-      if (!conversationId || !user?.id) {
-        throw new Error("Falta información para enviar mensaje");
-      }
-
-      // Obtener los datos necesarios para enviar al endpoint
-      const currentMessages = queryClient.getQueryData<Message[]>(["messages", conversationId]) || [];
-      const conversationData = currentMessages.length > 0 ? currentMessages[0] : null;
-      
-      if (!conversationData || !conversationData.lead_id) {
-        throw new Error("No se pudo obtener la información necesaria de la conversación");
-      }
-      
-      // Obtener datos adicionales de la conversación si no están disponibles
-      let leadId = conversationData.lead_id;
-      let canalId = conversationData.canal_id;
-      let canalIdentifier = conversationData.canal_identificador;
-      let chatbotId = conversationData.chatbot_id;
-      let empresaId = conversationData.empresa_id || user.companyId;
-      
-      // Si no tenemos algunos datos, intentar obtenerlos de la base de datos
-      if (!canalId || !canalIdentifier) {
-        const { data: convData, error: convError } = await supabase
-          .from("conversaciones")
-          .select("lead_id, canal_id, canal_identificador, chatbot_id")
-          .eq("id", conversationId)
-          .single();
-          
-        if (convError) {
-          console.error("Error obteniendo datos de conversación:", convError);
-        } else if (convData) {
-          leadId = convData.lead_id;
-          canalId = convData.canal_id;
-          canalIdentifier = convData.canal_identificador;
-          chatbotId = convData.chatbot_id;
-        }
-      }
-      
-      // Si aún no tenemos el canal_identificador, intentar obtenerlo de la tabla leads
-      if (!canalIdentifier && leadId) {
-        const { data: leadData, error: leadError } = await supabase
-          .from("leads")
-          .select("canal_id, canal_origen")
-          .eq("id", leadId)
-          .single();
-          
-        if (!leadError && leadData) {
-          canalId = leadData.canal_id;
-          canalIdentifier = leadData.canal_origen;
-        }
-      }
-
-      // Preparar el payload para la API usando la interfaz definida
-      const payload: MessagePayload = {
-        agent_id: user.id,
-        mensaje: content,
-        conversation_id: conversationId,
-        lead_id: leadId,
-        channel_id: canalId || "",
-        channel_identifier: canalIdentifier || "",
-        chatbot_id: chatbotId || "",
-        empresa_id: empresaId,
-        deactivate_chatbot: false, // Por defecto no desactivamos el chatbot
-        metadata: {
-          agent_name: user.name || "Agente",
-          department: "Ventas"
-        }
-      };
-
-      // Si tenemos el chatbot_canal_id, lo agregamos al payload
-      if (chatbotCanalId) {
-        console.log(`Usando chatbot_canal_id: ${chatbotCanalId}`);
-        payload.chatbot_canal_id = chatbotCanalId;
-      } else {
-        // Este campo es requerido por el endpoint, así que avisamos si no lo tenemos
-        console.error("Error: chatbot_canal_id es requerido pero no fue proporcionado");
-      }
-      
-      console.log("Enviando mensaje al endpoint:", payload);
-      
-      // URL base del API
-      const apiEndpoint = "https://web-production-01457.up.railway.app";
-
-      // Enviar el mensaje utilizando el endpoint
-      const response = await fetch(`${apiEndpoint}/api/v1/agent/message`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload)
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Error en la respuesta API:", response.status, errorText);
-        throw new Error(`Error al enviar mensaje: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      console.log("Respuesta del API:", data);
-      
-      return { 
-        mensaje_id: data.mensaje_id, 
-        conversacion_id: data.conversacion_id,
-        mensaje: content,
-        metadata: data.metadata || {}
-      };
-    },
-    onSuccess: (data) => {
-      console.log("Mensaje enviado exitosamente, respuesta:", data);
-      
-      // Actualizar UI inmediatamente con nuestro mensaje enviado sin esperar al realtime
-      queryClient.setQueryData(["messages", conversationId], (oldData: Message[] = []) => {
-        // Asegurar que no añadimos un mensaje duplicado
-        if (oldData.some(msg => msg.id === data.mensaje_id)) {
-          return oldData;
-        }
-        
-        return [...oldData, {
-          id: data.mensaje_id,
-          conversacion_id: data.conversacion_id || conversationId,
-          contenido: data.mensaje || "",
-          origen: "agente",
-          created_at: new Date().toISOString(),
-          leido: true,
-          remitente_id: user?.id,
-          metadata: {
-            ...(data.metadata || {}),
-            agent_name: user?.name || "Agente",
-            department: "Ventas",
-            origin: "agent"
-          }
-        }];
-      });
-      
-      // Invalidar consultas relacionadas para refrescar datos
-      queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
-      queryClient.invalidateQueries({ queryKey: ["conversations"] });
-    },
-    onError: (error) => {
-      console.error("Error al enviar mensaje:", error);
+      return data;
+    } catch (err) {
+      console.error("Error en sendMessage:", err);
+      return null;
     }
-  });
-
-  return {
-    ...messagesQuery,
-    markAsRead: markAsReadMutation.mutate,
-    isMarkingAsRead: markAsReadMutation.isPending,
-    sendMessage: (content: string, chatbotCanalId?: string) => 
-      sendMessageMutation.mutate({ content, chatbotCanalId }),
-    isSending: sendMessageMutation.isPending,
+  };
+  
+  return { 
+    messages, 
+    isLoading, 
+    error,
+    sendMessage
   };
 }
