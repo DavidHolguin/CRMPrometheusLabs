@@ -8,6 +8,10 @@ export interface ChatMessage {
   origen: string;
   created_at: string;
   metadata?: any;
+  // Propiedades adicionales para mensajes de audio
+  isAudio?: boolean;
+  audioUrl?: string;
+  audioDuration?: number;
 }
 
 export function useChatMessages(conversationId: string | null) {
@@ -106,6 +110,33 @@ export function useChatMessages(conversationId: string | null) {
     };
   }, [conversationId]);
   
+  // Función para agregar un mensaje al estado (sin enviarlo a la API)
+  const addMessage = (message: ChatMessage) => {
+    // Asegurarnos de que el mensaje tenga un conversacion_id
+    const completeMessage: ChatMessage = {
+      ...message,
+      conversacion_id: message.conversacion_id || conversationId || '',
+    };
+
+    setMessages(currentMessages => {
+      // Verificar si el mensaje ya existe
+      const exists = currentMessages.some(msg => msg.id === completeMessage.id);
+      if (exists) {
+        return currentMessages;
+      }
+      return [...currentMessages, completeMessage];
+    });
+  };
+
+  // Función para actualizar un mensaje existente
+  const updateMessage = (id: string, updates: Partial<ChatMessage>) => {
+    setMessages(currentMessages => 
+      currentMessages.map(msg => 
+        msg.id === id ? { ...msg, ...updates } : msg
+      )
+    );
+  };
+  
   const sendMessage = async (content: string) => {
     if (!conversationId) return null;
     
@@ -135,6 +166,8 @@ export function useChatMessages(conversationId: string | null) {
     messages, 
     isLoading, 
     error, 
-    sendMessage 
+    sendMessage,
+    addMessage,
+    updateMessage
   };
 }

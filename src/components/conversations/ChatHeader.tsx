@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Lead } from "@/hooks/useLeads";
 import { Conversation } from "@/hooks/useConversations";
+import { useEffect, useState } from "react";
 
 interface ChatHeaderProps {
   selectedLead: Lead | null;
@@ -38,6 +39,15 @@ const ChatHeader = ({
   formatDate,
 }: ChatHeaderProps) => {
   const navigate = useNavigate();
+  // Añadimos un estado local para gestionar el estado del switch
+  const [isChatbotActive, setIsChatbotActive] = useState<boolean>(false);
+
+  // Actualizamos el estado local cuando cambia la conversación seleccionada
+  useEffect(() => {
+    if (selectedConversation) {
+      setIsChatbotActive(selectedConversation.chatbot_activo || false);
+    }
+  }, [selectedConversation?.id, selectedConversation?.chatbot_activo]);
 
   const getInitials = (name: string) => {
     if (!name) return "?";
@@ -47,6 +57,15 @@ const ChatHeader = ({
       .join('')
       .toUpperCase()
       .substring(0, 2);
+  };
+
+  // Función para manejar el cambio del toggle con optimistic UI update
+  const handleToggleChatbot = (status?: boolean) => {
+    const newStatus = status !== undefined ? status : !isChatbotActive;
+    // Actualizamos inmediatamente el estado local (optimistic update)
+    setIsChatbotActive(newStatus);
+    // Llamamos a la función original que hace la petición al servidor
+    toggleChatbot(newStatus);
   };
 
   return (
@@ -102,15 +121,15 @@ const ChatHeader = ({
                       <Loader2 className="h-4 w-4 animate-spin mr-2" />
                     ) : null}
                     <Switch
-                      checked={selectedConversation.chatbot_activo || false}
-                      onCheckedChange={toggleChatbot}
+                      checked={isChatbotActive}
+                      onCheckedChange={handleToggleChatbot}
                       disabled={toggleChatbotLoading}
-                      aria-label={selectedConversation.chatbot_activo ? 'Desactivar chatbot' : 'Activar chatbot'}
+                      aria-label={isChatbotActive ? 'Desactivar chatbot' : 'Activar chatbot'}
                     />
                   </div>
                 </TooltipTrigger>
                 <TooltipContent>
-                  {selectedConversation.chatbot_activo ? 
+                  {isChatbotActive ? 
                     'Desactivar chatbot para responder manualmente' : 
                     'Activar chatbot para respuestas automáticas'}
                 </TooltipContent>

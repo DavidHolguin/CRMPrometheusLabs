@@ -103,33 +103,46 @@ const ConversationsPage = () => {
 
   // Transformamos los datos de leadsDetalleData al formato que espera el componente
   const conversations = useMemo(() => {
-    return leadsDetalleData.map(lead => ({
-      id: lead.conversacion_id,
-      lead_id: lead.lead_id,
-      ultimo_mensaje: lead.conversacion_ultimo_mensaje,
-      created_at: lead.lead_creado_en,
-      canal_id: lead.canal_id || '',
-      estado: lead.lead_estado || '',
-      chatbot_id: '', // No tenemos esta información en la nueva vista
-      chatbot_activo: false, // Añadimos esta propiedad con un valor predeterminado
-      lead: {
-        id: lead.lead_id,
-        nombre: lead.nombre_lead || 'Usuario',
-        apellido: lead.apellido_lead || '',
-        email: lead.email_lead,
-        telefono: lead.telefono_lead,
-        score: lead.lead_score,
-        asignado_a: lead.asignado_a,
-        tags: [], // No tenemos tags en la nueva vista, habría que cargar por separado si se necesitan
-        created_at: lead.lead_creado_en || '', // Añadimos created_at
-        updated_at: lead.lead_actualizado_en || '' // Añadimos updated_at
-      },
-      unread_count: 0, // No tenemos esta información en la nueva vista, habría que cargar por separado
-      message_count: 0, // No tenemos esta información en la nueva vista, habría que cargar por separado
-      canal_nombre: lead.canal_nombre,
-      canal_color: lead.canal_color,
-      ultimo_mensaje_contenido: lead.ultimo_mensaje_contenido || ''
-    }));
+    return leadsDetalleData.map(lead => {
+      // Verificamos si tenemos información sobre el estado del chatbot en los datos
+      let chatbotActivo = false;
+      
+      // Intentamos obtener el estado del chatbot de varias fuentes posibles
+      if (lead.chatbot_activo !== undefined) {
+        chatbotActivo = lead.chatbot_activo;
+      }
+      
+      // También podemos verificar en la base de datos local para cada conversación
+      // Esto se hace de manera asíncrona al cargar el componente
+      
+      return {
+        id: lead.conversacion_id,
+        lead_id: lead.lead_id,
+        ultimo_mensaje: lead.conversacion_ultimo_mensaje,
+        created_at: lead.lead_creado_en,
+        canal_id: lead.canal_id || '',
+        estado: lead.lead_estado || '',
+        chatbot_id: lead.chatbot_id || '', // Intentamos obtener chatbot_id si existe
+        chatbot_activo: chatbotActivo, // Usamos el valor que pudimos determinar
+        lead: {
+          id: lead.lead_id,
+          nombre: lead.nombre_lead || 'Usuario',
+          apellido: lead.apellido_lead || '',
+          email: lead.email_lead,
+          telefono: lead.telefono_lead,
+          score: lead.lead_score,
+          asignado_a: lead.asignado_a,
+          tags: [], // No tenemos tags en la nueva vista, habría que cargar por separado si se necesitan
+          created_at: lead.lead_creado_en || '', // Añadimos created_at
+          updated_at: lead.lead_actualizado_en || '' // Añadimos updated_at
+        },
+        unread_count: 0,
+        message_count: 0,
+        canal_nombre: lead.canal_nombre,
+        canal_color: lead.canal_color,
+        ultimo_mensaje_contenido: lead.ultimo_mensaje_contenido || ''
+      };
+    });
   }, [leadsDetalleData]);
   
   const groupedConversations = useMemo(() => {
@@ -313,6 +326,18 @@ const ConversationsPage = () => {
       
       console.log('Enviando solicitud a la API:', requestBody);
       
+      // Actualizamos la conversación en la base de datos local primero
+      const { data: localUpdateData, error: localUpdateError } = await supabase
+        .from("conversaciones")
+        .update({ chatbot_activo: toggleStatus })
+        .eq("id", conversationId)
+        .select();
+        
+      if (localUpdateError) {
+        console.error("Error en actualización local:", localUpdateError);
+        // Continuamos con la API externa aunque falle localmente
+      }
+      
       const response = await fetch('https://web-production-01457.up.railway.app/api/v1/agent/toggle-chatbot', {
         method: 'POST',
         headers: {
@@ -333,19 +358,22 @@ const ConversationsPage = () => {
       
       toast.success(toggleStatus ? 'Chatbot activado' : 'Chatbot desactivado');
       
-      // Actualizar el estado local inmediatamente
+      // Actualizar el estado de la conversación en la UI inmediatamente
       if (selectedConversation) {
         selectedConversation.chatbot_activo = toggleStatus;
       }
       
-      // Esperar un momento y luego actualizar los datos
-      setTimeout(() => {
-        refetchLeadsDetalle();
-      }, 300);
+      // Forzamos la actualización de los datos con un refetch
+      await refetchLeadsDetalle();
       
     } catch (error) {
       console.error('Error toggling chatbot:', error);
       toast.error(`No se pudo ${selectedConversation?.chatbot_activo ? 'desactivar' : 'activar'} el chatbot: ${error.message || 'Error desconocido'}`);
+      
+      // Revertir el estado del toggle en la UI si hubo un error
+      if (selectedConversation) {
+        selectedConversation.chatbot_activo = !status;
+      }
     } finally {
       setToggleChatbotLoading(false);
     }

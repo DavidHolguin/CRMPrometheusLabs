@@ -367,6 +367,234 @@ const LeadDetailSidebar: React.FC<LeadDetailSidebarProps> = ({
               {temperature.label} • {scorePercentage}
             </Badge>
           </div>
+          
+          {/* Botones de acción - 4 botones */}
+          <div className="flex gap-1.5 mt-3">
+            {/* Botón de llamada */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <ActionButton
+                    onClick={() => {
+                      if (selectedLead.telefono) {
+                        window.open(`tel:${selectedLead.telefono.replace(/\D/g, '')}`, '_blank');
+                      } else {
+                        toast({
+                          title: "No hay número de teléfono",
+                          description: "El lead no tiene un número de teléfono registrado.",
+                          variant: "destructive"
+                        });
+                      }
+                    }}
+                  >
+                    <Phone className="h-3.5 w-3.5 text-emerald-400" />
+                    Llamar
+                  </ActionButton>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Llamar al contacto</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            
+            {/* Botón de enviar mensaje */}
+            <Popover open={textMessageOpen} onOpenChange={setTextMessageOpen}>
+              <PopoverTrigger asChild>
+                <ActionButton>
+                  <MessageSquare className="h-3.5 w-3.5 text-blue-400" />
+                  MSN
+                </ActionButton>
+              </PopoverTrigger>
+              <PopoverContent className="w-80" align="end">
+                <Form {...messageForm}>
+                  <form onSubmit={messageForm.handleSubmit(handleMessageSubmit)} className="space-y-4">
+                    <div className="space-y-2">
+                      <h3 className="font-medium text-sm">Enviar mensaje</h3>
+                      <p className="text-xs text-slate-400">El mensaje se enviará al número {selectedLead.telefono || "No disponible"}</p>
+                    </div>
+                    
+                    <FormField
+                      control={messageForm.control}
+                      name="message"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Mensaje</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder="Escribe tu mensaje..."
+                              className="resize-none"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="flex justify-end gap-2">
+                      <Button type="button" variant="outline" size="sm" onClick={() => setTextMessageOpen(false)}>
+                        Cancelar
+                      </Button>
+                      <Button type="submit" size="sm">
+                        Enviar
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              </PopoverContent>
+            </Popover>
+            
+            {/* Botón de correo */}
+            <Dialog open={emailDialogOpen} onOpenChange={setEmailDialogOpen}>
+              <DialogTrigger asChild>
+                <ActionButton>
+                  <Mail className="h-3.5 w-3.5 text-amber-400" />
+                  Correo
+                </ActionButton>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Enviar correo electrónico</DialogTitle>
+                  <DialogDescription>
+                    Enviar un correo a {selectedLead.email || "No disponible"}
+                  </DialogDescription>
+                </DialogHeader>
+                
+                <Form {...emailForm}>
+                  <form onSubmit={emailForm.handleSubmit(handleEmailSubmit)} className="space-y-4">
+                    <FormField
+                      control={emailForm.control}
+                      name="subject"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Asunto</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Asunto del correo..." {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={emailForm.control}
+                      name="body"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Mensaje</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder="Escribe el contenido del correo..."
+                              className="min-h-32 resize-none"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <DialogFooter>
+                      <Button type="button" variant="outline" onClick={() => setEmailDialogOpen(false)}>
+                        Cancelar
+                      </Button>
+                      <Button type="submit">Enviar correo</Button>
+                    </DialogFooter>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+            
+            {/* Botón de agendar */}
+            <Dialog open={calendarDialogOpen} onOpenChange={setCalendarDialogOpen}>
+              <DialogTrigger asChild>
+                <ActionButton>
+                  <Calendar className="h-3.5 w-3.5 text-violet-400" />
+                  Agendar
+                </ActionButton>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Agendar evento</DialogTitle>
+                  <DialogDescription>
+                    Programa una actividad con {selectedLead.nombre} {selectedLead.apellido}
+                  </DialogDescription>
+                </DialogHeader>
+                
+                <Form {...calendarForm}>
+                  <form onSubmit={calendarForm.handleSubmit(handleCalendarSubmit)} className="space-y-4">
+                    <FormField
+                      control={calendarForm.control}
+                      name="title"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Título</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Título del evento..." {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={calendarForm.control}
+                        name="date"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Fecha</FormLabel>
+                            <FormControl>
+                              <Input type="date" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={calendarForm.control}
+                        name="time"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Hora</FormLabel>
+                            <FormControl>
+                              <Input type="time" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    
+                    <FormField
+                      control={calendarForm.control}
+                      name="notes"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Notas</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder="Detalles adicionales..."
+                              className="resize-none"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <DialogFooter>
+                      <Button type="button" variant="outline" onClick={() => setCalendarDialogOpen(false)}>
+                        Cancelar
+                      </Button>
+                      <Button type="submit">Guardar evento</Button>
+                    </DialogFooter>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
         {/* Contenido principal con pestañas */}

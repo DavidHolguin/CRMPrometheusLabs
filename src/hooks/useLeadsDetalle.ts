@@ -33,6 +33,10 @@ export interface LeadDetalle {
   nombre_asignado: string | null;
   email_asignado: string | null;
   avatar_asignado: string | null;
+  // Información del chatbot
+  chatbot_id?: string | null;
+  chatbot_activo?: boolean;
+  chatbot_nombre?: string | null;
 }
 
 export function useLeadsDetalle(options?: {
@@ -78,20 +82,55 @@ export function useLeadsDetalle(options?: {
         
         console.log(`Obtenidos ${data?.length || 0} leads de la vista`);
         
+        // Obtener IDs de conversación para buscar el estado del chatbot
+        const conversacionIds = data?.map(lead => lead.conversacion_id).filter(Boolean) || [];
+        
+        // Obtener información actual del estado del chatbot de la tabla conversaciones
+        let chatbotStatusMap = new Map();
+        
+        if (conversacionIds.length > 0) {
+          const { data: conversacionesData, error: conversacionesError } = await supabase
+            .from('conversaciones')
+            .select('id, chatbot_id, chatbot_activo')
+            .in('id', conversacionIds);
+            
+          if (conversacionesError) {
+            console.error('Error al obtener estado de chatbot:', conversacionesError);
+          } else if (conversacionesData) {
+            // Crear un mapa de id -> {chatbot_id, chatbot_activo}
+            conversacionesData.forEach(conv => {
+              chatbotStatusMap.set(conv.id, {
+                chatbot_id: conv.chatbot_id,
+                chatbot_activo: conv.chatbot_activo !== null ? conv.chatbot_activo : true // Por defecto TRUE si no está definido
+              });
+            });
+            
+            console.log(`Obtenido el estado del chatbot para ${chatbotStatusMap.size} conversaciones`);
+          }
+        }
+        
         // Transformar los datos para proporcionar una estructura consistente
-        const processedData = data?.map(lead => ({
-          ...lead,
-          // Asegurar que la información del agente esté directamente disponible
-          agente_nombre: lead.nombre_asignado,
-          agente_email: lead.email_asignado,
-          agente_avatar: lead.avatar_asignado,
-          // Crear objeto usuario_asignado para mantener compatibilidad
-          usuario_asignado: lead.asignado_a ? {
-            nombre: lead.nombre_asignado,
-            email: lead.email_asignado,
-            avatar_url: lead.avatar_asignado
-          } : null
-        })) || [];
+        const processedData = data?.map(lead => {
+          const convId = lead.conversacion_id;
+          const chatbotStatus = chatbotStatusMap.get(convId) || {};
+          
+          return {
+            ...lead,
+            // Asegurar que la información del agente esté directamente disponible
+            agente_nombre: lead.nombre_asignado,
+            agente_email: lead.email_asignado,
+            agente_avatar: lead.avatar_asignado,
+            // Crear objeto usuario_asignado para mantener compatibilidad
+            usuario_asignado: lead.asignado_a ? {
+              nombre: lead.nombre_asignado,
+              email: lead.email_asignado,
+              avatar_url: lead.avatar_asignado
+            } : null,
+            // Añadir información del chatbot de la tabla de conversaciones
+            chatbot_id: chatbotStatus.chatbot_id || lead.chatbot_id,
+            chatbot_activo: chatbotStatus.chatbot_activo !== undefined ? chatbotStatus.chatbot_activo : true
+          };
+        }) || [];
         
         return processedData;
         
@@ -101,8 +140,8 @@ export function useLeadsDetalle(options?: {
       }
     },
     enabled: !!user?.companyId,
-    refetchInterval: 45000, // 45 segundos
-    staleTime: 30000, // 30 segundos
-    refetchOnWindowFocus: false
+    refetchInterval: 20000, // Reducimos a 20 segundos para actualizaciones más frecuentes
+    staleTime: 10000, // Reducimos a 10 segundos para obtener datos frescos más rápido
+    refetchOnWindowFocus: true // Habilitamos refetch en focus para actualizar cuando el usuario vuelva a la pestaña
   });
 }

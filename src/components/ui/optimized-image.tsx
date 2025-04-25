@@ -53,16 +53,19 @@ export function OptimizedImage({
     if (isExternalUrl) {
       try {
         // Para URLs externas, usamos la API de Vercel para optimización
-        const url = new URL('/_vercel/image', window.location.origin);
-        url.searchParams.append('url', src);
-        url.searchParams.append('w', width.toString());
-        url.searchParams.append('q', quality.toString());
+        // Nota: No modificamos directamente la URL global window.location
+        // para evitar conflictos con otras partes de la aplicación
+        const baseUrl = window.location.origin;
+        const imgUrl = new URL('/_vercel/image', baseUrl);
+        imgUrl.searchParams.append('url', src);
+        imgUrl.searchParams.append('w', width.toString());
+        imgUrl.searchParams.append('q', quality.toString());
         
         if (cacheKey) {
-          url.searchParams.append('cacheKey', cacheKey);
+          imgUrl.searchParams.append('cacheKey', cacheKey);
         }
         
-        setImgSrc(url.toString());
+        setImgSrc(imgUrl.toString());
       } catch (err) {
         console.error('Error al optimizar imagen externa:', err);
         setImgSrc(src); // Fallback a la imagen original

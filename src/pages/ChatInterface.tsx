@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import ReactMarkdown from 'react-markdown';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Send, Bot, User, Mic, Smile, MoreVertical, Check, Star, Phone, Info, Shield, ExternalLink, Square } from "lucide-react";
+import { Send, Bot, User, Mic, Smile, MoreVertical, Check, Star, Phone, Mail, Calendar, MessageSquare, Info, Shield, ExternalLink, Square } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
@@ -45,6 +45,15 @@ const ChatInterface = () => {
   const [showRecordingControls, setShowRecordingControls] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [phoneError, setPhoneError] = useState<string | null>(null);
+  
+  // Nuevos estados para los formularios y modales
+  const [showContactForm, setShowContactForm] = useState(false);
+  const [showEmailForm, setShowEmailForm] = useState(false);
+  const [showScheduleForm, setShowScheduleForm] = useState(false);
+  const [userEmail, setUserEmail] = useState("");
+  const [scheduleDate, setScheduleDate] = useState("");
+  const [scheduleTime, setScheduleTime] = useState("");
+  const [scheduleSubject, setScheduleSubject] = useState("");
 
   const { messages, addMessage, updateMessage } = useChatMessages(conversationId);
   const isMobile = useIsMobile();
@@ -171,6 +180,7 @@ const ChatInterface = () => {
             // Formatear el mensaje según la estructura esperada por ChatMessage
             const formattedMessage: ChatMessage = {
               id: newMessage.id,
+              conversacion_id: conversationId || '',
               contenido: newMessage.contenido,
               origen: newMessage.origen,
               created_at: newMessage.created_at,
@@ -228,6 +238,7 @@ const ChatInterface = () => {
       const optimisticId = uuidv4();
       const optimisticMsg: ChatMessage = {
         id: optimisticId,
+        conversacion_id: conversationId || '',
         contenido: "",
         origen: "usuario",
         created_at: new Date().toISOString(),
@@ -337,6 +348,7 @@ const ChatInterface = () => {
         if (data.respuesta) {
           addMessage({
             id: data.mensaje_id || uuidv4(),
+            conversacion_id: data.conversacion_id || conversationId || '',
             contenido: data.respuesta,
             origen: "chatbot",
             created_at: new Date().toISOString(),
@@ -625,6 +637,7 @@ const ChatInterface = () => {
         
         const welcomeMessage = {
           id: uuidv4(),
+          conversacion_id: conversationId || '',
           contenido: welcomeText,
           origen: "chatbot",
           created_at: new Date().toISOString()
@@ -799,6 +812,7 @@ const ChatInterface = () => {
       const optimisticId = uuidv4();
       const optimisticMsg: ChatMessage = {
         id: optimisticId,
+        conversacion_id: conversationId || '',
         contenido: messageContent,
         origen: "usuario",
         created_at: new Date().toISOString()
@@ -900,6 +914,7 @@ const ChatInterface = () => {
       if (data.respuesta) {
         addMessage({
           id: data.mensaje_id || uuidv4(),
+          conversacion_id: data.conversacion_id || conversationId || '',
           contenido: data.respuesta,
           origen: "chatbot",
           created_at: new Date().toISOString(),
@@ -1005,6 +1020,89 @@ const ChatInterface = () => {
     }
   };
 
+  // Nuevas funciones para manejar los formularios de contacto
+  const handleCallRequest = () => {
+    setShowContactForm(true);
+  };
+
+  const handleEmailRequest = () => {
+    setShowEmailForm(true);
+  };
+
+  const handleScheduleRequest = () => {
+    setShowScheduleForm(true);
+  };
+
+  const submitEmailForm = async () => {
+    if (!userEmail.trim()) {
+      toast.error("Por favor, ingresa tu correo electrónico");
+      return;
+    }
+
+    try {
+      // Mensaje del usuario para el correo
+      const userEmailMsg: ChatMessage = {
+        id: uuidv4(),
+        conversacion_id: conversationId || '',
+        contenido: `Mi correo es: ${userEmail}`,
+        origen: "usuario",
+        created_at: new Date().toISOString()
+      };
+      addMessage(userEmailMsg);
+
+      // Respuesta del sistema
+      const systemEmailResponse: ChatMessage = {
+        id: uuidv4(),
+        conversacion_id: conversationId || '',
+        contenido: "Gracias por proporcionar tu correo electrónico. Te enviaremos información detallada a la brevedad.",
+        origen: "chatbot",
+        created_at: new Date().toISOString()
+      };
+      addMessage(systemEmailResponse);
+
+      setShowEmailForm(false);
+      toast.success("Correo registrado correctamente");
+    } catch (error) {
+      console.error("Error al enviar correo:", error);
+      toast.error("No se pudo procesar tu solicitud. Intenta nuevamente.");
+    }
+  };
+
+  const submitScheduleForm = async () => {
+    if (!scheduleDate || !scheduleTime || !scheduleSubject.trim()) {
+      toast.error("Por favor, completa todos los campos");
+      return;
+    }
+
+    try {
+      // Mensaje del usuario para la cita
+      const userScheduleMsg: ChatMessage = {
+        id: uuidv4(),
+        conversacion_id: conversationId || '',
+        contenido: `Quisiera agendar una cita para el ${scheduleDate} a las ${scheduleTime}. Asunto: ${scheduleSubject}`,
+        origen: "usuario",
+        created_at: new Date().toISOString()
+      };
+      addMessage(userScheduleMsg);
+
+      // Respuesta del sistema
+      const systemScheduleResponse: ChatMessage = {
+        id: uuidv4(),
+        conversacion_id: conversationId || '',
+        contenido: `Tu cita ha sido agendada para el ${scheduleDate} a las ${scheduleTime}. Te enviaremos una confirmación por correo electrónico o mensaje de texto.`,
+        origen: "chatbot",
+        created_at: new Date().toISOString()
+      };
+      addMessage(systemScheduleResponse);
+
+      setShowScheduleForm(false);
+      toast.success("Cita agendada correctamente");
+    } catch (error) {
+      console.error("Error al agendar cita:", error);
+      toast.error("No se pudo agendar tu cita. Intenta nuevamente.");
+    }
+  };
+
   return (
     <div className="flex flex-col h-screen bg-[#0e1621] overflow-hidden" ref={containerRef}>
       <header className="p-3 bg-[#020817] shadow-sm flex items-center justify-between fixed top-0 left-0 right-0 z-30 border-b border-[#3b82f6]">
@@ -1097,6 +1195,49 @@ const ChatInterface = () => {
           )}
           <div ref={messagesEndRef} />
         </div>
+      </div>
+
+      {/* Botones de acción rápida */}
+      <div className="flex justify-center gap-2 py-2 bg-[#1f2c34] border-t border-gray-800">
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="flex flex-col items-center text-blue-400 hover:bg-blue-800/20 rounded-lg py-2 px-3"
+          onClick={handleCallRequest}
+        >
+          <Phone className="h-5 w-5 mb-1" />
+          <span className="text-xs">Llamar</span>
+        </Button>
+        
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="flex flex-col items-center text-green-400 hover:bg-green-800/20 rounded-lg py-2 px-3"
+          onClick={() => setMessage(message + " Por favor envíame un mensaje por WhatsApp.")}
+        >
+          <MessageSquare className="h-5 w-5 mb-1" />
+          <span className="text-xs">MSN</span>
+        </Button>
+        
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="flex flex-col items-center text-purple-400 hover:bg-purple-800/20 rounded-lg py-2 px-3"
+          onClick={handleEmailRequest}
+        >
+          <Mail className="h-5 w-5 mb-1" />
+          <span className="text-xs">Correo</span>
+        </Button>
+        
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="flex flex-col items-center text-amber-400 hover:bg-amber-800/20 rounded-lg py-2 px-3"
+          onClick={handleScheduleRequest}
+        >
+          <Calendar className="h-5 w-5 mb-1" />
+          <span className="text-xs">Agendar</span>
+        </Button>
       </div>
 
       <div className="p-2 bg-[#020817] border-t border-[#3b82f6] fixed bottom-0 left-0 right-0 z-30">
@@ -1226,6 +1367,209 @@ const ChatInterface = () => {
             <p className="text-xs text-center text-muted-foreground mt-4">
               Al continuar, aceptas nuestras <a href="http://prometheuslabs.com.co/politicas_de_privacidad" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">políticas de privacidad</a> y <a href="http://prometheuslabs.com.co/condiciones_de_servicio" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">términos de uso</a>.
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Email Form Modal */}
+      {showEmailForm && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card rounded-lg shadow-lg max-w-md w-full p-6 space-y-4 relative">
+            <div className="text-center mb-4">
+              <Mail className="h-12 w-12 mx-auto mb-2 text-purple-500" />
+              <h2 className="text-xl font-semibold">Déjanos tu correo</h2>
+              <p className="text-muted-foreground text-sm mt-1">
+                Te enviaremos información detallada a tu correo electrónico.
+              </p>
+            </div>
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <label htmlFor="userEmail" className="text-sm font-medium">
+                  Correo electrónico
+                </label>
+                <input 
+                  id="userEmail" 
+                  type="email" 
+                  value={userEmail} 
+                  onChange={e => setUserEmail(e.target.value)} 
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" 
+                  placeholder="correo@ejemplo.com" 
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-4">
+              <Button 
+                variant="outline" 
+                className="flex-1" 
+                onClick={() => setShowEmailForm(false)}
+              >
+                Cancelar
+              </Button>
+              <Button 
+                className="flex-1" 
+                onClick={submitEmailForm} 
+                disabled={!userEmail.includes('@')}
+              >
+                Enviar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Schedule Form Modal */}
+      {showScheduleForm && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card rounded-lg shadow-lg max-w-md w-full p-6 space-y-4 relative">
+            <div className="text-center mb-4">
+              <Calendar className="h-12 w-12 mx-auto mb-2 text-amber-500" />
+              <h2 className="text-xl font-semibold">Agendar una cita</h2>
+              <p className="text-muted-foreground text-sm mt-1">
+                Selecciona la fecha y hora que prefieras para tu cita.
+              </p>
+            </div>
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <label htmlFor="scheduleDate" className="text-sm font-medium">
+                  Fecha
+                </label>
+                <input 
+                  id="scheduleDate" 
+                  type="date" 
+                  value={scheduleDate} 
+                  onChange={e => setScheduleDate(e.target.value)} 
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" 
+                />
+              </div>
+              <div className="space-y-1">
+                <label htmlFor="scheduleTime" className="text-sm font-medium">
+                  Hora
+                </label>
+                <input 
+                  id="scheduleTime" 
+                  type="time" 
+                  value={scheduleTime} 
+                  onChange={e => setScheduleTime(e.target.value)} 
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" 
+                />
+              </div>
+              <div className="space-y-1">
+                <label htmlFor="scheduleSubject" className="text-sm font-medium">
+                  Asunto
+                </label>
+                <input 
+                  id="scheduleSubject" 
+                  type="text" 
+                  value={scheduleSubject} 
+                  onChange={e => setScheduleSubject(e.target.value)} 
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" 
+                  placeholder="Ej: Consulta sobre servicios" 
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-4">
+              <Button 
+                variant="outline" 
+                className="flex-1" 
+                onClick={() => setShowScheduleForm(false)}
+              >
+                Cancelar
+              </Button>
+              <Button 
+                className="flex-1" 
+                onClick={submitScheduleForm} 
+                disabled={!scheduleDate || !scheduleTime || !scheduleSubject}
+              >
+                Agendar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Contact Form Modal */}
+      {showContactForm && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card rounded-lg shadow-lg max-w-md w-full p-6 space-y-4 relative">
+            <div className="text-center mb-4">
+              <Phone className="h-12 w-12 mx-auto mb-2 text-blue-500" />
+              <h2 className="text-xl font-semibold">Solicitar llamada</h2>
+              <p className="text-muted-foreground text-sm mt-1">
+                Confirma tu número para que te contactemos a la brevedad.
+              </p>
+            </div>
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <label htmlFor="confirmPhone" className="text-sm font-medium">
+                  Número de teléfono
+                </label>
+                <div className="flex">
+                  <select 
+                    className="rounded-l-md border border-input bg-background px-2 py-2 text-sm border-r-0" 
+                    defaultValue="+57"
+                  >
+                    <option value="+57">+57 🇨🇴</option>
+                    <option value="+1">+1 🇺🇸</option>
+                    <option value="+52">+52 🇲🇽</option>
+                    <option value="+34">+34 🇪🇸</option>
+                    <option value="+58">+58 🇻🇪</option>
+                  </select>
+                  <input 
+                    id="confirmPhone" 
+                    type="tel" 
+                    value={userPhone} 
+                    onChange={e => {
+                      // Permitir solo números y limitar a 10 dígitos
+                      const value = e.target.value.replace(/\D/g, '');
+                      if (value.length <= 10) {
+                        setUserPhone(value);
+                      }
+                    }} 
+                    className="flex-1 rounded-r-md border border-input bg-background px-3 py-2 text-sm" 
+                    placeholder="Ej: 3001234567" 
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-4">
+              <Button 
+                variant="outline" 
+                className="flex-1" 
+                onClick={() => setShowContactForm(false)}
+              >
+                Cancelar
+              </Button>
+              <Button 
+                className="flex-1" 
+                onClick={() => {
+                  // Agregar mensaje al chat
+                  const userCallMsg: ChatMessage = {
+                    id: uuidv4(),
+                    conversacion_id: conversationId || '',
+                    contenido: "Me gustaría recibir una llamada para obtener más información.",
+                    origen: "usuario",
+                    created_at: new Date().toISOString()
+                  };
+                  addMessage(userCallMsg);
+
+                  // Respuesta del bot
+                  const botCallResponse: ChatMessage = {
+                    id: uuidv4(),
+                    conversacion_id: conversationId || '',
+                    contenido: `Gracias por tu interés. Te llamaremos pronto al número ${userPhone}.`,
+                    origen: "chatbot",
+                    created_at: new Date().toISOString()
+                  };
+                  addMessage(botCallResponse);
+                  
+                  setShowContactForm(false);
+                  toast.success("Solicitud de llamada enviada correctamente");
+                }} 
+                disabled={!userPhone || userPhone.length < 10}
+              >
+                Solicitar llamada
+              </Button>
+            </div>
           </div>
         </div>
       )}
