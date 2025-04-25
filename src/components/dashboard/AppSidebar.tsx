@@ -15,7 +15,8 @@ import {
   Brain,
   UserCircle,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Sparkles
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { 
@@ -224,6 +225,14 @@ export function AppSidebar({ isMobileOpen, setIsMobileOpen }: AppSidebarProps) {
               icon={<MessagesSquare size={20} />}
               label="Chatbots"
               isActive={location.pathname.includes("chatbots")}
+              isCollapsed={isCollapsed}
+              onClick={handleLinkClick}
+            />
+            <NavLink
+              to="/dashboard/agentes-ia"
+              icon={<Sparkles size={20} />}
+              label="Agentes IA"
+              isActive={location.pathname.includes("agentes-ia")}
               isCollapsed={isCollapsed}
               onClick={handleLinkClick}
             />

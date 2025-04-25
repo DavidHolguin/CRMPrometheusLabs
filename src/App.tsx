@@ -3,7 +3,6 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-// Importar correctamente la versión de Analytics para entornos sin Next.js
 import { inject } from '@vercel/analytics';
 
 // Pages
@@ -26,6 +25,7 @@ import EntrenamientoIA from "./pages/EntrenamientoIA";
 import PerfilEmpresa from "./pages/PerfilEmpresa";
 import ChatbotConfig from "./pages/ChatbotConfig";
 import ImageOptimization from "./pages/ImageOptimization";
+import AgentesIA from "./pages/AgentesIA";
 
 // Admin pages
 import AdminAgentes from "./pages/admin/AdminAgentes";
@@ -94,6 +94,7 @@ const App = () => {
           <Route path="chatbots" element={<Chatbots />} />
           <Route path="chatbots/:chatbotId/settings" element={<ChatbotConfig />} />
           <Route path="entrenamiento-ia" element={<EntrenamientoIA />} />
+          <Route path="agentes-ia" element={<AgentesIA />} />
           <Route path="perfil-empresa" element={<PerfilEmpresa />} />
           <Route path="settings" element={<Dashboard />} />
           <Route path="image-optimization" element={<ImageOptimization />} />
