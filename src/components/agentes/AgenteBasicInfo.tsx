@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
-import { Upload, X } from "lucide-react";
+import { Upload, X, Bot } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const formSchema = z.object({
@@ -105,81 +105,87 @@ export function AgenteBasicInfo({ onDataChange, initialData }: AgenteBasicInfoPr
   };
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      <div>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      {/* Columna del formulario */}
+      <Card className="p-6">
         <Form {...form}>
           <form className="space-y-6">
-            <FormField
-              control={form.control}
-              name="nombre"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nombre del agente</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Ej: Asistente de Ventas" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="space-y-4">
+              <FormField
+                control={form.control}
+                name="nombre"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nombre del agente</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ej: Asistente de Ventas" {...field} />
+                    </FormControl>
+                    <FormDescription className="text-xs">
+                      Elige un nombre descriptivo que refleje la función del agente
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <Input 
-                      type="email" 
-                      placeholder="correo@empresa.com" 
-                      {...field} 
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Este email se usará para identificar al agente en el sistema
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="sitioWeb"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Sitio web</FormLabel>
-                  <FormControl>
-                    <div className="relative">
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
                       <Input 
-                        placeholder="https://www.ejemplo.com" 
-                        {...field}
-                        className={cn(
-                          field.value && !isUrlValid && "border-red-500 focus-visible:ring-red-500"
-                        )}
+                        type="email" 
+                        placeholder="correo@empresa.com" 
+                        {...field} 
                       />
-                      {field.value && (
-                        <div 
+                    </FormControl>
+                    <FormDescription className="text-xs">
+                      Se usará para identificar al agente y las notificaciones
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="sitioWeb"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Sitio web</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Input 
+                          placeholder="https://www.ejemplo.com" 
+                          {...field}
                           className={cn(
-                            "absolute right-3 top-1/2 -translate-y-1/2 h-2 w-2 rounded-full",
-                            isUrlValid ? "bg-green-500" : "bg-red-500"
+                            field.value && !isUrlValid && "border-red-500 focus-visible:ring-red-500"
                           )}
                         />
-                      )}
-                    </div>
-                  </FormControl>
-                  <FormDescription>
-                    URL del sitio web donde se implementará el agente
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                        {field.value && (
+                          <div 
+                            className={cn(
+                              "absolute right-3 top-1/2 -translate-y-1/2 h-2 w-2 rounded-full",
+                              isUrlValid ? "bg-green-500" : "bg-red-500"
+                            )}
+                          />
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormDescription className="text-xs">
+                      URL del sitio donde se implementará el chatbot
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
-            <div>
+            <div className="space-y-4">
               <FormLabel>Avatar del agente</FormLabel>
-              <div className="mt-2 flex items-center gap-4">
+              <div className="flex items-center gap-4">
                 <Avatar className="h-20 w-20">
                   <AvatarImage src={avatarPreview || undefined} />
                   <AvatarFallback className="text-lg">
@@ -220,44 +226,117 @@ export function AgenteBasicInfo({ onDataChange, initialData }: AgenteBasicInfoPr
                   )}
                 </div>
               </div>
+              <FormDescription className="text-xs">
+                Un avatar personalizado ayuda a humanizar la experiencia
+              </FormDescription>
             </div>
           </form>
         </Form>
-      </div>
+      </Card>
 
-      {/* Preview en tiempo real */}
-      <Card className="relative overflow-hidden bg-muted/50">
-        <div className="absolute inset-0 bg-grid-black/5 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.6))] dark:bg-grid-white/5" />
-        <CardContent className="p-6 relative">
-          <div className="flex flex-col items-center space-y-4">
+      {/* Columna de recomendaciones */}
+      <Card className="bg-muted/50 border-dashed p-6">
+        <h4 className="font-medium mb-4">Consejos para configurar tu chatbot</h4>
+        <div className="space-y-6">
+          <div>
+            <h5 className="font-medium text-sm mb-2">Nombre efectivo</h5>
+            <ul className="text-sm space-y-2 text-muted-foreground">
+              <li>
+                <span className="font-medium text-foreground">Sea descriptivo:</span>{" "}
+                Elige un nombre que refleje claramente la función del chatbot
+              </li>
+              <li>
+                <span className="font-medium text-foreground">Sea memorable:</span>{" "}
+                Usa nombres fáciles de recordar y pronunciar
+              </li>
+              <li>
+                <span className="font-medium text-foreground">Sea profesional:</span>{" "}
+                Evita nombres demasiado informales o poco serios
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <h5 className="font-medium text-sm mb-2">Email y comunicación</h5>
+            <ul className="text-sm space-y-2 text-muted-foreground">
+              <li>
+                <span className="font-medium text-foreground">Email corporativo:</span>{" "}
+                Usa un email profesional relacionado con tu empresa
+              </li>
+              <li>
+                <span className="font-medium text-foreground">Dominio propio:</span>{" "}
+                Evita usar emails genéricos o personales
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <h5 className="font-medium text-sm mb-2">Sitio web</h5>
+            <ul className="text-sm space-y-2 text-muted-foreground">
+              <li>
+                <span className="font-medium text-foreground">URL completa:</span>{" "}
+                Incluye https:// en la dirección web
+              </li>
+              <li>
+                <span className="font-medium text-foreground">Accesibilidad:</span>{" "}
+                Asegúrate que la página sea accesible públicamente
+              </li>
+            </ul>
+          </div>
+        </div>
+      </Card>
+
+      {/* Columna de preview */}
+      <Card className="p-6">
+        <h4 className="font-medium mb-6 text-center">Vista previa del chatbot</h4>
+        <div className="flex flex-col items-center space-y-6">
+          <div className="relative">
             <Avatar className="h-24 w-24">
               <AvatarImage src={avatarPreview || undefined} />
-              <AvatarFallback className="text-2xl">
+              <AvatarFallback className="text-2xl bg-primary/10 text-primary">
                 {getInitials(formValues.nombre || "NA")}
               </AvatarFallback>
             </Avatar>
-            
-            <div className="text-center space-y-1.5">
-              <h3 className="font-semibold text-lg">
-                {formValues.nombre || "Nombre del agente"}
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                {formValues.email || "correo@empresa.com"}
-              </p>
-              {formValues.sitioWeb && (
-                <p className="text-xs text-muted-foreground">
-                  {formValues.sitioWeb}
-                </p>
-              )}
-            </div>
-
-            <div className="w-full max-w-xs bg-background rounded-lg p-4 shadow-sm">
-              <p className="text-xs text-center text-muted-foreground">
-                Vista previa de cómo se verá tu agente en el chat
-              </p>
+            <div className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
+              <Bot className="h-4 w-4" />
             </div>
           </div>
-        </CardContent>
+          
+          <div className="text-center space-y-1.5">
+            <h3 className="font-semibold text-lg">
+              {formValues.nombre || "Nombre del agente"}
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              {formValues.email || "correo@empresa.com"}
+            </p>
+            {formValues.sitioWeb && (
+              <p className="text-xs text-muted-foreground">
+                {formValues.sitioWeb}
+              </p>
+            )}
+          </div>
+
+          {/* Preview del chat */}
+          <div className="w-full max-w-sm bg-background rounded-lg border p-4">
+            <div className="space-y-4">
+              <div className="flex items-start gap-3">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={avatarPreview || undefined} />
+                  <AvatarFallback className="text-xs">
+                    {getInitials(formValues.nombre || "NA")}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="bg-primary/10 text-primary rounded-lg p-3 text-sm">
+                  ¡Hola! Soy {formValues.nombre || "tu asistente"}, ¿en qué puedo ayudarte?
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <p className="text-xs text-center text-muted-foreground">
+            Vista previa de cómo se verá tu chatbot en la interfaz de chat
+          </p>
+        </div>
       </Card>
     </div>
   );

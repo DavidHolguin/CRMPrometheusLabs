@@ -114,13 +114,13 @@ export function AgenteWizard({ onComplete, onCancel }: AgenteWizardProps) {
   };
 
   return (
-    <div className="flex flex-col h-full max-h-[calc(100vh-4rem)] overflow-hidden">
+    <div className="fixed inset-0 z-50 bg-background flex flex-col overflow-hidden">
       {/* Header con Progreso */}
-      <div className="sticky top-0 z-20 bg-background p-6 border-b">
+      <div className="flex-none bg-background p-6 border-b">
         <div className="space-y-4">
           <div className="flex justify-between items-center">
             <div>
-              <h2 className="text-lg font-semibold">{steps[currentStepIndex].label}</h2>
+              <h2 className="text-2xl font-semibold">{steps[currentStepIndex].label}</h2>
               <p className="text-sm text-muted-foreground">
                 Paso {currentStepIndex + 1} de {steps.length}
               </p>
@@ -164,28 +164,31 @@ export function AgenteWizard({ onComplete, onCancel }: AgenteWizardProps) {
       </div>
 
       {/* Contenido del paso actual */}
-      <ScrollArea className="flex-1 p-6">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentStep}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
-          >
-            <Card className="p-6">
-              {renderStepContent()}
-            </Card>
-          </motion.div>
-        </AnimatePresence>
+      <ScrollArea className="verflow-y-auto">
+        <div className="p-6">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentStep}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+            >
+              <Card className="p-6">
+                {renderStepContent()}
+              </Card>
+            </motion.div>
+          </AnimatePresence>
+        </div>
       </ScrollArea>
 
       {/* Barra de navegación inferior */}
-      <div className="sticky bottom-0 z-20 bg-background p-6 border-t">
-        <div className="flex items-center justify-between">
+      <div className="flex-none bg-background p-6 border-t">
+        <div className="container max-w-3xl mx-auto flex items-center justify-between">
           <Button
             variant="outline"
             onClick={currentStepIndex === 0 ? onCancel : handlePrevStep}
+            className="min-w-[100px]"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             {currentStepIndex === 0 ? "Cancelar" : "Anterior"}
@@ -194,6 +197,7 @@ export function AgenteWizard({ onComplete, onCancel }: AgenteWizardProps) {
           <Button 
             onClick={handleNextStep}
             disabled={!canProceed()}
+            className="min-w-[100px]"
           >
             {currentStepIndex === steps.length - 1 ? (
               <>

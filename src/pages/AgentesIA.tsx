@@ -57,54 +57,61 @@ const AgentesIA = () => {
   );
 
   return (
-    <div className="container py-6 space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Agentes IA</h1>
-          <p className="text-muted-foreground">
-            Gestiona y configura tus agentes de inteligencia artificial
-          </p>
-        </div>
-        <Button onClick={() => setShowWizard(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Crear agente
-        </Button>
-      </div>
+    <>
+      <div className="flex flex-col h-[calc(100vh-64px)] overflow-hidden bg-background">
+        {/* Header con barra de búsqueda */}
+        <div className="flex-none p-6 pb-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">Agentes IA</h1>
+              <p className="text-muted-foreground">
+                Gestiona y configura tus agentes de inteligencia artificial
+              </p>
+            </div>
+            <Button onClick={() => setShowWizard(true)} size="default">
+              <Plus className="mr-2 h-4 w-4" />
+              Crear agente
+            </Button>
+          </div>
 
-      <div className="flex items-center gap-4">
-        <div className="flex-1 relative">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar agentes..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-8"
-          />
+          <div className="flex items-center gap-4 mt-4">
+            <div className="flex-1 relative max-w-md">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar agentes..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Contenido principal */}
+        <div className="flex-1 overflow-auto">
+          <div className="container mx-auto p-6">
+            {isLoading ? (
+              <div className="flex items-center justify-center h-[200px]">
+                <div className="animate-pulse text-muted-foreground">
+                  Cargando agentes...
+                </div>
+              </div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {filteredAgentes?.map((agente) => (
+                  <AgenteCard 
+                    key={agente.id} 
+                    agente={agente}
+                    onEdit={() => {}} 
+                    onActivate={handleActivate}
+                    onResetPassword={handleResetPassword}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
-
-      {isLoading ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Cargando agentes...</CardTitle>
-            <CardDescription>
-              Por favor espera mientras se cargan los agentes disponibles.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredAgentes?.map((agente) => (
-            <AgenteCard 
-              key={agente.id} 
-              agente={agente}
-              onEdit={() => {}} // Implementar si es necesario
-              onActivate={handleActivate}
-              onResetPassword={handleResetPassword}
-            />
-          ))}
-        </div>
-      )}
 
       {showWizard && (
         <AgenteWizard 
@@ -131,7 +138,7 @@ const AgentesIA = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </>
   );
 }
 
