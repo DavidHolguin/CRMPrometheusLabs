@@ -3,21 +3,23 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, ArrowRight, Bot, FileText, Sparkles, Zap, CheckCircle } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bot, FileText, Sparkles, Target, CheckCircle } from "lucide-react";
 import { AgenteBasicInfo } from "./AgenteBasicInfo";
 import { AgenteKnowledgeSource } from "./AgenteKnowledgeSource";
 import { AgentePersonality } from "./AgentePersonality";
-import { AgenteAutomation } from "./AgenteAutomation";
+import { AgenteGoalsExamples } from "./AgenteGoalsExamples";
 import { AgenteReview } from "./AgenteReview";
 import { Progress } from "@/components/ui/progress";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
-type Step = "basic" | "knowledge" | "personality" | "automation" | "review";
+type Step = "basic" | "knowledge" | "personality" | "goals" | "review";
 
 const steps = [
   { id: "basic", label: "Información básica", icon: Bot },
   { id: "knowledge", label: "Fuentes de conocimiento", icon: FileText },
   { id: "personality", label: "Personalidad & estilo", icon: Sparkles },
-  { id: "automation", label: "Intenciones & Automatizaciones", icon: Zap },
+  { id: "goals", label: "Objetivos & Ejemplos", icon: Target },
   { id: "review", label: "Revisión & Publicación", icon: CheckCircle }
 ];
 
@@ -30,16 +32,23 @@ export function AgenteWizard({ onComplete, onCancel }: AgenteWizardProps) {
   const [currentStep, setCurrentStep] = useState<Step>("basic");
   const [formData, setFormData] = useState<any>({});
   const [progress, setProgress] = useState(0);
+  const [agenteId, setAgenteId] = useState<string | null>(null);
+  const [isCreatingAgent, setIsCreatingAgent] = useState(false);
 
   // Índice del paso actual
   const currentStepIndex = steps.findIndex(step => step.id === currentStep);
 
-  const handleNextStep = () => {
+  const handleNextStep = async () => {
+    if (currentStep === "basic" && !agenteId) {
+      // Si estamos en el paso básico y aún no tenemos un ID de agente, lo creamos primero
+      await createInitialAgent();
+    }
+
     if (currentStepIndex < steps.length - 1) {
       setCurrentStep(steps[currentStepIndex + 1].id as Step);
       setProgress(((currentStepIndex + 2) / steps.length) * 100);
     } else {
-      onComplete(formData);
+      onComplete({...formData, agenteId});
     }
   };
 
@@ -57,13 +66,49 @@ export function AgenteWizard({ onComplete, onCancel }: AgenteWizardProps) {
     }));
   };
 
+  // Crear un registro inicial del agente para obtener el ID
+  const createInitialAgent = async () => {
+    if (!formData.basic?.nombre) return;
+    
+    setIsCreatingAgent(true);
+    
+    try {
+      // Crear el registro del agente en la tabla principal
+      const { data, error } = await supabase
+        .from('agentes')
+        .insert({
+          nombre: formData.basic.nombre,
+          descripcion: "",
+          tipo: "asistente", // tipo predeterminado
+          nivel_autonomia: 1,
+          status: "entrenamiento"
+        })
+        .select('id')
+        .single();
+      
+      if (error) {
+        throw error;
+      }
+      
+      if (data) {
+        setAgenteId(data.id);
+        toast.success("Agente creado correctamente. Puedes continuar configurándolo.");
+      }
+    } catch (error) {
+      toast.error(`Error al crear el agente: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+      console.error("Error al crear el agente:", error);
+    } finally {
+      setIsCreatingAgent(false);
+    }
+  };
+
   const canProceed = () => {
     switch (currentStep) {
       case "basic":
-        return formData.basic?.nombre && formData.basic?.email;
+        return formData.basic?.nombre && formData.basic?.email && !isCreatingAgent;
       case "knowledge":
       case "personality":
-      case "automation":
+      case "goals":
         return true; // Estos pasos son opcionales
       case "review":
         return formData.basic?.nombre && formData.basic?.email;
@@ -86,6 +131,7 @@ export function AgenteWizard({ onComplete, onCancel }: AgenteWizardProps) {
           <AgenteKnowledgeSource
             onDataChange={(data) => updateFormData("knowledge", data)}
             initialData={formData.knowledge}
+            agenteId={agenteId}
           />
         );
       case "personality":
@@ -95,11 +141,11 @@ export function AgenteWizard({ onComplete, onCancel }: AgenteWizardProps) {
             initialData={formData.personality}
           />
         );
-      case "automation":
+      case "goals":
         return (
-          <AgenteAutomation
-            onDataChange={(data) => updateFormData("automation", data)}
-            initialData={formData.automation}
+          <AgenteGoalsExamples
+            onDataChange={(data) => updateFormData("goals", data)}
+            initialData={formData.goals}
           />
         );
       case "review":
@@ -164,7 +210,7 @@ export function AgenteWizard({ onComplete, onCancel }: AgenteWizardProps) {
       </div>
 
       {/* Contenido del paso actual */}
-      <ScrollArea className="verflow-y-auto">
+      <ScrollArea className="flex-1 overflow-y-auto">
         <div className="p-6">
           <AnimatePresence mode="wait">
             <motion.div
@@ -189,6 +235,7 @@ export function AgenteWizard({ onComplete, onCancel }: AgenteWizardProps) {
             variant="outline"
             onClick={currentStepIndex === 0 ? onCancel : handlePrevStep}
             className="min-w-[100px]"
+            disabled={isCreatingAgent}
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             {currentStepIndex === 0 ? "Cancelar" : "Anterior"}
@@ -199,7 +246,11 @@ export function AgenteWizard({ onComplete, onCancel }: AgenteWizardProps) {
             disabled={!canProceed()}
             className="min-w-[100px]"
           >
-            {currentStepIndex === steps.length - 1 ? (
+            {isCreatingAgent ? (
+              <>
+                Creando agente...
+              </>
+            ) : currentStepIndex === steps.length - 1 ? (
               <>
                 Publicar agente
                 <CheckCircle className="h-4 w-4 ml-2" />

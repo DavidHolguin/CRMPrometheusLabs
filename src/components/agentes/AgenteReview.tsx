@@ -7,14 +7,11 @@ import { Progress } from "@/components/ui/progress";
 import {
   Bot,
   FileText,
-  MessageSquare,
-  Mail,
-  BellRing,
-  TimerReset,
-  Calendar,
-  AlertCircle,
   CheckCircle,
   X,
+  AlertCircle,
+  Target,
+  CheckSquare,
 } from "lucide-react";
 
 interface AgenteReviewProps {
@@ -39,26 +36,16 @@ interface AgenteReviewProps {
       tone: number;
       instructions: string;
     };
-    automation?: {
-      intents: Array<{
+    goals?: {
+      objectives: string;
+      keyPoints: string[];
+      examples: Array<{
         id: string;
-        name: string;
-        keywords: string[];
-        response: string;
-        action: string;
-      }>;
-      automations: Array<{
-        id: string;
-        trigger: {
-          type: string;
-          condition: string;
-        };
-        action: {
-          type: string;
-          value: string;
-        };
+        type: 'positive' | 'negative';
+        text: string;
       }>;
     };
+    agenteId?: string;
   };
 }
 
@@ -79,23 +66,8 @@ const getToneLabel = (tone: number) => {
   return "Muy casual";
 };
 
-const actionIcons: Record<string, any> = {
-  reply: MessageSquare,
-  email: Mail,
-  notify: BellRing,
-  wait: TimerReset,
-  schedule: Calendar,
-};
-
-const triggerIcons: Record<string, any> = {
-  inactivity: TimerReset,
-  keyword: MessageSquare,
-  schedule: Calendar,
-  error: AlertCircle,
-};
-
 export function AgenteReview({ data }: AgenteReviewProps) {
-  const { basic, knowledge, personality, automation } = data;
+  const { basic, knowledge, personality, goals, agenteId } = data;
 
   return (
     <div className="space-y-6">
@@ -117,6 +89,9 @@ export function AgenteReview({ data }: AgenteReviewProps) {
               <p className="text-sm text-muted-foreground">{basic?.email}</p>
               {basic?.sitioWeb && (
                 <p className="text-sm text-muted-foreground">{basic.sitioWeb}</p>
+              )}
+              {agenteId && (
+                <Badge variant="outline" className="mt-2">ID: {agenteId}</Badge>
               )}
             </div>
           </div>
@@ -203,45 +178,68 @@ export function AgenteReview({ data }: AgenteReviewProps) {
         </CardContent>
       </Card>
 
-      {/* Automatizaciones */}
+      {/* Objetivos y ejemplos */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg font-medium">
-            Intenciones y automatizaciones
+            Objetivos y ejemplos
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-6">
-            {/* Intenciones */}
+            {/* Objetivos del agente */}
             <div>
-              <h4 className="text-sm font-medium mb-3">Intenciones</h4>
-              {automation?.intents && automation.intents.length > 0 ? (
+              <h4 className="text-sm font-medium mb-3">Objetivos del agente</h4>
+              {goals?.objectives ? (
+                <Card className="bg-muted/50">
+                  <CardContent className="p-4">
+                    <p className="text-sm whitespace-pre-wrap">
+                      {goals.objectives}
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No se han definido objetivos
+                </p>
+              )}
+            </div>
+
+            {/* Puntos clave */}
+            <div>
+              <h4 className="text-sm font-medium mb-3">Puntos clave</h4>
+              {goals?.keyPoints && goals.keyPoints.length > 0 ? (
+                <div className="space-y-2">
+                  {goals.keyPoints.map((point, index) => (
+                    <div key={index} className="flex items-start gap-2">
+                      <CheckSquare className="h-4 w-4 text-primary mt-1" />
+                      <p className="text-sm">{point}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No se han definido puntos clave
+                </p>
+              )}
+            </div>
+
+            {/* Ejemplos */}
+            <div>
+              <h4 className="text-sm font-medium mb-3">Ejemplos</h4>
+              {goals?.examples && goals.examples.length > 0 ? (
                 <ScrollArea className="h-[200px] rounded-md border">
                   <div className="p-4 space-y-4">
-                    {automation.intents.map((intent) => (
-                      <Card key={intent.id} className="bg-muted/50">
+                    {goals.examples.map((example) => (
+                      <Card key={example.id} className="bg-muted/50">
                         <CardContent className="p-4">
-                          <div className="flex items-start justify-between">
-                            <div className="space-y-2">
-                              <p className="font-medium">{intent.name}</p>
-                              <div className="flex flex-wrap gap-1">
-                                {intent.keywords.map((keyword) => (
-                                  <Badge key={keyword} variant="secondary">
-                                    {keyword}
-                                  </Badge>
-                                ))}
-                              </div>
-                              <p className="text-sm text-muted-foreground">
-                                {intent.response}
-                              </p>
-                            </div>
-                            {actionIcons[intent.action] && (
-                              <div className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center">
-                                {React.createElement(actionIcons[intent.action], {
-                                  className: "h-4 w-4",
-                                })}
-                              </div>
-                            )}
+                          <div className="space-y-2">
+                            <Badge
+                              variant={example.type === 'positive' ? 'default' : 'destructive'}
+                            >
+                              {example.type === 'positive' ? 'Ejemplo positivo' : 'Ejemplo negativo'}
+                            </Badge>
+                            <p className="text-sm">{example.text}</p>
                           </div>
                         </CardContent>
                       </Card>
@@ -250,53 +248,7 @@ export function AgenteReview({ data }: AgenteReviewProps) {
                 </ScrollArea>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  No se han definido intenciones
-                </p>
-              )}
-            </div>
-
-            {/* Automatizaciones */}
-            <div>
-              <h4 className="text-sm font-medium mb-3">Automatizaciones</h4>
-              {automation?.automations && automation.automations.length > 0 ? (
-                <ScrollArea className="h-[200px] rounded-md border">
-                  <div className="p-4 space-y-4">
-                    {automation.automations.map((automation) => {
-                      const TriggerIcon = triggerIcons[automation.trigger.type];
-                      const ActionIcon = actionIcons[automation.action.type];
-                      return (
-                        <div
-                          key={automation.id}
-                          className="flex items-center gap-4 p-4 rounded-lg border bg-muted/50"
-                        >
-                          <div className="flex items-center gap-2 flex-1">
-                            <div className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center">
-                              {TriggerIcon && <TriggerIcon className="h-4 w-4" />}
-                            </div>
-                            <div className="text-sm">
-                              Cuando{" "}
-                              <span className="font-medium">
-                                {automation.trigger.type}
-                              </span>
-                            </div>
-                            <div className="h-px w-12 bg-border" />
-                            <div className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center">
-                              {ActionIcon && <ActionIcon className="h-4 w-4" />}
-                            </div>
-                            <div className="text-sm">
-                              <span className="font-medium">
-                                {automation.action.type}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </ScrollArea>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  No se han configurado automatizaciones
+                  No se han añadido ejemplos
                 </p>
               )}
             </div>
