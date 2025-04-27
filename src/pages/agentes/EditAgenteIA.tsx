@@ -136,134 +136,113 @@ const EditAgenteIA = () => {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-64px)] overflow-hidden">
-      {/* Header */}
-      <div className="flex-none px-6 py-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate("/dashboard/agentes-ia")}
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight">{basicData.nombre || "Editar Agente IA"}</h1>
-              <p className="text-sm text-muted-foreground">
-                Configura todos los aspectos de tu agente de inteligencia artificial
-              </p>
-            </div>
-          </div>
+    <div className="flex-1 overflow-hidden">
+      <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container h-14 flex items-center gap-4 px-4">
           <Button
-            onClick={handleSave}
-            disabled={!hasUnsavedChanges || isSaving}
-            className="gap-2"
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate("/dashboard/agentes-ia")}
           >
-            {isSaving ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4" />
-            )}
-            {hasUnsavedChanges ? "Guardar cambios" : "Guardado"}
+            <ArrowLeft className="h-4 w-4" />
           </Button>
+          <div>
+            <h1 className="text-lg font-semibold tracking-tight">{basicData.nombre || "Editar Agente IA"}</h1>
+            <p className="text-sm text-muted-foreground">
+              Configura todos los aspectos de tu agente de inteligencia artificial
+            </p>
+          </div>
+          <div className="ml-auto">
+            <Button
+              onClick={handleSave}
+              disabled={!hasUnsavedChanges || isSaving}
+              className="gap-2"
+            >
+              {isSaving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              {hasUnsavedChanges ? "Guardar cambios" : "Guardado"}
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* Main content - Grid con sidebar de navegación */}
-      <div className="container mx-auto flex-1 overflow-hidden">
-        <div className="grid grid-cols-12 h-full">
-          {/* Sidebar de navegación - 25% */}
-          <div className="col-span-3 border-r">
-            <div className="h-full">
-              <div className="space-y-1 p-4">
-                <Tabs
-                  value={activeTab}
-                  onValueChange={handleTabChange}
-                  orientation="vertical"
-                  className="w-full"
-                >
-                  <TabsList className="flex flex-col h-auto bg-transparent p-0 gap-1">
-                    <TabsTrigger 
-                      value="basic" 
-                      className="justify-start py-2 px-3 gap-2 h-9 data-[state=active]:bg-muted rounded-lg w-full"
-                    >
-                      <Settings className="h-4 w-4" />
-                      <span>Información básica</span>
-                    </TabsTrigger>
-                    <TabsTrigger 
-                      value="knowledge" 
-                      className="justify-start py-2 px-3 gap-2 h-9 data-[state=active]:bg-muted rounded-lg w-full"
-                    >
-                      <Database className="h-4 w-4" />
-                      <span>Conocimiento</span>
-                    </TabsTrigger>
-                    <TabsTrigger 
-                      value="personality" 
-                      className="justify-start py-2 px-3 gap-2 h-9 data-[state=active]:bg-muted rounded-lg w-full"
-                    >
-                      <UserRound className="h-4 w-4" />
-                      <span>Personalidad</span>
-                    </TabsTrigger>
-                    <TabsTrigger 
-                      value="goals" 
-                      className="justify-start py-2 px-3 gap-2 h-9 data-[state=active]:bg-muted rounded-lg w-full"
-                    >
-                      <Target className="h-4 w-4" />
-                      <span>Objetivos</span>
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              </div>
-            </div>
+      {/* Navegación entre pestañas */}
+      <div className="border-b px-4">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+          <TabsList className="h-12 w-full justify-start gap-6 rounded-none border-b bg-transparent p-0">
+            <TabsTrigger
+              value="basic"
+              className="relative h-12 rounded-none border-b-2 border-b-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground hover:text-foreground data-[state=active]:border-b-primary data-[state=active]:text-foreground"
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              <span>Información básica</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="knowledge"
+              className="relative h-12 rounded-none border-b-2 border-b-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground hover:text-foreground data-[state=active]:border-b-primary data-[state=active]:text-foreground"
+            >
+              <Database className="h-4 w-4 mr-2" />
+              <span>Conocimiento</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="personality"
+              className="relative h-12 rounded-none border-b-2 border-b-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground hover:text-foreground data-[state=active]:border-b-primary data-[state=active]:text-foreground"
+            >
+              <UserRound className="h-4 w-4 mr-2" />
+              <span>Personalidad</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="goals"
+              className="relative h-12 rounded-none border-b-2 border-b-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground hover:text-foreground data-[state=active]:border-b-primary data-[state=active]:text-foreground"
+            >
+              <Target className="h-4 w-4 mr-2" />
+              <span>Objetivos</span>
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Contenido de las pestañas */}
+          <div className="flex-1 space-y-4 p-6 overflow-y-auto">
+            <TabsContent value="basic" className="mt-0 border-none">
+              <Card className="p-6">
+                <AgenteBasicInfo
+                  onDataChange={handleBasicChange}
+                  initialData={basicData}
+                />
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="knowledge" className="mt-0 border-none">
+              <Card className="p-6">
+                <AgenteKnowledgeSource
+                  onDataChange={handleKnowledgeChange}
+                  initialData={knowledgeData}
+                  agenteId={agenteId}
+                />
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="personality" className="mt-0 border-none">
+              <Card className="p-6">
+                <AgentePersonality
+                  onDataChange={handlePersonalityChange}
+                  initialData={personalityData}
+                />
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="goals" className="mt-0 border-none">
+              <Card className="p-6">
+                <AgenteGoalsExamples
+                  onDataChange={handleGoalsChange}
+                  initialData={goalsData}
+                />
+              </Card>
+            </TabsContent>
           </div>
-
-          {/* Contenido principal - 75% */}
-          <div className="col-span-9">
-            <ScrollArea className="h-full">
-              <div className="p-6">
-                <Tabs value={activeTab} className="w-full">
-                  <TabsContent value="basic" className="mt-0">
-                    <Card className="p-6">
-                      <AgenteBasicInfo
-                        onDataChange={handleBasicChange}
-                        initialData={basicData}
-                      />
-                    </Card>
-                  </TabsContent>
-
-                  <TabsContent value="knowledge" className="mt-0">
-                    <Card className="p-6">
-                      <AgenteKnowledgeSource
-                        onDataChange={handleKnowledgeChange}
-                        initialData={knowledgeData}
-                        agenteId={agenteId}
-                      />
-                    </Card>
-                  </TabsContent>
-
-                  <TabsContent value="personality" className="mt-0">
-                    <Card className="p-6">
-                      <AgentePersonality
-                        onDataChange={handlePersonalityChange}
-                        initialData={personalityData}
-                      />
-                    </Card>
-                  </TabsContent>
-
-                  <TabsContent value="goals" className="mt-0">
-                    <Card className="p-6">
-                      <AgenteGoalsExamples
-                        onDataChange={handleGoalsChange}
-                        initialData={goalsData}
-                      />
-                    </Card>
-                  </TabsContent>
-                </Tabs>
-              </div>
-            </ScrollArea>
-          </div>
-        </div>
+        </Tabs>
       </div>
 
       <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
