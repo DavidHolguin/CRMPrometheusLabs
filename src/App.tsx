@@ -8,8 +8,8 @@ import { inject } from '@vercel/analytics';
 // Pages
 import Login from "@/pages/auth/Login";
 import Register from "@/pages/auth/Register";
-import ForgotPassword from "@/pages/auth/ForgotPassword";
-import ResetPassword from "@/pages/auth/ResetPassword";
+import ForgotPassword from "./pages/auth/ForgotPassword";
+import ResetPassword from "./pages/auth/ResetPassword";
 import Index from "@/pages/Index";
 import Dashboard from "@/pages/Dashboard";
 import Leads from "@/pages/Leads";
