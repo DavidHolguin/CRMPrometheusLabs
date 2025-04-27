@@ -172,13 +172,12 @@ export function AgenteWizard({ onComplete, onCancel }: AgenteWizardProps) {
     setIsCreatingAgent(true);
     
     try {
-      // Crear el registro del agente en la tabla principal
+      // Crear el registro del agente en la tabla principal - eliminamos sitio_web que tampoco existe
       const { data, error } = await supabase
         .from('agentes')
         .insert({
           nombre: formData.basic.nombre,
           descripcion: formData.basic.descripcion || "",
-          sitio_web: formData.basic.sitioWeb || "",
           tipo: "asistente", // tipo predeterminado
           nivel_autonomia: 1,
           status: "entrenamiento"
