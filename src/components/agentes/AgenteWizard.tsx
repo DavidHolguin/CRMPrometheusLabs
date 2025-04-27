@@ -51,14 +51,7 @@ export function AgenteWizard({ onComplete, onCancel }: AgenteWizardProps) {
   }, [formData.knowledge]);
 
   const handleNextStep = async () => {
-    // Detectar si hay fuentes procesándose antes de continuar
-    if (currentStep === "knowledge" && loadingSources) {
-      const confirmed = window.confirm(
-        "Hay documentos que siguen procesándose. ¿Deseas continuar de todos modos?"
-      );
-      if (!confirmed) return;
-    }
-
+    // Eliminamos la verificación de fuentes en procesamiento ya que se maneja en el sidebar
     setIsSavingStep(true);
 
     try {
@@ -116,16 +109,48 @@ export function AgenteWizard({ onComplete, onCancel }: AgenteWizardProps) {
           break;
 
         case "goals":
-          // Para objetivos, usamos una estructura diferente según tu esquema
-          const { error: goalsError } = await supabase
-            .from('agentes')
-            .update({
-              objetivos: formData.goals?.objectives || "",
-              puntos_clave: formData.goals?.keyPoints || []
-            })
-            .eq('id', agenteId);
+          // Guardar objetivos como un documento de conocimiento
+          if (formData.goals?.objectives) {
+            const { error: objectivesError } = await supabase
+              .from('agente_conocimiento')
+              .upsert({
+                agente_id: agenteId,
+                tipo: 'objetivos',
+                fuente: 'manual',
+                formato: 'text',
+                contenido: formData.goals.objectives,
+                prioridad: 1,
+                metadata: {
+                  type: 'objectives'
+                }
+              });
 
-          // Los ejemplos podrían ir en una tabla específica o como parte de conocimiento
+            if (objectivesError) throw objectivesError;
+          }
+
+          // Guardar puntos clave como documentos de conocimiento
+          if (formData.goals?.keyPoints && formData.goals.keyPoints.length > 0) {
+            const keyPointsDoc = {
+              agente_id: agenteId,
+              tipo: 'puntos_clave',
+              fuente: 'manual',
+              formato: 'text',
+              contenido: formData.goals.keyPoints.join('\n'),
+              prioridad: 1,
+              metadata: {
+                type: 'key_points',
+                points: formData.goals.keyPoints
+              }
+            };
+
+            const { error: keyPointsError } = await supabase
+              .from('agente_conocimiento')
+              .upsert(keyPointsDoc);
+
+            if (keyPointsError) throw keyPointsError;
+          }
+
+          // Los ejemplos van en la tabla de conocimiento
           if (formData.goals?.examples && formData.goals.examples.length > 0) {
             // Insertar ejemplos como conocimiento del agente
             const ejemplos = formData.goals.examples.map((ejemplo: any) => ({
@@ -148,8 +173,6 @@ export function AgenteWizard({ onComplete, onCancel }: AgenteWizardProps) {
 
             if (ejemplosError) throw ejemplosError;
           }
-
-          if (goalsError) throw goalsError;
           break;
         
         default:
