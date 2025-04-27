@@ -158,7 +158,7 @@ const AgentesIA = () => {
                 Gestiona y configura tus agentes de inteligencia artificial
               </p>
             </div>
-            <Button onClick={() => handleOpenEdit()} size="default">
+            <Button onClick={() => setShowWizard(true)} size="default">
               <Plus className="mr-2 h-4 w-4" />
               Crear agente
             </Button>
@@ -240,7 +240,7 @@ const AgentesIA = () => {
                     Limpiar filtros
                   </Button>
                 )}
-                <Button onClick={() => handleOpenEdit()} variant="default">
+                <Button onClick={() => setShowWizard(true)} variant="default">
                   <Plus className="mr-2 h-4 w-4" />
                   Crear tu primer agente
                 </Button>
