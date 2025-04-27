@@ -204,15 +204,10 @@ export function AgenteKnowledgeSource({ onDataChange, initialData, agenteId }: A
       // URL base para apuntar al servidor Railway
       const apiBaseUrl = 'https://web-production-01457.up.railway.app';
       
-      const formData = new FormData();
-      formData.append('url', source.url || '');
-      formData.append('agent_id', agenteId);
-      formData.append('company_id', user.companyId);
-      
       // Configuración para la petición
       const xhr = new XMLHttpRequest();
       
-      // Configurar seguimiento del progreso si está disponible para URLs
+      // Configurar seguimiento del progreso
       if (xhr.upload) {
         xhr.upload.addEventListener('progress', (event) => {
           if (event.lengthComputable) {
@@ -241,9 +236,17 @@ export function AgenteKnowledgeSource({ onDataChange, initialData, agenteId }: A
           }
         };
         
-        // Endpoint para procesar URLs - podría ser diferente al de archivos
-        xhr.open('POST', `${apiBaseUrl}/api/v1/v2/knowledge/upload`, true);
-        xhr.send(formData);
+        // Endpoint específico para URLs
+        xhr.open('POST', `${apiBaseUrl}/api/v1/v2/knowledge/upload/url`, true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        
+        // Enviar los datos en formato JSON como requiere el nuevo endpoint
+        xhr.send(JSON.stringify({
+          url: source.url,
+          agent_id: agenteId,
+          company_id: user.companyId,
+          metadata: {}
+        }));
       });
       
       updateSourceStatus(source.id, 'completed', 100, response);

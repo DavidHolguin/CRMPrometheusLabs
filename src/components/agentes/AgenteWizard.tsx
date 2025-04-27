@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, ArrowRight, Bot, FileText, Sparkles, Target, CheckCircle } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bot, FileText, Sparkles, Target, CheckCircle, Loader2 } from "lucide-react";
 import { AgenteBasicInfo } from "./AgenteBasicInfo";
 import { AgenteKnowledgeSource } from "./AgenteKnowledgeSource";
 import { AgentePersonality } from "./AgentePersonality";
@@ -34,21 +34,120 @@ export function AgenteWizard({ onComplete, onCancel }: AgenteWizardProps) {
   const [progress, setProgress] = useState(0);
   const [agenteId, setAgenteId] = useState<string | null>(null);
   const [isCreatingAgent, setIsCreatingAgent] = useState(false);
+  const [isSavingStep, setIsSavingStep] = useState(false);
+  const [loadingSources, setLoadingSources] = useState(false);
 
   // Índice del paso actual
   const currentStepIndex = steps.findIndex(step => step.id === currentStep);
 
+  // Efecto para detectar cambios en las fuentes de conocimiento
+  useEffect(() => {
+    if (formData.knowledge?.sources) {
+      const processingItems = formData.knowledge.sources.filter(
+        (s: any) => s.status === 'processing'
+      );
+      setLoadingSources(processingItems.length > 0);
+    }
+  }, [formData.knowledge]);
+
   const handleNextStep = async () => {
-    if (currentStep === "basic" && !agenteId) {
-      // Si estamos en el paso básico y aún no tenemos un ID de agente, lo creamos primero
-      await createInitialAgent();
+    // Detectar si hay fuentes procesándose antes de continuar
+    if (currentStep === "knowledge" && loadingSources) {
+      const confirmed = window.confirm(
+        "Hay documentos que siguen procesándose. ¿Deseas continuar de todos modos?"
+      );
+      if (!confirmed) return;
     }
 
-    if (currentStepIndex < steps.length - 1) {
-      setCurrentStep(steps[currentStepIndex + 1].id as Step);
-      setProgress(((currentStepIndex + 2) / steps.length) * 100);
-    } else {
-      onComplete({...formData, agenteId});
+    setIsSavingStep(true);
+
+    try {
+      // Guardar datos del paso actual en el servidor
+      if (agenteId) {
+        await saveStepDataToServer(currentStep);
+      }
+
+      // Crear el agente si estamos en el primer paso y aún no tenemos ID
+      if (currentStep === "basic" && !agenteId) {
+        await createInitialAgent();
+      }
+
+      // Avanzar al siguiente paso
+      if (currentStepIndex < steps.length - 1) {
+        setCurrentStep(steps[currentStepIndex + 1].id as Step);
+        setProgress(((currentStepIndex + 2) / steps.length) * 100);
+      } else {
+        // Si es el último paso, finalizar el proceso
+        await finalizeAgentCreation();
+        onComplete({...formData, agenteId});
+      }
+    } catch (error) {
+      console.error("Error al avanzar al siguiente paso:", error);
+      toast.error("Error al guardar los datos. Inténtalo de nuevo.");
+    } finally {
+      setIsSavingStep(false);
+    }
+  };
+
+  const saveStepDataToServer = async (step: Step) => {
+    if (!agenteId) return;
+
+    try {
+      let updateData: any = {};
+
+      switch (step) {
+        case "personality":
+          updateData = {
+            personalidad: {
+              tone: formData.personality?.tone || 50,
+              instructions: formData.personality?.instructions || "",
+              preset: formData.personality?.preset || "default"
+            }
+          };
+          break;
+        case "goals":
+          updateData = {
+            objetivos: formData.goals?.objectives || "",
+            puntos_clave: formData.goals?.keyPoints || [],
+            ejemplos: formData.goals?.examples || []
+          };
+          break;
+        default:
+          return; // No guardar otros pasos
+      }
+
+      const { error } = await supabase
+        .from('agentes')
+        .update(updateData)
+        .eq('id', agenteId);
+
+      if (error) throw error;
+
+      toast.success(`Datos guardados correctamente`);
+    } catch (error) {
+      console.error(`Error al guardar datos del paso ${step}:`, error);
+      throw error;
+    }
+  };
+
+  const finalizeAgentCreation = async () => {
+    if (!agenteId) return;
+
+    try {
+      // Actualizar el estado del agente a "activo"
+      const { error } = await supabase
+        .from('agentes')
+        .update({
+          status: "activo"
+        })
+        .eq('id', agenteId);
+
+      if (error) throw error;
+      
+      toast.success("¡Agente creado y activado correctamente!");
+    } catch (error) {
+      console.error("Error al finalizar la creación del agente:", error);
+      throw error;
     }
   };
 
@@ -78,7 +177,9 @@ export function AgenteWizard({ onComplete, onCancel }: AgenteWizardProps) {
         .from('agentes')
         .insert({
           nombre: formData.basic.nombre,
-          descripcion: "",
+          descripcion: formData.basic.descripcion || "",
+          email: formData.basic.email,
+          sitio_web: formData.basic.sitioWeb || "",
           tipo: "asistente", // tipo predeterminado
           nivel_autonomia: 1,
           status: "entrenamiento"
@@ -97,6 +198,7 @@ export function AgenteWizard({ onComplete, onCancel }: AgenteWizardProps) {
     } catch (error) {
       toast.error(`Error al crear el agente: ${error instanceof Error ? error.message : 'Error desconocido'}`);
       console.error("Error al crear el agente:", error);
+      throw error;
     } finally {
       setIsCreatingAgent(false);
     }
@@ -111,7 +213,7 @@ export function AgenteWizard({ onComplete, onCancel }: AgenteWizardProps) {
       case "goals":
         return true; // Estos pasos son opcionales
       case "review":
-        return formData.basic?.nombre && formData.basic?.email;
+        return formData.basic?.nombre && formData.basic?.email && !isSavingStep;
       default:
         return false;
     }
@@ -151,7 +253,7 @@ export function AgenteWizard({ onComplete, onCancel }: AgenteWizardProps) {
       case "review":
         return (
           <AgenteReview
-            data={formData}
+            data={{...formData, agenteId}}
           />
         );
       default:
@@ -176,6 +278,8 @@ export function AgenteWizard({ onComplete, onCancel }: AgenteWizardProps) {
                 const Icon = step.icon;
                 const isActive = currentStep === step.id;
                 const isCompleted = currentStepIndex > idx;
+                const isLoading = step.id === "knowledge" && loadingSources && currentStep !== "knowledge";
+                
                 return (
                   <div key={step.id} className="flex items-center">
                     {idx > 0 && (
@@ -195,7 +299,11 @@ export function AgenteWizard({ onComplete, onCancel }: AgenteWizardProps) {
                         }
                       `}
                     >
-                      <Icon className="h-4 w-4" />
+                      {isLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Icon className="h-4 w-4" />
+                      )}
                       {isCompleted && (
                         <CheckCircle className="absolute -top-1 -right-1 h-4 w-4 text-primary-foreground bg-primary rounded-full" />
                       )}
@@ -235,7 +343,7 @@ export function AgenteWizard({ onComplete, onCancel }: AgenteWizardProps) {
             variant="outline"
             onClick={currentStepIndex === 0 ? onCancel : handlePrevStep}
             className="min-w-[100px]"
-            disabled={isCreatingAgent}
+            disabled={isCreatingAgent || isSavingStep}
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             {currentStepIndex === 0 ? "Cancelar" : "Anterior"}
@@ -243,12 +351,18 @@ export function AgenteWizard({ onComplete, onCancel }: AgenteWizardProps) {
 
           <Button 
             onClick={handleNextStep}
-            disabled={!canProceed()}
+            disabled={!canProceed() || isSavingStep}
             className="min-w-[100px]"
           >
             {isCreatingAgent ? (
               <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 Creando agente...
+              </>
+            ) : isSavingStep ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Guardando...
               </>
             ) : currentStepIndex === steps.length - 1 ? (
               <>

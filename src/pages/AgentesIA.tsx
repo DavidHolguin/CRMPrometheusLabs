@@ -14,11 +14,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 
 const AgentesIA = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [showWizard, setShowWizard] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [wizardCompleted, setWizardCompleted] = useState(false);
   const { agentes = [], isLoading, updateAgente, resetPassword } = useAgentes();
 
   const handleActivate = async (id: string, active: boolean) => {
@@ -32,12 +34,22 @@ const AgentesIA = () => {
     await resetPassword.mutate(email);
   };
 
-  const handleWizardComplete = () => {
-    setShowConfirmDialog(true);
+  const handleWizardComplete = (agentData: any) => {
+    // Marcar que el asistente se completó exitosamente
+    setWizardCompleted(true);
+    // Ocultar el asistente
     setShowWizard(false);
+    // Recargar la lista de agentes después de un breve retraso
+    setTimeout(() => {
+      window.location.reload();
+    }, 1000);
+    
+    toast.success("¡Agente creado exitosamente! La página se actualizará en breve.");
   };
 
   const handleWizardCancel = () => {
+    // Solo mostrar el diálogo de confirmación si se cancela manualmente
+    // antes de completar el proceso
     setShowConfirmDialog(true);
   };
 
@@ -96,6 +108,16 @@ const AgentesIA = () => {
                   Cargando agentes...
                 </div>
               </div>
+            ) : filteredAgentes.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-[200px] text-center">
+                <p className="text-muted-foreground mb-4">
+                  No se encontraron agentes
+                </p>
+                <Button onClick={() => setShowWizard(true)} variant="outline">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Crear tu primer agente
+                </Button>
+              </div>
             ) : (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {filteredAgentes?.map((agente) => (
@@ -120,20 +142,21 @@ const AgentesIA = () => {
         />
       )}
 
-      <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+      {/* Solo mostrar el diálogo de confirmación si el asistente no se ha completado */}
+      <AlertDialog open={showConfirmDialog && !wizardCompleted} onOpenChange={setShowConfirmDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Desea continuar con la iteración?</AlertDialogTitle>
+            <AlertDialogTitle>¿Desea cancelar la creación del agente?</AlertDialogTitle>
             <AlertDialogDescription>
-              Puede continuar con la creación del agente o cancelar el proceso.
+              Si cancela ahora, perderá el progreso realizado. ¿Desea continuar con la creación o cancelar el proceso?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <Button variant="outline" onClick={handleConfirmCancel}>
-              Cancelar
+              Cancelar creación
             </Button>
             <Button onClick={handleContinueWizard}>
-              Continuar
+              Continuar editando
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
