@@ -15,11 +15,32 @@ export interface AgenteIA {
   especialidad: any;
   status: string;
   metricas_rendimiento: any;
-  configuracion_evolutiva: any;
+  configuracion_evolutiva: {
+    preset: string;
+    tone: number;
+    instructions: string;
+  } | null;
   llm_configuracion_id: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+interface UpdateAgenteIAInput {
+  id: string;
+  nombre?: string;
+  descripcion?: string;
+  avatar_url?: string;
+  tipo?: string;
+  nivel_autonomia?: number;
+  especialidad?: any;
+  status?: string;
+  configuracion_evolutiva?: {
+    preset: string;
+    tone: number;
+    instructions: string;
+  };
+  is_active?: boolean;
 }
 
 export function useAgentesIA() {
@@ -97,17 +118,7 @@ export function useAgentesIA() {
   });
 
   const updateAgenteIA = useMutation({
-    mutationFn: async (data: {
-      id: string;
-      nombre?: string;
-      descripcion?: string;
-      avatar_url?: string;
-      tipo?: string;
-      nivel_autonomia?: number;
-      especialidad?: any;
-      status?: string;
-      is_active?: boolean;
-    }) => {
+    mutationFn: async (data: UpdateAgenteIAInput) => {
       const updateData: any = {};
       
       if (data.nombre !== undefined) updateData.nombre = data.nombre;
@@ -117,6 +128,7 @@ export function useAgentesIA() {
       if (data.nivel_autonomia !== undefined) updateData.nivel_autonomia = data.nivel_autonomia;
       if (data.especialidad !== undefined) updateData.especialidad = data.especialidad;
       if (data.status !== undefined) updateData.status = data.status;
+      if (data.configuracion_evolutiva !== undefined) updateData.configuracion_evolutiva = data.configuracion_evolutiva;
       if (data.is_active !== undefined) updateData.is_active = data.is_active;
 
       const { error } = await supabase

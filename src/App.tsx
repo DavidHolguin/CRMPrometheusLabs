@@ -6,26 +6,25 @@ import { useEffect, useState } from "react";
 import { inject } from '@vercel/analytics';
 
 // Pages
-import Login from "./pages/auth/Login";
-import Register from "./pages/auth/Register";
-import Dashboard from "./pages/Dashboard";
-import NotFound from "./pages/NotFound";
-import Index from "./pages/Index";
-import Onboarding from "./pages/onboarding/Onboarding";
-import OnboardingCompany from "./pages/onboarding/OnboardingCompany";
-import OnboardingServices from "./pages/onboarding/OnboardingServices";
-import OnboardingChatbot from "./pages/onboarding/OnboardingChatbot";
-import Chatbots from "./pages/Chatbots";
-import ChatInterface from "./pages/ChatInterface";
-import ConversationsPage from "./pages/Conversations";
-import Leads from "./pages/Leads";
-import PipelineManagement from "./pages/PipelineManagement";
-import Canales from "./pages/Canales";
-import EntrenamientoIA from "./pages/EntrenamientoIA";
-import PerfilEmpresa from "./pages/PerfilEmpresa";
-import ChatbotConfig from "./pages/ChatbotConfig";
-import ImageOptimization from "./pages/ImageOptimization";
-import AgentesIA from "./pages/AgentesIA";
+import Login from "@/pages/auth/Login";
+import Register from "@/pages/auth/Register";
+import ForgotPassword from "@/pages/auth/ForgotPassword";
+import ResetPassword from "@/pages/auth/ResetPassword";
+import Index from "@/pages/Index";
+import Dashboard from "@/pages/Dashboard";
+import Leads from "@/pages/Leads";
+import Conversations from "@/pages/Conversations";
+import PipelineManagement from "@/pages/PipelineManagement";
+import Canales from "@/pages/Canales";
+import ChatbotConfig from "@/pages/ChatbotConfig";
+import Chatbots from "@/pages/Chatbots";
+import ChatInterface from "@/pages/ChatInterface";
+import EntrenamientoIA from "@/pages/EntrenamientoIA";
+import AgentesIA from "@/pages/AgentesIA";
+import EditAgenteIA from "@/pages/agentes/EditAgenteIA";
+import NotFound from "@/pages/NotFound";
+import PerfilEmpresa from "@/pages/PerfilEmpresa";
+import ImageOptimization from "@/pages/ImageOptimization";
 
 // Admin pages
 import AdminAgentes from "./pages/admin/AdminAgentes";
@@ -42,14 +41,11 @@ import MarketingAudiencias from "./pages/marketing/MarketingAudiencias";
 import MarketingInteligencia from "./pages/marketing/MarketingInteligencia";
 
 // Layout
-import DashboardLayout from "./components/layouts/DashboardLayout";
-import AuthLayout from "./components/layouts/AuthLayout";
-import OnboardingLayout from "./components/layouts/OnboardingLayout";
+import AuthLayout from "@/components/layouts/AuthLayout";
+import DashboardLayout from "@/components/layouts/DashboardLayout";
+import { ProtectedAdminRoute } from "@/components/auth/ProtectedAdminRoute";
 
-// Auth
-import { ProtectedAdminRoute } from "./components/auth/ProtectedAdminRoute";
-
-const App = () => {
+export const App = () => {
   const [mounted, setMounted] = useState(false);
 
   // Fix for hydration issues
@@ -73,14 +69,8 @@ const App = () => {
         <Route element={<AuthLayout />}>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-        </Route>
-
-        {/* Onboarding routes */}
-        <Route path="/onboarding" element={<OnboardingLayout />}>
-          <Route index element={<Onboarding />} />
-          <Route path="company" element={<OnboardingCompany />} />
-          <Route path="services" element={<OnboardingServices />} />
-          <Route path="chatbot" element={<OnboardingChatbot />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
         </Route>
 
         {/* Dashboard routes */}
@@ -89,12 +79,13 @@ const App = () => {
           <Route path="leads" element={<Leads />} />
           <Route path="crm" element={<PipelineManagement />} />
           <Route path="canales" element={<Canales />} />
-          <Route path="conversations" element={<ConversationsPage />} />
-          <Route path="conversations/:conversationId" element={<ConversationsPage />} />
+          <Route path="conversations" element={<Conversations />} />
+          <Route path="conversations/:conversationId" element={<Conversations />} />
           <Route path="chatbots" element={<Chatbots />} />
           <Route path="chatbots/:chatbotId/settings" element={<ChatbotConfig />} />
           <Route path="entrenamiento-ia" element={<EntrenamientoIA />} />
           <Route path="agentes-ia" element={<AgentesIA />} />
+          <Route path="agentes-ia/:agenteId/edit" element={<EditAgenteIA />} />
           <Route path="perfil-empresa" element={<PerfilEmpresa />} />
           <Route path="settings" element={<Dashboard />} />
           <Route path="image-optimization" element={<ImageOptimization />} />
@@ -121,7 +112,7 @@ const App = () => {
             <Route path="admin/leads" element={<AdminLeads />} />
           </Route>
         </Route>
-        
+
         {/* Standalone Chat Interface - No Dashboard Layout */}
         <Route path="/chat/:chatbotId" element={<ChatInterface />} />
 

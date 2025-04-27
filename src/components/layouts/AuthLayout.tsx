@@ -1,4 +1,3 @@
-
 import { Outlet, Navigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 
@@ -18,63 +17,30 @@ const AuthLayout = () => {
   if (session) {
     if (user && !user.onboardingCompleted) {
       return <Navigate to="/onboarding" replace />;
-    } else {
-      return <Navigate to="/dashboard" replace />;
     }
+    return <Navigate to="/dashboard" replace />;
   }
 
   return (
-    <div className="h-full w-full">
-      <div className="flex h-full w-full flex-col md:flex-row">
-        {/* Lado izquierdo - Imagen/Branding */}
-        <div className="hidden md:flex md:w-1/2 bg-gradient-to-br from-primary/20 to-primary/5 items-center justify-center relative overflow-hidden">
-          <div className="absolute inset-0 bg-grid-pattern opacity-10"></div>
-          <div className="relative z-10 text-center p-8">
-            <div className="mb-6">
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-                Prometheus CRM Nexus
-              </h1>
-              <p className="text-muted-foreground mt-2">
-                La plataforma de CRM con IA más avanzada
-              </p>
-            </div>
-            <div className="space-y-4 text-left max-w-md mx-auto">
-              <div className="flex items-center gap-3">
-                <div className="bg-primary/20 p-2 rounded-full">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                  </svg>
-                </div>
-                <p className="text-sm text-foreground/80">Integración con múltiples canales</p>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="bg-primary/20 p-2 rounded-full">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect width="20" height="14" x="2" y="3" rx="2" />
-                    <line x1="8" x2="16" y1="21" y2="21" />
-                    <line x1="12" x2="12" y1="17" y2="21" />
-                  </svg>
-                </div>
-                <p className="text-sm text-foreground/80">Chatbots impulsados por IA</p>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="bg-primary/20 p-2 rounded-full">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
-                    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
-                  </svg>
-                </div>
-                <p className="text-sm text-foreground/80">Gestión avanzada de leads</p>
-              </div>
-            </div>
-          </div>
+    <div className="container relative h-screen flex-col items-center justify-center grid lg:max-w-none lg:grid-cols-2 lg:px-0">
+      <div className="relative hidden h-full flex-col bg-muted p-10 text-white lg:flex dark:border-r">
+        <div className="absolute inset-0 bg-primary/20" />
+        <div className="relative z-20 flex items-center text-lg font-medium">
+          <img src="/logo.svg" alt="Logo" className="h-8 w-8 mr-2" />
+          Prometheus CRM
         </div>
-
-        {/* Lado derecho - Formulario */}
-        <div className="flex flex-1 items-center justify-center p-6 md:p-10">
-          <div className="w-full max-w-md">
-            <Outlet />
-          </div>
+        <div className="relative z-20 mt-auto">
+          <h2 className="text-lg font-semibold tracking-tight">
+            Simplifica tu atención al cliente con IA
+          </h2>
+          <p className="text-sm text-muted">
+            Automatiza, analiza y mejora la experiencia de tus clientes con nuestro CRM potenciado con inteligencia artificial.
+          </p>
+        </div>
+      </div>
+      <div className="p-4 lg:p-8 h-full flex items-center">
+        <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px]">
+          <Outlet />
         </div>
       </div>
     </div>

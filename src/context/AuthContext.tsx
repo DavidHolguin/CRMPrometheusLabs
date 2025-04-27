@@ -25,6 +25,8 @@ type AuthContextType = {
   createCompany: (companyData: any) => Promise<string>;
   createChatbot: (chatbotData: any) => Promise<string>;
   saveServices: (servicesData: any[]) => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
+  confirmPasswordReset: (token: string, newPassword: string) => Promise<void>;
 };
 
 // Creamos el contexto
@@ -536,7 +538,53 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       return Promise.reject(error);
     }
   };
-  
+
+  const resetPassword = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) throw error;
+      
+      toast({
+        title: "Correo enviado",
+        description: "Se ha enviado un enlace para restablecer tu contraseña"
+      });
+    } catch (error: any) {
+      console.error("Error sending reset password email:", error);
+      toast({
+        title: "Error",
+        description: error.message || "No se pudo enviar el correo",
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
+
+  const confirmPasswordReset = async (token: string, newPassword: string) => {
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+
+      if (error) throw error;
+      
+      toast({
+        title: "Contraseña actualizada",
+        description: "Tu contraseña ha sido restablecida correctamente"
+      });
+    } catch (error: any) {
+      console.error("Error resetting password:", error);
+      toast({
+        title: "Error",
+        description: error.message || "No se pudo restablecer la contraseña",
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -551,7 +599,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setOnboardingCompleted,
         createCompany,
         saveServices,
-        createChatbot
+        createChatbot,
+        resetPassword,
+        confirmPasswordReset
       }}
     >
       {children}

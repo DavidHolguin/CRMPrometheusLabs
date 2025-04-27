@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AgenteIACard } from "@/components/agentes/AgenteIACard";
 import { AgenteIAEditDialog } from "@/components/agentes/AgenteIAEditDialog";
@@ -28,6 +29,7 @@ import {
 } from "@/components/ui/select";
 
 const AgentesIA = () => {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTipo, setSelectedTipo] = useState("all");
   const [activeView, setActiveView] = useState<"grid" | "list">("grid");
@@ -75,8 +77,12 @@ const AgentesIA = () => {
   };
 
   const handleOpenEdit = (agente?: AgenteIA) => {
-    setSelectedAgente(agente || null);
-    setIsEditDialogOpen(true);
+    if (agente) {
+      navigate(`/dashboard/agentes-ia/${agente.id}/edit`);
+    } else {
+      setSelectedAgente(null);
+      setIsEditDialogOpen(true);
+    }
   };
 
   const handleOpenDetail = (agente: AgenteIA) => {
