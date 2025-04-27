@@ -178,7 +178,6 @@ export function AgenteWizard({ onComplete, onCancel }: AgenteWizardProps) {
         .insert({
           nombre: formData.basic.nombre,
           descripcion: formData.basic.descripcion || "",
-          email: formData.basic.email,
           sitio_web: formData.basic.sitioWeb || "",
           tipo: "asistente", // tipo predeterminado
           nivel_autonomia: 1,
@@ -207,13 +206,13 @@ export function AgenteWizard({ onComplete, onCancel }: AgenteWizardProps) {
   const canProceed = () => {
     switch (currentStep) {
       case "basic":
-        return formData.basic?.nombre && formData.basic?.email && !isCreatingAgent;
+        return formData.basic?.nombre && !isCreatingAgent; // Ya no requerimos email
       case "knowledge":
       case "personality":
       case "goals":
         return true; // Estos pasos son opcionales
       case "review":
-        return formData.basic?.nombre && formData.basic?.email && !isSavingStep;
+        return formData.basic?.nombre && !isSavingStep; // Ya no requerimos email
       default:
         return false;
     }
