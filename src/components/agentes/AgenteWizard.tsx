@@ -93,35 +93,68 @@ export function AgenteWizard({ onComplete, onCancel }: AgenteWizardProps) {
     if (!agenteId) return;
 
     try {
-      let updateData: any = {};
-
       switch (step) {
         case "personality":
-          updateData = {
-            personalidad: {
-              tone: formData.personality?.tone || 50,
-              instructions: formData.personality?.instructions || "",
-              preset: formData.personality?.preset || "default"
-            }
-          };
+          // En lugar de actualizar la tabla 'agentes', insertamos en la tabla 'agente_personalidad'
+          const { error: personalityError } = await supabase
+            .from('agente_personalidad')
+            .upsert({
+              agente_id: agenteId,
+              rasgos: {
+                tone: formData.personality?.tone || 50,
+                preset: formData.personality?.preset || "default"
+              },
+              estilo_comunicacion: {
+                instructions: formData.personality?.instructions || ""
+              },
+              preferencias_interaccion: {},
+              adaptabilidad_contextual: formData.personality?.tone || 50
+            })
+            .select();
+
+          if (personalityError) throw personalityError;
           break;
+
         case "goals":
-          updateData = {
-            objetivos: formData.goals?.objectives || "",
-            puntos_clave: formData.goals?.keyPoints || [],
-            ejemplos: formData.goals?.examples || []
-          };
+          // Para objetivos, usamos una estructura diferente según tu esquema
+          const { error: goalsError } = await supabase
+            .from('agentes')
+            .update({
+              objetivos: formData.goals?.objectives || "",
+              puntos_clave: formData.goals?.keyPoints || []
+            })
+            .eq('id', agenteId);
+
+          // Los ejemplos podrían ir en una tabla específica o como parte de conocimiento
+          if (formData.goals?.examples && formData.goals.examples.length > 0) {
+            // Insertar ejemplos como conocimiento del agente
+            const ejemplos = formData.goals.examples.map((ejemplo: any) => ({
+              agente_id: agenteId,
+              tipo: 'ejemplo',
+              fuente: 'manual',
+              formato: 'text',
+              contenido: `Pregunta: ${ejemplo.question}\nRespuesta: ${ejemplo.answer}`,
+              prioridad: 2,
+              metadata: {
+                type: 'example',
+                question: ejemplo.question,
+                answer: ejemplo.answer
+              }
+            }));
+
+            const { error: ejemplosError } = await supabase
+              .from('agente_conocimiento')
+              .upsert(ejemplos);
+
+            if (ejemplosError) throw ejemplosError;
+          }
+
+          if (goalsError) throw goalsError;
           break;
+        
         default:
           return; // No guardar otros pasos
       }
-
-      const { error } = await supabase
-        .from('agentes')
-        .update(updateData)
-        .eq('id', agenteId);
-
-      if (error) throw error;
 
       toast.success(`Datos guardados correctamente`);
     } catch (error) {
