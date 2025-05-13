@@ -136,7 +136,7 @@ const Dashboard = () => {
         const formattedData = data.map(item => ({
           ...item,
           fecha: format(new Date(item.fecha), 'dd/MM/yy'),
-          tiempo_respuesta_promedio_min: +(item.tiempo_respuesta_promedio_seg / 60).toFixed(1)
+          tiempo_respuesta_promedio_min: item?.tiempo_respuesta_promedio_seg != null && !isNaN(item.tiempo_respuesta_promedio_seg) ? +(item.tiempo_respuesta_promedio_seg / 60).toFixed(1) : 0
         }));
         
         setConversacionesData(formattedData);
@@ -167,8 +167,8 @@ const Dashboard = () => {
     
     return {
       totalConversaciones,
-      promedioMensajes: +promedioMensajes.toFixed(1),
-      tiempoRespuestaPromedio: +(tiempoRespuestaPromedio / 60).toFixed(1) // Convertir a minutos
+      promedioMensajes: promedioMensajes != null && typeof promedioMensajes === 'number' && !isNaN(promedioMensajes) ? +promedioMensajes.toFixed(1) : 0,
+      tiempoRespuestaPromedio: tiempoRespuestaPromedio != null && typeof tiempoRespuestaPromedio === 'number' && !isNaN(tiempoRespuestaPromedio) ? +(tiempoRespuestaPromedio / 60).toFixed(1) : 0 // Convertir a minutos
     };
   }, [conversacionesData]);
 
@@ -662,8 +662,9 @@ const Dashboard = () => {
                           <tr key={index} className={index % 2 === 0 ? "bg-muted/20" : ""}>
                             <td className="p-2">{item.fecha}</td>
                             <td className="p-2">{item.total_conversaciones}</td>
-                            <td className="p-2">{item.mensajes_por_conversacion.toFixed(1)}</td>
-                            <td className="p-2">{(item.tiempo_respuesta_promedio_seg / 60).toFixed(1)}</td>
+                            <td className="p-2">{typeof item.mensajes_por_conversacion === 'number' && !isNaN(item.mensajes_por_conversacion) ? item.mensajes_por_conversacion.toFixed(1) : '0.0'}</td>
+                            <td className="p-2">{typeof item.mensajes_por_conversacion === 'number' && !isNaN(item.mensajes_por_conversacion) ? item.mensajes_por_conversacion.toFixed(1) : '0.0'}</td>
+                            <td className="p-2">{typeof item.tiempo_respuesta_promedio_seg === 'number' && !isNaN(item.tiempo_respuesta_promedio_seg) ? (item.tiempo_respuesta_promedio_seg / 60).toFixed(1) : '0.0'}</td>
                           </tr>
                         ))
                       )}
