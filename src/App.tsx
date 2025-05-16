@@ -48,6 +48,7 @@ import MarketingCampanias from "./pages/marketing/MarketingCampanias";
 import MarketingContenido from "./pages/marketing/MarketingContenido";
 import MarketingAudiencias from "./pages/marketing/MarketingAudiencias";
 import MarketingInteligencia from "./pages/marketing/MarketingInteligencia";
+import MarketingFormularios from "./pages/marketing/MarketingFormularios";
 
 // Auth
 import { ProtectedAdminRoute } from "@/components/auth/ProtectedAdminRoute";
@@ -113,6 +114,7 @@ export const App = () => {
             <Route path="content" element={<MarketingContenido />} />
             <Route path="audience" element={<MarketingAudiencias />} />
             <Route path="intelligence" element={<MarketingInteligencia />} />
+            <Route path="forms" element={<MarketingFormularios />} />
             <Route path="insights" element={<Navigate to="/dashboard/marketing/analytics" replace />} />
             <Route path="trends" element={<Navigate to="/dashboard/marketing/analytics" replace />} />
             <Route path="kpis" element={<Navigate to="/dashboard/marketing/analytics" replace />} />

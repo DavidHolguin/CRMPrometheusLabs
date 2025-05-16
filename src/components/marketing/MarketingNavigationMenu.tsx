@@ -69,6 +69,14 @@ export function MarketingNavigationMenu() {
               >
                 Análisis competitivo y tendencias de mercado
               </ListItem>
+              <ListItem 
+                to="/dashboard/marketing/forms" 
+                title="Formularios"
+                icon={<BookOpen className="mr-2 h-4 w-4" />}
+                badge={3}
+              >
+                Gestión de formularios y landing pages con seguimiento
+              </ListItem>
             </ul>
           </NavigationMenuContent>
         </NavigationMenuItem>
