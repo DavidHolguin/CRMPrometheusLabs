@@ -191,7 +191,7 @@ export const useMarketingLandings = (options: LandingPagesOptions = {}) => {
 
     while (true) {
       const { data, error } = await supabase
-        .from("marketing_landing_pages")
+        .from("landing_pages")
         .select("id")
         .eq("url", url)
         .single();
@@ -211,9 +211,9 @@ export const useMarketingLandings = (options: LandingPagesOptions = {}) => {
 
       // Obtener la empresa_id del usuario actual
       const { data: userData, error: userError } = await supabase
-        .from("usuarios")
+        .from("profiles")
         .select("empresa_id")
-        .eq("user_id", user.id)
+        .eq("id", user.id)
         .single();
 
       if (userError || !userData?.empresa_id) {
@@ -224,13 +224,13 @@ export const useMarketingLandings = (options: LandingPagesOptions = {}) => {
       const url = await generateUniqueUrl(landing.nombre);
 
       const { data, error } = await supabase
-        .from("marketing_landing_pages")
+        .from("landing_pages")
         .insert([
           {
             ...landing,
             empresa_id: userData.empresa_id,
             url,
-            estado: landing.estado || "activo",
+            is_active: landing.is_active !== undefined ? landing.is_active : true,
             fecha_creacion: new Date().toISOString(),
             fecha_modificacion: new Date().toISOString(),
             visitas: 0,
@@ -265,7 +265,7 @@ export const useMarketingLandings = (options: LandingPagesOptions = {}) => {
   const updateLanding = useMutation({
     mutationFn: async (landing: UpdateLandingPageInput) => {
       const { data, error } = await supabase
-        .from("marketing_landing_pages")
+        .from("landing_pages")
         .update({
           ...landing,
           fecha_modificacion: new Date().toISOString()
@@ -298,7 +298,7 @@ export const useMarketingLandings = (options: LandingPagesOptions = {}) => {
   const deleteLanding = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
-        .from("marketing_landing_pages")
+        .from("landing_pages")
         .delete()
         .eq("id", id);
 
@@ -325,7 +325,7 @@ export const useMarketingLandings = (options: LandingPagesOptions = {}) => {
   const getLandingById = async (id: string): Promise<LandingPage | null> => {
     try {
       const { data, error } = await supabase
-        .from("marketing_landing_pages")
+        .from("landing_pages")
         .select("*")
         .eq("id", id)
         .single();

@@ -405,10 +405,7 @@ const MarketingFormularios = () => {
       landing.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
       landing.descripcion.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  });
-  
-  // Crear versiones adaptadas para la interfaz de los componentes
-  const adaptedLandingPages = filteredLandingPages?.map(landing => mapApiToLandingPage(landing)) || [];
+  }) || [];
 
   return (
     <div className="flex flex-col space-y-6 p-6">
@@ -620,7 +617,7 @@ const MarketingFormularios = () => {
                       </CardContent>
                     </Card>
                   ))
-                ) : adaptedLandingPages.length === 0 ? (
+                ) : filteredLandingPages.length === 0 ? (
                   <div className="col-span-3 text-center py-10">
                     <FileCode className="h-10 w-10 mx-auto text-muted-foreground" />
                     <h3 className="mt-4 text-lg font-medium">No se encontraron landing pages</h3>
@@ -638,8 +635,10 @@ const MarketingFormularios = () => {
                     </Button>
                   </div>
                 ) : (
-                  adaptedLandingPages.map((landingPage) => (
-                      <Card key={landingPage.id} className="overflow-hidden hover:shadow-md transition-shadow">
+                  filteredLandingPages.map((apiLandingPage) => {
+                    const landingPage = mapApiToLandingPage(apiLandingPage);
+                    return (
+                    <Card key={landingPage.id} className="overflow-hidden hover:shadow-md transition-shadow">
                       <CardHeader className="pb-2">
                         <div className="flex justify-between items-start">
                           <CardTitle className="text-lg">{landingPage.nombre}</CardTitle>

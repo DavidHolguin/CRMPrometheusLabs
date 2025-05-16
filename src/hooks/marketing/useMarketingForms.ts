@@ -180,7 +180,7 @@ export const useMarketingForms = (options: FormulariosOptions = {}) => {
       }
 
       const { data, error } = await supabase
-        .from("marketing_formularios")
+        .from("formularios")
         .insert([
           {
             ...form,
@@ -250,7 +250,7 @@ export const useMarketingForms = (options: FormulariosOptions = {}) => {
   const deleteForm = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
-        .from("marketing_formularios")
+        .from("formularios")
         .delete()
         .eq("id", id);
 
@@ -277,7 +277,7 @@ export const useMarketingForms = (options: FormulariosOptions = {}) => {
   const getFormById = async (id: string): Promise<Formulario | null> => {
     try {
       const { data, error } = await supabase
-        .from("marketing_formularios")
+        .from("formularios")
         .select("*")
         .eq("id", id)
         .single();

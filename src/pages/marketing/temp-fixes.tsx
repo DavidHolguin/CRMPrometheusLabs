@@ -53,122 +53,28 @@ import { MarketingNavigationMenu } from "@/components/marketing/MarketingNavigat
 import { FormularioDetail } from "@/components/marketing/formularios/FormularioDetail";
 import { LandingPageDetail } from "@/components/marketing/formularios/LandingPageDetail";
 import { FormularioIntegracion } from "@/components/marketing/formularios/FormularioIntegracion";
-import { useMarketingForms } from "@/hooks/marketing/useMarketingForms";
-import { useMarketingLandings } from "@/hooks/marketing/useMarketingLandings";
+import { useMarketingForms, Formulario as FormularioType } from "@/hooks/marketing/useMarketingForms";
+import { useMarketingLandings, LandingPage as LandingPageType } from "@/hooks/marketing/useMarketingLandings";
 
-// Definición de la interfaz Campo para reutilización
-interface Campo {
-  id: string;
-  label: string;
-  tipo: string;
-  requerido: boolean;
-  opciones?: string[];
+// Interfaz local compatible con FormularioType para mantener compatibilidad con componentes existentes
+interface Formulario extends FormularioType {
+  tipo?: string;
+  estado?: string;
+  fecha_creacion?: string;
+  fecha_modificacion?: string;
+  envios?: number;
+  conversion?: number;
+  tasa_conversion?: number;
 }
 
-// Interfaz Formulario compatible con FormularioDetail y FormularioIntegracion
-interface Formulario {
-  id: string;
-  nombre: string;
-  descripcion: string;
-  tipo: string;
-  campos: Campo[];
-  fecha_creacion: string;
-  fecha_modificacion: string;
-  estado: string;
-  envios: number;
-  conversion: number;
-  tasa_conversion: number;
-  // Campos necesarios para la API
-  is_active?: boolean;
-  created_at?: string;
-  updated_at?: string;
-  pipeline_id?: string;
-  stage_id?: string;
-  codigo_integracion?: string;
-  redirect_url?: string;
-  empresa_id?: string;
-}
-
-// Convertir formulario de la API a la interfaz local
-const mapApiToFormulario = (apiFormulario: any): Formulario => {
-  return {
-    id: apiFormulario.id,
-    nombre: apiFormulario.nombre,
-    descripcion: apiFormulario.descripcion,
-    tipo: apiFormulario.tipo || 'Contacto',
-    campos: apiFormulario.campos || [],
-    fecha_creacion: apiFormulario.created_at,
-    fecha_modificacion: apiFormulario.updated_at,
-    estado: apiFormulario.is_active ? 'activo' : 'inactivo',
-    envios: 0,
-    conversion: 0,
-    tasa_conversion: 0,
-    // Mantener campos originales
-    is_active: apiFormulario.is_active,
-    created_at: apiFormulario.created_at,
-    updated_at: apiFormulario.updated_at,
-    pipeline_id: apiFormulario.pipeline_id,
-    stage_id: apiFormulario.stage_id,
-    codigo_integracion: apiFormulario.codigo_integracion,
-    redirect_url: apiFormulario.redirect_url,
-    empresa_id: apiFormulario.empresa_id
-  };
-}
-
-// Interfaz LandingPage compatible con LandingPageDetail
-interface LandingPage {
-  id: string;
-  nombre: string;
-  descripcion: string;
-  url: string;
-  formulario_id: string;
-  campania_id: string | null;
-  fecha_creacion: string;
-  fecha_modificacion: string;
-  estado: string;
-  visitas: number;
-  conversiones: number;
-  tasa_conversion: number;
-  // Campos necesarios para la API
-  is_active?: boolean;
-  created_at?: string;
-  updated_at?: string;
-  empresa_id?: string;
-  configuracion_seguimiento?: {
-    analytics?: {
-      gtm_id?: string;
-      ga_id?: string;
-    };
-    social?: {
-      og_title?: string;
-      og_description?: string;
-      og_image?: string;
-    };
-  };
-}
-
-// Convertir landing page de la API a la interfaz local
-const mapApiToLandingPage = (apiLandingPage: any): LandingPage => {
-  return {
-    id: apiLandingPage.id,
-    nombre: apiLandingPage.nombre,
-    descripcion: apiLandingPage.descripcion,
-    url: apiLandingPage.url || '',
-    formulario_id: apiLandingPage.formulario_id,
-    campania_id: apiLandingPage.campania_id || null,
-    fecha_creacion: apiLandingPage.created_at,
-    fecha_modificacion: apiLandingPage.updated_at,
-    estado: apiLandingPage.is_active ? 'activo' : 'inactivo',
-    visitas: 0,
-    conversiones: 0,
-    tasa_conversion: 0,
-    // Mantener campos originales
-    is_active: apiLandingPage.is_active,
-    created_at: apiLandingPage.created_at,
-    updated_at: apiLandingPage.updated_at,
-    empresa_id: apiLandingPage.empresa_id,
-    configuracion_seguimiento: apiLandingPage.configuracion_seguimiento
-  };
+// Interfaz local compatible con LandingPageType para mantener compatibilidad con componentes existentes
+interface LandingPage extends LandingPageType {
+  estado?: string;
+  fecha_creacion?: string;
+  fecha_modificacion?: string;
+  visitas?: number;
+  conversiones?: number;
+  tasa_conversion?: number;
 }
 
 const MarketingFormularios = () => {
@@ -210,8 +116,7 @@ const MarketingFormularios = () => {
   const isLoading = isLoadingForms || isLoadingLandings;
 
   // Formatear fecha
-  const formatDate = (dateString: string | undefined) => {
-    if (!dateString) return "";
+  const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return new Intl.DateTimeFormat("es-ES", {
       day: "2-digit",
@@ -221,30 +126,30 @@ const MarketingFormularios = () => {
   };
 
   // Manejar clic en formulario
-  const handleFormularioClick = (formulario: any) => {
-    setSelectedFormulario(mapApiToFormulario(formulario));
+  const handleFormularioClick = (formulario: Formulario) => {
+    setSelectedFormulario(formulario);
     setSelectedLandingPage(null);
     setShowIntegracion(false);
   };
 
   // Manejar clic en landing page
-  const handleLandingPageClick = (landingPage: any) => {
-    setSelectedLandingPage(mapApiToLandingPage(landingPage));
+  const handleLandingPageClick = (landingPage: LandingPage) => {
+    setSelectedLandingPage(landingPage);
     setSelectedFormulario(null);
     setShowIntegracion(false);
   };
 
   // Manejar clic en integración
-  const handleIntegracionClick = (formulario: any) => {
-    setSelectedIntegracionFormulario(mapApiToFormulario(formulario));
+  const handleIntegracionClick = (formulario: Formulario) => {
+    setSelectedIntegracionFormulario(formulario);
     setShowIntegracion(true);
     setSelectedFormulario(null);
     setSelectedLandingPage(null);
   };
 
   // Manejar edición de landing page
-  const handleEditLandingPage = (landingPage: any) => {
-    setSelectedLandingPage(mapApiToLandingPage(landingPage));
+  const handleEditLandingPage = (landingPage: LandingPage) => {
+    setSelectedLandingPage(landingPage);
   };
 
   // Manejar eliminación de landing page
@@ -273,10 +178,10 @@ const MarketingFormularios = () => {
     setShowIntegracion(false);
 
     // Obtener IDs de pipeline y stage para el formulario
-    // Usar valores reales de la base de datos
-    const defaultPipelineId = "c645af13-8a8b-4cd3-b52d-f67fcd7ef018";
-    // Usar el ID correcto del stage de la tabla stages
-    const defaultStageId = "1a0bc962-1fe3-43aa-a2b9-45f432f8a977";
+    // Usar valores predeterminados o solicitar al usuario que los seleccione
+    // En este caso usamos valores ficticios para prueba
+    const defaultPipelineId = "550e8400-e29b-41d4-a716-446655440000";
+    const defaultStageId = "550e8400-e29b-41d4-a716-446655440001";
     
     // Crear formulario con los datos requeridos por la API
     const nuevoFormulario = {
@@ -343,7 +248,6 @@ const MarketingFormularios = () => {
       nombre: "Nueva Landing Page",
       descripcion: "Descripción de la nueva landing page",
       formulario_id: formularios[0].id, // Asignar el primer formulario disponible por defecto
-      campania_id: "", // Campo vacío pero requerido por la API
       configuracion_seguimiento: {
         analytics: {
           gtm_id: "",
@@ -390,13 +294,13 @@ const MarketingFormularios = () => {
   };
 
   // Filtrar formularios basado en el término de búsqueda
-  const filteredFormularios = (formularios || [])?.filter(form => {
+  const filteredFormularios = formularios?.filter(form => {
     if (!searchTerm) return true;
     return (
       form.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
       form.descripcion.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  });
+  }) || [];
 
   // Filtrar landing pages basado en el término de búsqueda
   const filteredLandingPages = landingPages?.filter(landing => {
@@ -405,10 +309,7 @@ const MarketingFormularios = () => {
       landing.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
       landing.descripcion.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  });
-  
-  // Crear versiones adaptadas para la interfaz de los componentes
-  const adaptedLandingPages = filteredLandingPages?.map(landing => mapApiToLandingPage(landing)) || [];
+  }) || [];
 
   return (
     <div className="flex flex-col space-y-6 p-6">
@@ -582,7 +483,7 @@ const MarketingFormularios = () => {
                           </div>
                           <div className="flex justify-between text-sm">
                             <span className="text-muted-foreground">Última modificación:</span>
-                            <span className="font-medium">{formatDate(formulario.updated_at || formulario.fecha_modificacion)}</span>
+                            <span className="font-medium">{formatDate(formulario.updated_at || formulario.fecha_modificacion || new Date().toISOString())}</span>
                           </div>
                         </div>
                         <div className="mt-4">
@@ -620,7 +521,7 @@ const MarketingFormularios = () => {
                       </CardContent>
                     </Card>
                   ))
-                ) : adaptedLandingPages.length === 0 ? (
+                ) : filteredLandingPages.length === 0 ? (
                   <div className="col-span-3 text-center py-10">
                     <FileCode className="h-10 w-10 mx-auto text-muted-foreground" />
                     <h3 className="mt-4 text-lg font-medium">No se encontraron landing pages</h3>
@@ -638,8 +539,8 @@ const MarketingFormularios = () => {
                     </Button>
                   </div>
                 ) : (
-                  adaptedLandingPages.map((landingPage) => (
-                      <Card key={landingPage.id} className="overflow-hidden hover:shadow-md transition-shadow">
+                  filteredLandingPages.map((landingPage) => (
+                    <Card key={landingPage.id} className="overflow-hidden hover:shadow-md transition-shadow">
                       <CardHeader className="pb-2">
                         <div className="flex justify-between items-start">
                           <CardTitle className="text-lg">{landingPage.nombre}</CardTitle>
@@ -696,7 +597,7 @@ const MarketingFormularios = () => {
                           </div>
                           <div className="flex justify-between text-sm">
                             <span className="text-muted-foreground">Última modificación:</span>
-                            <span className="font-medium">{formatDate(landingPage.updated_at || landingPage.fecha_modificacion)}</span>
+                            <span className="font-medium">{formatDate(landingPage.updated_at || landingPage.fecha_modificacion || new Date().toISOString())}</span>
                           </div>
                         </div>
                         <div className="mt-4">
