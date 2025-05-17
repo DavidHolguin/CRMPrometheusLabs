@@ -37,17 +37,35 @@ interface Formulario {
 
 interface LandingPage {
   id: string;
+  empresa_id: string;
+  url: string;
   nombre: string;
   descripcion: string;
-  url: string;
   formulario_id: string;
-  campania_id: string | null;
-  fecha_creacion: string;
-  fecha_modificacion: string;
-  estado: string;
-  visitas: number;
-  conversiones: number;
-  tasa_conversion: number;
+  configuracion_seguimiento: {
+    analytics?: {
+      gtm_id?: string;
+      ga_id?: string;
+    };
+    social?: {
+      og_title?: string;
+      og_description?: string;
+      og_image?: string;
+      twitter_card?: string;
+    };
+    custom_scripts?: string[];
+    custom_styles?: string[];
+  };
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  // Campos para compatibilidad con el componente actual
+  estado?: string;
+  visitas?: number;
+  conversiones?: number;
+  tasa_conversion?: number;
+  fecha_creacion?: string;
+  fecha_modificacion?: string;
 }
 
 interface LandingPageDetailProps {
@@ -191,7 +209,7 @@ export function LandingPageDetail({ landingPage, formularios, onClose }: Landing
                             </div>
                             <div className="flex justify-between mb-1">
                               <span className="text-muted-foreground">Campos:</span>
-                              <span className="font-medium">{formularioAsociado.campos.length}</span>
+                              <span className="font-medium">{formularioAsociado.campos?.length || 0}</span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Tasa de conversión:</span>
@@ -327,7 +345,7 @@ export function LandingPageDetail({ landingPage, formularios, onClose }: Landing
                         <CardTitle className="text-sm font-medium text-muted-foreground">Total visitas</CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="text-2xl font-bold">{landingPage.visitas}</div>
+                        <div className="text-2xl font-bold">{landingPage.visitas || 0}</div>
                       </CardContent>
                     </Card>
                     <Card>
@@ -335,7 +353,7 @@ export function LandingPageDetail({ landingPage, formularios, onClose }: Landing
                         <CardTitle className="text-sm font-medium text-muted-foreground">Conversiones</CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="text-2xl font-bold">{landingPage.conversiones}</div>
+                        <div className="text-2xl font-bold">{landingPage.conversiones || 0}</div>
                       </CardContent>
                     </Card>
                     <Card>
@@ -343,7 +361,7 @@ export function LandingPageDetail({ landingPage, formularios, onClose }: Landing
                         <CardTitle className="text-sm font-medium text-muted-foreground">Tasa de conversión</CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="text-2xl font-bold">{landingPage.tasa_conversion}%</div>
+                        <div className="text-2xl font-bold">{landingPage.tasa_conversion || 0}%</div>
                       </CardContent>
                     </Card>
                   </div>
@@ -380,31 +398,24 @@ export function LandingPageDetail({ landingPage, formularios, onClose }: Landing
               <div>
                 <div className="text-sm font-medium">Estado</div>
                 <div className="mt-1">
-                  <Badge variant={landingPage.estado === "activo" ? "default" : "secondary"}>
-                    {landingPage.estado === "activo" ? "Activo" : "Inactivo"}
+                  <Badge variant={landingPage.is_active ? "default" : "secondary"}>
+                    {landingPage.is_active ? "Activo" : "Inactivo"}
                   </Badge>
                 </div>
               </div>
               <div>
                 <div className="text-sm font-medium">Fecha de creación</div>
                 <div className="text-sm text-muted-foreground mt-1">
-                  {new Date(landingPage.fecha_creacion).toLocaleDateString("es-ES")}
+                  {new Date(landingPage.created_at || landingPage.fecha_creacion || Date.now()).toLocaleDateString("es-ES")}
                 </div>
               </div>
               <div>
                 <div className="text-sm font-medium">Última modificación</div>
                 <div className="text-sm text-muted-foreground mt-1">
-                  {new Date(landingPage.fecha_modificacion).toLocaleDateString("es-ES")}
+                  {new Date(landingPage.updated_at || landingPage.fecha_modificacion || Date.now()).toLocaleDateString("es-ES")}
                 </div>
               </div>
-              {landingPage.campania_id && (
-                <div>
-                  <div className="text-sm font-medium">Campaña asociada</div>
-                  <div className="text-sm text-muted-foreground mt-1">
-                    ID: {landingPage.campania_id}
-                  </div>
-                </div>
-              )}
+              {/* Código para campaña asociada eliminado ya que no existe en el esquema */}
             </CardContent>
             <CardFooter className="flex flex-col space-y-2">
               <Button className="w-full">

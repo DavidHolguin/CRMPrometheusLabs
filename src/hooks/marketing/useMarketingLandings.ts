@@ -223,21 +223,20 @@ export const useMarketingLandings = (options: LandingPagesOptions = {}) => {
       // Generar URL única
       const url = await generateUniqueUrl(landing.nombre);
 
+      // Crear un objeto con solo los campos que existen en la tabla
+      const landingData = {
+        nombre: landing.nombre,
+        descripcion: landing.descripcion,
+        formulario_id: landing.formulario_id,
+        configuracion_seguimiento: landing.configuracion_seguimiento || {},
+        is_active: landing.is_active !== undefined ? landing.is_active : true,
+        empresa_id: userData.empresa_id,
+        url
+      };
+      
       const { data, error } = await supabase
         .from("landing_pages")
-        .insert([
-          {
-            ...landing,
-            empresa_id: userData.empresa_id,
-            url,
-            is_active: landing.is_active !== undefined ? landing.is_active : true,
-            fecha_creacion: new Date().toISOString(),
-            fecha_modificacion: new Date().toISOString(),
-            visitas: 0,
-            conversiones: 0,
-            tasa_conversion: 0
-          }
-        ])
+        .insert([landingData])
         .select()
         .single();
 
