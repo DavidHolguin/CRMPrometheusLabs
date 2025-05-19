@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { useMarketingForms } from "@/hooks/marketing/useMarketingForms";
+import { useFormularioCampos } from "@/hooks/marketing/useFormularioCampos";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -17,7 +18,8 @@ interface CampoFormulario {
   label: string;
   tipo: string;
   requerido: boolean;
-  opciones?: string[];
+  opciones?: string[] | string;
+  placeholder?: string;
 }
 
 interface CrearFormularioProps {
@@ -51,9 +53,76 @@ const CrearFormulario = ({ onClose, onSuccess, formularioExistente }: CrearFormu
   });
   const [isCreating, setIsCreating] = useState(false);
   const { createForm, updateForm } = useMarketingForms();
+  const { createCampo, updateCampo, deleteCampo, mapCamposToDBFormat } = useFormularioCampos(
+    formularioExistente?.id
+  );
   const { toast } = useToast();
 
-  // Generar ID u00fanico para nuevos campos
+  // Función para guardar los campos de un formulario
+  const guardarCamposFormulario = async (formularioId: string, campos: CampoFormulario[]) => {
+    try {
+      console.log("Iniciando guardado de campos para formulario:", formularioId);
+      console.log("Campos a guardar:", campos);
+      
+      // Convertir los campos al formato esperado por la base de datos
+      const camposDB = campos.map((campo, index) => {
+        // Procesamiento simplificado de opciones
+        let opcionesFormateadas = null;
+        
+        if (campo.opciones) {
+          if (typeof campo.opciones === 'string' && campo.opciones.trim() !== '') {
+            opcionesFormateadas = campo.opciones.split(',').map(opt => opt.trim());
+          } else if (Array.isArray(campo.opciones) && campo.opciones.length > 0) {
+            opcionesFormateadas = campo.opciones;
+          }
+        }
+        
+        const campoDB = {
+          formulario_id: formularioId,
+          nombre: campo.label.toLowerCase().replace(/\s+/g, '_'),
+          tipo: campo.tipo,
+          etiqueta: campo.label,
+          placeholder: campo.placeholder || '',
+          is_required: campo.requerido || false,
+          orden: index + 1, // Simplificamos a índice + 1
+          validacion_regex: null,
+          opciones: opcionesFormateadas,
+          is_active: true
+        };
+        
+        console.log("Campo preparado para DB:", campoDB);
+        return campoDB;
+      });
+      
+      // Crear cada campo individualmente con mejor manejo de errores
+      console.log("Iniciando creación de campos en la BD...");
+      for (let i = 0; i < camposDB.length; i++) {
+        const campo = camposDB[i];
+        console.log(`Creando campo ${i+1}/${camposDB.length}:`, campo.nombre);
+        
+        try {
+          const resultado = await createCampo.mutateAsync(campo);
+          console.log(`Campo ${campo.nombre} creado con éxito:`, resultado);
+        } catch (error) {
+          console.error(`Error al crear campo ${campo.nombre}:`, error);
+          // Continuamos con los siguientes campos en lugar de abortar todo el proceso
+          toast({
+            title: "Advertencia",
+            description: `Problema al crear el campo ${campo.etiqueta}. Intente nuevamente.`,
+            variant: "destructive"
+          });
+        }
+      }
+      
+      console.log("Proceso de guardado de campos completado");
+      return true;
+    } catch (error) {
+      console.error('Error general al guardar campos del formulario:', error);
+      throw error;
+    }
+  };
+
+  // Generar ID único para nuevos campos
   const generarId = () => {
     return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
   };
@@ -91,24 +160,37 @@ const CrearFormulario = ({ onClose, onSuccess, formularioExistente }: CrearFormu
     setCampos(campos.filter(campo => campo.id !== id));
   };
 
-  // Manejar el envu00edo del formulario
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Manejar el envío del formulario
+  const handleSubmit = async () => {
+    if (!nombre.trim()) {
+      toast({
+        title: "Error",
+        description: "El nombre del formulario es obligatorio.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (campos.length === 0) {
+      toast({
+        title: "Error",
+        description: "Debes agregar al menos un campo al formulario.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsCreating(true);
 
-    // Usar los IDs correctos para pipeline y stage
-    const pipelineId = "c645af13-8a8b-4cd3-b52d-f67fcd7ef018";
-    const stageId = "1a0bc962-1fe3-43aa-a2b9-45f432f8a977";
-    
+    // Solo incluimos los datos básicos del formulario
     const formularioData = {
       nombre,
       descripcion,
-      pipeline_id: pipelineId,
-      stage_id: stageId,
-      campos,
+      tipo: "contacto", // Tipo por defecto
       codigo_integracion: "",
       redirect_url: "",
       is_active: isActive
+      // Ya no incluimos 'campos' aquí porque debe guardarse en otra tabla
     };
 
     try {
@@ -117,13 +199,26 @@ const CrearFormulario = ({ onClose, onSuccess, formularioExistente }: CrearFormu
         updateForm.mutate(
           { id: formularioExistente.id, ...formularioData },
           {
-            onSuccess: (data) => {
+            onSuccess: async (data) => {
               toast({
                 title: "Formulario actualizado",
                 description: "Se ha actualizado el formulario correctamente."
               });
-              onSuccess(data.id);
-              setIsCreating(false);
+              
+              // Guardar los campos del formulario
+              try {
+                await guardarCamposFormulario(data.id, campos);
+                onSuccess(data.id);
+                setIsCreating(false);
+              } catch (error) {
+                console.error('Error al actualizar campos del formulario:', error);
+                toast({
+                  title: "Advertencia",
+                  description: "El formulario se actualizó, pero hubo un problema con los campos.",
+                  variant: "default"
+                });
+                setIsCreating(false);
+              }
             },
             onError: (error) => {
               console.error('Error al actualizar formulario:', error);
@@ -138,14 +233,34 @@ const CrearFormulario = ({ onClose, onSuccess, formularioExistente }: CrearFormu
         );
       } else {
         // Estamos creando un nuevo formulario
-        createForm.mutate(formularioData, {
-          onSuccess: (data) => {
+        createForm.mutate({
+          nombre,
+          descripcion,
+          tipo: "contacto", // Tipo por defecto
+          // Dejamos que el código de integración se genere automáticamente
+          redirect_url: "",
+          is_active: isActive
+        }, {
+          onSuccess: async (data) => {
             toast({
               title: "Formulario creado",
               description: "Se ha creado el formulario correctamente."
             });
-            onSuccess(data.id);
-            setIsCreating(false);
+            
+            // Manejar los campos del formulario
+            try {
+              await guardarCamposFormulario(data.id, campos);
+              onSuccess(data.id);
+              setIsCreating(false);
+            } catch (error) {
+              console.error('Error al crear campos del formulario:', error);
+              toast({
+                title: "Advertencia",
+                description: "El formulario se creó, pero hubo un problema con los campos.",
+                variant: "default"
+              });
+              setIsCreating(false);
+            }
           },
           onError: (error) => {
             console.error('Error al crear formulario:', error);

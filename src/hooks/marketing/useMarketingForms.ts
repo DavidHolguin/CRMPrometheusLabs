@@ -7,8 +7,6 @@ import { useToast } from "@/hooks/use-toast";
 export interface Formulario {
   id: string;
   empresa_id: string;
-  pipeline_id: string;
-  stage_id: string;
   nombre: string;
   descripcion: string;
   tipo: string;
@@ -35,8 +33,7 @@ export interface Formulario {
 export interface CreateFormularioInput {
   nombre: string;
   descripcion: string;
-  pipeline_id: string;
-  stage_id: string;
+  tipo?: string;
   codigo_integracion?: string;
   redirect_url?: string;
   is_active?: boolean;
@@ -46,8 +43,7 @@ export interface UpdateFormularioInput {
   id: string;
   nombre?: string;
   descripcion?: string;
-  pipeline_id?: string;
-  stage_id?: string;
+  tipo?: string;
   codigo_integracion?: string;
   redirect_url?: string;
   is_active?: boolean;
@@ -163,6 +159,13 @@ export const useMarketingForms = (options: FormulariosOptions = {}) => {
     enabled: !!user?.id
   });
 
+  // Generar cu00f3digo de integraciu00f3n u00fanico
+  const generateUniqueCode = () => {
+    const timestamp = Date.now().toString(36);
+    const randomStr = Math.random().toString(36).substring(2, 8);
+    return `form_${timestamp}_${randomStr}`;
+  };
+
   // Crear nuevo formulario
   const createForm = useMutation({
     mutationFn: async (form: CreateFormularioInput) => {
@@ -179,11 +182,16 @@ export const useMarketingForms = (options: FormulariosOptions = {}) => {
         throw new Error("No se pudo obtener la empresa del usuario");
       }
 
+      // Generar un cu00f3digo de integraciu00f3n u00fanico si no se proporciona uno
+      const codigo_integracion = form.codigo_integracion || generateUniqueCode();
+      console.log("Cu00f3digo de integraciu00f3n generado:", codigo_integracion);
+
       const { data, error } = await supabase
         .from("formularios")
         .insert([
           {
             ...form,
+            codigo_integracion,
             empresa_id: userData.empresa_id,
             is_active: form.is_active !== undefined ? form.is_active : true,
             created_at: new Date().toISOString(),
@@ -207,7 +215,7 @@ export const useMarketingForms = (options: FormulariosOptions = {}) => {
       console.error("Error al crear formulario:", error);
       toast({
         title: "Error",
-        description: "No se pudo crear el formulario",
+        description: "No se pudo crear el formulario: " + (error.message || 'Error desconocido'),
         variant: "destructive"
       });
     }
