@@ -12,11 +12,9 @@ import {
   MessagesSquare,
   Database,
   Link2,
-  Brain,
   UserCircle,
   ChevronDown,
-  ChevronUp,
-  Sparkles
+  ChevronUp
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { 
@@ -228,22 +226,7 @@ export function AppSidebar({ isMobileOpen, setIsMobileOpen }: AppSidebarProps) {
               isCollapsed={isCollapsed}
               onClick={handleLinkClick}
             />
-            <NavLink
-              to="/dashboard/agentes-ia"
-              icon={<Sparkles size={20} />}
-              label="Agentes IA"
-              isActive={location.pathname.includes("agentes-ia")}
-              isCollapsed={isCollapsed}
-              onClick={handleLinkClick}
-            />
-            <NavLink
-              to="/dashboard/entrenamiento-ia"
-              icon={<Brain size={20} />}
-              label="Entrenamiento IA"
-              isActive={location.pathname.includes("entrenamiento-ia")}
-              isCollapsed={isCollapsed}
-              onClick={handleLinkClick}
-            />
+
             <NavLink
               to="/dashboard/crm"
               icon={<Database size={20} />}

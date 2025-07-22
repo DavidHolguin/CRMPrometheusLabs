@@ -15,7 +15,6 @@ import {
 } from "@/components/ui/breadcrumb";
 
 // Importamos nuestros componentes
-import { MarketingNavigationMenu } from "@/components/marketing/MarketingNavigationMenu";
 import { UserProfileMenu } from "@/components/dashboard/UserProfileMenu";
 
 interface AppHeaderProps {
@@ -101,8 +100,7 @@ export function AppHeader({ toggleSidebar }: AppHeaderProps) {
         
         {/* Sección derecha: Menú de marketing, notificaciones, buscador y perfil de usuario */}
         <div className="flex items-center space-x-4">
-          {/* Menú de navegación de marketing (visible solo en pantallas grandes) */}
-          <MarketingNavigationMenu />
+
           
           {/* Botón de notificaciones */}
           <Button variant="outline" size="icon" className="relative">
