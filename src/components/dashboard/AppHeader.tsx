@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation, Link } from "react-router-dom";
-import { MenuIcon, Search, Bell } from "lucide-react";
+import { MenuIcon, Search, Bell, PanelLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -78,24 +78,15 @@ export function AppHeader({ toggleSidebar }: AppHeaderProps) {
             <span className="sr-only">Toggle Menu</span>
           </Button>
           
-          <div className="hidden md:flex items-center gap-2">
-            <Breadcrumb>
-              <BreadcrumbList>
-                {breadcrumbItems.map((item, index) => (
-                  <BreadcrumbItem key={index}>
-                    {item.isLast ? (
-                      <BreadcrumbPage>{item.name}</BreadcrumbPage>
-                    ) : (
-                      <BreadcrumbLink asChild>
-                        <Link to={item.path}>{item.name}</Link>
-                      </BreadcrumbLink>
-                    )}
-                    {!item.isLast && <BreadcrumbSeparator />}
-                  </BreadcrumbItem>
-                ))}
-              </BreadcrumbList>
-            </Breadcrumb>
-          </div>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={toggleSidebar} 
+            className="hidden md:flex"
+          >
+            <PanelLeft className="h-5 w-5" />
+            <span className="sr-only">Toggle Sidebar</span>
+          </Button>
         </div>
         
         {/* Sección derecha: Menú de marketing, notificaciones, buscador y perfil de usuario */}
