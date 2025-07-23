@@ -411,7 +411,7 @@ const LeadsPage = () => {
     <div className="flex flex-col h-full">
       {/* Header y filtros */}
       <div className="sticky top-0 z-40 bg-background border-b">
-        <div className="container mx-auto py-4">
+        <div className="px-6 py-4">
           <div className="flex justify-between items-center">
             <h1 className="text-2xl font-bold">Leads</h1>
             <div className="flex items-center gap-2">
@@ -699,7 +699,7 @@ const LeadsPage = () => {
       </div>
       
       {/* Contenido principal */}
-      <div className="flex-1 container mx-auto py-4">
+      <div className="flex-1 px-6 py-4">
         {isLoading ? (
           <div className="flex justify-center py-12">
             <div className="animate-pulse text-primary">Cargando leads...</div>
