@@ -238,7 +238,7 @@ export default function PerfilEmpresa() {
   }
 
   return (
-    <div className="container mx-auto p-6">
+    <div className="px-6 py-6">
       <div className="flex flex-col gap-6">
         <div>
           <h1 className="text-3xl font-bold">Perfil de Empresa</h1>

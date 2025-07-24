@@ -242,7 +242,7 @@ Nos complace darte la bienvenida a nuestra plataforma. Tu cuenta ha sido creada 
   };
 
   return (
-    <div className="container py-6 space-y-6">
+    <div className="px-6  py-6 space-y-6">
       <div className="flex flex-col space-y-2 md:flex-row md:items-center md:justify-between md:space-y-0">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Agentes Humanos</h2>

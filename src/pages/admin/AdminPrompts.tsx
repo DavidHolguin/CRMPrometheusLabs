@@ -406,7 +406,7 @@ export default function AdminPrompts() {
   };
 
   return (
-    <div className="container py-6 space-y-6">
+    <div className="px-6 py-6 space-y-6">
       {/* Encabezado de página con título y botón de nueva plantilla */}
       <div className="flex flex-col space-y-2 md:flex-row md:items-center md:justify-between md:space-y-0">
         <div>

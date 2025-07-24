@@ -43,7 +43,7 @@ export function AdminNavbar() {
 
   return (
     <div className="sticky z-30 border-b border-muted bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <nav className="container flex h-12 items-center px-4">
+      <nav className="flex h-12 items-center px-4">
         <ul className="flex gap-4 text-sm overflow-x-auto">
           {navItems.map((item) => (
             <li key={item.href}>
