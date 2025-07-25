@@ -228,7 +228,7 @@ const ChatbotConfig = () => {
 
   if (error || !chatbot) {
     return (
-      <div className="container mx-auto py-10">
+      <div className="px-6 py-6">
         <div className="text-center">
           <h2 className="text-2xl font-bold mb-2">Error al cargar el chatbot</h2>
           <p className="text-muted-foreground mb-4">
@@ -246,7 +246,7 @@ const ChatbotConfig = () => {
   const hasUnsavedChanges = Object.values(unsavedChanges).some(Boolean);
 
   return (
-    <div className="container mx-auto">
+    <div className="px-6 py-6">
       {/* Header más compacto pegado al header principal */}
       <div className="flex items-center justify-between py-3 border-b sticky top-0 bg-background z-10">
         <div className="flex items-center gap-2">
