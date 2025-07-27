@@ -108,33 +108,90 @@ export function useMessages(conversationId: string | undefined) {
     };
   }, [conversationId, queryClient]);
 
-  // Función para enviar un mensaje
-  const sendMessage = async (content: string, metadata?: any) => {
+  // Función para enviar un mensaje usando el endpoint API
+  const sendMessage = async (
+    content: string, 
+    directMessageParamsOrMetadata?: {
+      agent_id: string;
+      lead_id: string;
+      chatbot_canal_id?: string;
+      channel_id?: string;
+      channel_identifier?: string;
+      chatbot_id?: string;
+      empresa_id?: string;
+      metadata?: any;
+    } | any
+  ) => {
     if (!conversationId) return null;
     
     try {
-      const newMessage = {
-        conversacion_id: conversationId,
-        contenido: content,
-        origen: 'agente', // Asumiendo que el contexto de uso es para un agente
-        metadata
-      };
-      
-      const { data, error } = await supabase
-        .from('mensajes')
-        .insert(newMessage)
-        .select()
-        .single();
+      // Si tenemos parámetros para mensaje directo, usar el endpoint API
+      if (directMessageParamsOrMetadata && typeof directMessageParamsOrMetadata === 'object' && directMessageParamsOrMetadata.agent_id) {
+        // Usar siempre la URL correcta de Railway para el endpoint de mensajes directos
+        const apiEndpoint = 'https://web-production-01457.up.railway.app';
         
-      if (error) {
-        console.error("Error al enviar mensaje:", error);
-        throw error;
+        const requestBody = {
+          agent_id: directMessageParamsOrMetadata.agent_id,
+          lead_id: directMessageParamsOrMetadata.lead_id,
+          mensaje: content,
+          chatbot_canal_id: directMessageParamsOrMetadata.chatbot_canal_id || '',
+          channel_id: directMessageParamsOrMetadata.channel_id || '',
+          channel_identifier: directMessageParamsOrMetadata.channel_identifier || '',
+          chatbot_id: directMessageParamsOrMetadata.chatbot_id || '',
+          empresa_id: directMessageParamsOrMetadata.empresa_id || '',
+          metadata: directMessageParamsOrMetadata.metadata || {}
+        };
+        
+        console.log('Enviando mensaje directo con parámetros:', requestBody);
+        
+        const response = await fetch(`${apiEndpoint}/api/v1/agent/direct-message`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody)
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ detail: 'Error desconocido' }));
+          console.error('Error en respuesta del API:', errorData);
+          throw new Error(`Error ${response.status}: ${errorData.detail || 'Error al enviar mensaje'}`);
+        }
+        
+        const data = await response.json();
+        console.log('Respuesta del API:', data);
+        
+        // Invalidar la query de mensajes para refrescar la lista
+        queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
+        
+        return data;
+      } else {
+        // Fallback: inserción directa en Supabase (para compatibilidad)
+        console.log('Usando fallback: inserción directa en Supabase');
+        
+        const newMessage = {
+          conversacion_id: conversationId,
+          contenido: content,
+          origen: 'agente',
+          metadata: directMessageParamsOrMetadata || {}
+        };
+        
+        const { data, error } = await supabase
+          .from('mensajes')
+          .insert(newMessage)
+          .select()
+          .single();
+          
+        if (error) {
+          console.error("Error al enviar mensaje:", error);
+          throw error;
+        }
+        
+        return data;
       }
-      
-      return data;
     } catch (err) {
       console.error("Error en sendMessage:", err);
-      return null;
+      throw err;
     }
   };
   

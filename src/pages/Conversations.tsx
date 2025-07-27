@@ -641,14 +641,48 @@ const ConversationsPage = () => {
     if (!messageText.trim() || !conversationId) return;
     
     try {
-      // Si tenemos chatbotCanalId, lo pasamos como parámetro adicional
-      if (chatbotCanalId) {
-        console.log(`Enviando mensaje con chatbot_canal_id: ${chatbotCanalId}`);
+      // Capturar todos los parámetros requeridos para el endpoint /api/v1/agent/direct-message
+      const directMessageParams = {
+        agent_id: user?.id || '', // ID del agente actual
+        lead_id: selectedConversation?.lead_id || selectedLeadId || '', // ID del lead
+        chatbot_canal_id: chatbotCanalId || selectedConversation?.canal_id || '', // Canal del chatbot
+        channel_id: selectedConversation?.canal_id || '', // ID del canal
+        channel_identifier: selectedConversation?.canal_nombre || '', // Identificador del canal
+        chatbot_id: selectedConversation?.chatbot_id || '', // ID del chatbot
+        empresa_id: user?.companyId || '', // ID de la empresa desde user.companyId
+        metadata: {
+          conversation_id: conversationId,
+          timestamp: new Date().toISOString(),
+          source: 'dashboard_conversations',
+          ...(chatbotCanalId && { original_chatbot_canal_id: chatbotCanalId })
+        }
+      };
+      
+      console.log('Enviando mensaje directo con parámetros:', {
+        ...directMessageParams,
+        mensaje: messageText
+      });
+      
+      // Validar que tenemos los parámetros mínimos requeridos
+      if (!directMessageParams.agent_id) {
+        throw new Error('No se pudo obtener el ID del agente');
       }
-      await sendMessage(messageText, chatbotCanalId);
+      
+      if (!directMessageParams.lead_id) {
+        throw new Error('No se pudo obtener el ID del lead');
+      }
+      
+      await sendMessage(messageText, directMessageParams);
+      
+      toast.success('Mensaje enviado correctamente');
+      
     } catch (error) {
       console.error("Error al enviar mensaje:", error);
-      toast.error("No se pudo enviar el mensaje. Intente de nuevo.");
+      
+      // Mostrar error más específico si está disponible
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+      toast.error(`No se pudo enviar el mensaje: ${errorMessage}`);
+      
       throw error;
     }
   };
