@@ -94,11 +94,8 @@ export const App = () => {
           <Route index element={<Navigate to="/dashboard/crm" replace />} />
           <Route path="leads" element={<Leads />} />
           <Route path="crm" element={<PipelineManagement />} />
-          <Route path="canales" element={<Canales />} />
           <Route path="conversations" element={<Conversations />} />
           <Route path="conversations/:conversationId" element={<Conversations />} />
-          <Route path="chatbots" element={<Chatbots />} />
-          <Route path="chatbots/:chatbotId/settings" element={<ChatbotConfig />} />
           <Route path="entrenamiento-ia" element={<EntrenamientoIA />} />
           <Route path="agentes-ia" element={<AgentesIA />} />
           <Route path="agentes-ia/:agenteId/edit" element={<EditAgenteIA />} />
@@ -127,6 +124,9 @@ export const App = () => {
             <Route path="admin/llm" element={<AdminLLM />} />
             <Route path="admin/prompts" element={<AdminPrompts />} />
             <Route path="admin/leads" element={<AdminLeads />} />
+            <Route path="chatbots" element={<Chatbots />} />
+            <Route path="chatbots/:chatbotId/settings" element={<ChatbotConfig />} />
+            <Route path="canales" element={<Canales />} />
           </Route>
         </Route>
 

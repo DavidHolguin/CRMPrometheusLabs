@@ -1,19 +1,13 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { 
-  ChevronLeft, 
-  ChevronRight, 
   LayoutDashboard, 
-  MessageSquare, 
   Settings, 
   Users,
   Building,
   LogOut,
   MessagesSquare,
-  Database,
-  Link2,
   UserCircle,
-  ChevronDown,
   ChevronUp
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -168,12 +162,12 @@ export function AppSidebar({ isMobileOpen, setIsMobileOpen }: AppSidebarProps) {
         <Separator />
 
         <SidebarContent className="flex-1 px-3 py-4">
-          <nav className="flex flex-col gap-1">
+          <nav className="flex flex-col gap-1 p-2">
             <NavLink
-              to="/dashboard"
+              to="/dashboard/crm"
               icon={<LayoutDashboard size={20} />}
-              label="Dashboard"
-              isActive={location.pathname === "/dashboard"}
+              label="CRM"
+              isActive={location.pathname.includes("crm")}
               isCollapsed={isCollapsed}
               onClick={handleLinkClick}
             />
@@ -187,45 +181,12 @@ export function AppSidebar({ isMobileOpen, setIsMobileOpen }: AppSidebarProps) {
             />
             <NavLink
               to="/dashboard/conversations"
-              icon={<MessageSquare size={20} />}
+              icon={<MessagesSquare size={20} />}
               label="Conversaciones"
               isActive={location.pathname.includes("conversations")}
               isCollapsed={isCollapsed}
               onClick={handleLinkClick}
-              badge={3}
-            />
-            <NavLink
-              to="/dashboard/chatbots"
-              icon={<MessagesSquare size={20} />}
-              label="Chatbots"
-              isActive={location.pathname.includes("chatbots")}
-              isCollapsed={isCollapsed}
-              onClick={handleLinkClick}
-            />
-
-            <NavLink
-              to="/dashboard/crm"
-              icon={<Database size={20} />}
-              label="CRM"
-              isActive={location.pathname.includes("crm")}
-              isCollapsed={isCollapsed}
-              onClick={handleLinkClick}
-            />
-            <NavLink
-              to="/dashboard/canales"
-              icon={<Link2 size={20} />}
-              label="Integraciones"
-              isActive={location.pathname.includes("canales")}
-              isCollapsed={isCollapsed}
-              onClick={handleLinkClick}
-            />
-            <NavLink
-              to="/dashboard/settings"
-              icon={<Settings size={20} />}
-              label="Configuración"
-              isActive={location.pathname.includes("settings")}
-              isCollapsed={isCollapsed}
-              onClick={handleLinkClick}
+              badge={5}
             />
           </nav>
         </SidebarContent>
@@ -313,10 +274,11 @@ function NavLink({
       to={to}
       onClick={onClick}
       className={cn(
-        "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+        "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
         isActive
           ? "bg-accent text-accent-foreground"
-          : "text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground"
+          : "text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground",
+        isCollapsed && "justify-center"
       )}
     >
       <span
@@ -328,7 +290,7 @@ function NavLink({
         {icon}
       </span>
       {!isCollapsed && (
-        <span className="flex-1 truncate">{label}</span>
+        <span className="flex-1 truncate transition-opacity duration-200 ease-in-out opacity-100">{label}</span>
       )}
       {!isCollapsed && badge && (
         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground">

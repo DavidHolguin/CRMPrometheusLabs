@@ -405,7 +405,7 @@ const PipelineManagement = () => {
                     </Button>
                   )}
 
-                  <div className="flex h-full w-full gap-6 transition-transform duration-300 pb-2">
+                  <div className="flex h-full w-full gap-2 transition-transform duration-300 pb-2">
                     {visibleStageData.map((stage) => (
                       <div key={stage.id} className="flex-1 min-w-0 max-w-[380px] kanban-column">
                         <StageCard 
