@@ -17,7 +17,7 @@ const Login = () => {
   
   // Redirect if already authenticated
   if (session) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/dashboard/crm" replace />;
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
