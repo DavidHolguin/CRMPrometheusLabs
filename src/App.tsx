@@ -71,7 +71,7 @@ export const App = () => {
     <TooltipProvider>
       <Routes>
         {/* Index Route */}
-        <Route path="/" element={<Index />} />
+        <Route path="/" element={<Navigate to="/dashboard/crm" replace />} />
 
         {/* Auth routes */}
         <Route element={<AuthLayout />}>
@@ -91,7 +91,7 @@ export const App = () => {
 
         {/* Dashboard routes */}
         <Route path="/dashboard" element={<DashboardLayout />}>
-          <Route index element={<Dashboard />} />
+          <Route index element={<Navigate to="/dashboard/crm" replace />} />
           <Route path="leads" element={<Leads />} />
           <Route path="crm" element={<PipelineManagement />} />
           <Route path="canales" element={<Canales />} />
